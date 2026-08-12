@@ -56,10 +56,14 @@ Route::middleware([
     Route::post('/signature/store/{carPosition}', [CarPositionController::class, 'signaturestore'])->name('signature.store');
 });
 
+// Correction WEB-C-1 : ajout de 'role:1' (Admin uniquement) — auparavant
+// n'importe quel compte actif (Agent, Autorité...) pouvait créer ou
+// promouvoir un compte Admin en atteignant ces routes directement.
 Route::middleware([
     'auth:sanctum', 'isActived',
     config('jetstream.auth_session'),
     'verified',
+    'role:1',
 ])->group(function () {
     Route::get('/dashboard/comptes/ajouter', [UserController::class, 'ajouter'])->name('ajouter');
     Route::get('/dashboard/comptes/admin', [UserController::class, 'admin'])->name('admin');

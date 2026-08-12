@@ -54,6 +54,8 @@ class Kernel extends HttpKernel
      */
     protected $middlewareAliases = [
         'isActived' => \App\Http\Middleware\IsActiveMiddleware::class,
+        // Correction WEB-C-1 : contrôle de rôle sur la gestion des comptes
+        'role' => \App\Http\Middleware\EnsureUserHasRole::class,
         'auth' => \App\Http\Middleware\Authenticate::class,
         'auth.basic' => \Illuminate\Auth\Middleware\AuthenticateWithBasicAuth::class,
         'auth.session' => \Illuminate\Session\Middleware\AuthenticateSession::class,
