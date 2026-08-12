@@ -144,7 +144,12 @@ return [
     */
 
     'features' => [
-        Features::registration(),
+        // Correction WEB-C-2 : l'auto-inscription publique n'a pas sa place
+        // sur un back-office interne — les comptes sont créés par un Admin
+        // via /dashboard/comptes/ajouter (désormais protégé par WEB-C-1).
+        // Le formulaire /register était en plus déjà cassé (la table users
+        // n'a pas de colonne `name`), mais restait joignable publiquement.
+        // Features::registration(),
         Features::resetPasswords(),
         // Features::emailVerification(),
         Features::updateProfileInformation(),
