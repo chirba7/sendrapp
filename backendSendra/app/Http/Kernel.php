@@ -65,5 +65,7 @@ class Kernel extends HttpKernel
         // Added JWT authentication middleware
         'jwt.auth' => \Tymon\JWTAuth\Http\Middleware\Authenticate::class,
         'jwt.refresh' => \Tymon\JWTAuth\Http\Middleware\RefreshToken::class,
+        // Correction API-C-3 : contrôle de rôle sur les routes métier
+        'role' => \App\Http\Middleware\EnsureUserHasRole::class,
     ];
 }

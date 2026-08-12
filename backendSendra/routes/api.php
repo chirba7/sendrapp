@@ -41,35 +41,43 @@ Route::middleware('jwt.auth')->group(function () {
     Route::post('/refresh', [AuthControllerApi::class, 'refresh']);
     Route::post('/me', [AuthControllerApi::class, 'me']);
     Route::post('/delete-user', [AuthControllerApi::class, 'deleteUser']);
-    // Signalement routes
-    Route::get('/listerSignalements', [CarPositionController::class, 'listerSignalements']);
-    Route::get('/listerSignalement/{carPosition}', [CarPositionController::class, 'listerSignalement']);
+
+    // Signalement routes ouvertes à tout citoyen connecté (auto-scopées à
+    // son propre compte côté contrôleur : store()/voirSignalements()).
     Route::get('/voirSignalements', [CarPositionController::class, 'voirSignalements']);
     Route::post('/faireSignalement', [CarPositionController::class, 'store']);
-    Route::delete('/supprimerSignalement/{carPosition}', [CarPositionController::class, 'destroy']);
 
-    // Vehicule routes
-    Route::put('/vehicule/{carPosition}', [VehiculeController::class, 'update']);
-    Route::get('/vehicule/{carPosition}', [VehiculeController::class, 'show']);
-    Route::get('/vehicule', [VehiculeController::class, 'index']);
+    // Correction API-C-3 : routes "métier" réservées au personnel
+    // (Admin=1, Agent=2, Autorité commune=3, Autorité préfecture=4).
+    // Auparavant accessibles à n'importe quel citoyen auto-inscrit (role_id=5).
+    Route::middleware('role:1,2,3,4')->group(function () {
+        Route::get('/listerSignalements', [CarPositionController::class, 'listerSignalements']);
+        Route::get('/listerSignalement/{carPosition}', [CarPositionController::class, 'listerSignalement']);
+        Route::delete('/supprimerSignalement/{carPosition}', [CarPositionController::class, 'destroy']);
 
-    // Infraction routes
-    Route::get('/infraction', [InfractionController::class, 'index']);
-    Route::get('/infraction/{carPosition}', [InfractionController::class, 'show']);
-    Route::put('/infraction/{carPosition}', [InfractionController::class, 'update']);
+        // Vehicule routes
+        Route::put('/vehicule/{carPosition}', [VehiculeController::class, 'update']);
+        Route::get('/vehicule/{carPosition}', [VehiculeController::class, 'show']);
+        Route::get('/vehicule', [VehiculeController::class, 'index']);
 
-    // Approbation routes
-    Route::put('/soumettreApprobation/{carPosition}', [ApprobationController::class, 'soumettreApprobation']);
-    Route::get('/motifsApprobation/{carPosition}', [ApprobationController::class, 'motifsApprobation']);
+        // Infraction routes
+        Route::get('/infraction', [InfractionController::class, 'index']);
+        Route::get('/infraction/{carPosition}', [InfractionController::class, 'show']);
+        Route::put('/infraction/{carPosition}', [InfractionController::class, 'update']);
 
-    // Enlevement routes
-    Route::put('/enlevement/{carPosition}', [EnlevementController::class, 'ajouterEnlevement']);
-    Route::get('/enlevement/{carPosition}', [EnlevementController::class, 'obtenirEnlevement']);
+        // Approbation routes
+        Route::put('/soumettreApprobation/{carPosition}', [ApprobationController::class, 'soumettreApprobation']);
+        Route::get('/motifsApprobation/{carPosition}', [ApprobationController::class, 'motifsApprobation']);
 
-    // Dommages routes
-    Route::put('/enregistrerDommages/{carPosition}', [DommagesController::class, 'enregistrerDommages']);
-    Route::get('/voirDommages/{vehicleId}', [DommagesController::class, 'voirDommages']);
+        // Enlevement routes
+        Route::put('/enlevement/{carPosition}', [EnlevementController::class, 'ajouterEnlevement']);
+        Route::get('/enlevement/{carPosition}', [EnlevementController::class, 'obtenirEnlevement']);
 
-    // Statistiques
-    Route::get('/statistiques', [CarPositionController::class, 'statistiques']);
+        // Dommages routes
+        Route::put('/enregistrerDommages/{carPosition}', [DommagesController::class, 'enregistrerDommages']);
+        Route::get('/voirDommages/{vehicleId}', [DommagesController::class, 'voirDommages']);
+
+        // Statistiques
+        Route::get('/statistiques', [CarPositionController::class, 'statistiques']);
+    });
 });
