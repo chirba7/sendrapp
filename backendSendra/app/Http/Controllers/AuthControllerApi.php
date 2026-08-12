@@ -67,8 +67,8 @@ class AuthControllerApi extends Controller
             'security_key' => 'required|string',        // New field for comparison
         ]);
 
-        // Security key for comparison
-        $expectedKey = 'Sendra@2025!'; // Replace this with your secure key
+        // Security key for comparison (voir config/services.php — API-C-5)
+        $expectedKey = config('services.mobile_security_key');
 
         // Compare the security key
         if ($request->security_key !== $expectedKey) {
@@ -108,8 +108,8 @@ class AuthControllerApi extends Controller
             'security_key' => 'required|string',        // New field for comparison
         ]);
 
-        // Security key for comparison
-        $expectedKey = 'Sendra@2025!'; // Replace this with your secure key
+        // Security key for comparison (voir config/services.php — API-C-5)
+        $expectedKey = config('services.mobile_security_key');
 
         // Compare the security key
         if ($request->security_key !== $expectedKey) {
@@ -292,18 +292,14 @@ class AuthControllerApi extends Controller
 
     public function deleteUser(Request $request)
     {
-        $request->validate([
-            'telephone' => 'required|string|exists:users,telephone',
-        ]);
-    
-        $user = User::where('telephone', $request->telephone)->first();
-    
-        if (!$user) {
-            return response()->json(['message' => 'Utilisateur non trouvé.'], 404);
-        }
-    
+        // Correction API-C-2 : ne supprime plus que le compte de l'appelant
+        // authentifié. L'ancienne version acceptait un `telephone` arbitraire
+        // dans la requête et supprimait CE compte, permettant à n'importe
+        // quel utilisateur connecté de supprimer le compte de n'importe qui.
+        $user = Auth::user();
+
         $user->delete();
-    
+
         return response()->json(['message' => 'Utilisateur supprimé avec succès.']);
     }
     
