@@ -1,0 +1,310 @@
+<?php
+
+namespace App\Http\Controllers;
+
+
+
+use Illuminate\Support\Facades\Auth;
+use App\Http\Controllers\Controller;
+use App\Http\Requests\RegisterRequest;
+use App\Models\User;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Hash;
+
+use App\Services\OrangeSmsService;
+use App\Models\UserVerificationCode;
+
+class AuthControllerApi extends Controller
+{
+    /**
+     * Create a new AuthController instance.
+     *
+     * @return void
+     */
+    protected $smsService;
+
+    public function __construct(OrangeSmsService $smsService=null)
+    {
+        $this->middleware('auth:api', ['except' => ['login', 'register', 'sendVerificationCode', 'verifyCode','checkPhone']]);
+        $this->smsService = $smsService;
+    }
+
+    /**
+ * Connexion de l'utilisateur
+ *
+ * Cette API permet à un utilisateur de se connecter en fournissant son numéro de téléphone et son mot de passe.
+ *
+ * @group Authentification
+ * @bodyParam telephone string requis Le numéro de téléphone de l'utilisateur. Exemple: 774208140
+ * @bodyParam password string requis Le mot de passe de l'utilisateur. Exemple: motdepasse123
+ * @response 200 {
+ *   "success": true,
+ *   "token": "eyJhbGciOiJIUzI1...",
+ *   "id": 1,
+ *   "fullName": "John Doe",
+ *   "phone": "774208140",
+ *   "token_type": "bearer"
+ * }
+ * @response 401 {
+ *   "error": "Non autorisé"
+ * }
+ */
+    public function login()
+    {
+        $credentials = request(['telephone', 'password']);
+
+        if (!$token = auth()->attempt($credentials)) {
+            return response()->json(['error' => 'Unauthorized'], 401);
+        }
+
+        return $this->respondWithToken($token);
+    }
+
+    public function checkPhone(Request $request)
+    {
+        $request->validate([
+            'telephone' => 'required|regex:/^\d{9}$/', // Phone number format validation
+            'security_key' => 'required|string',        // New field for comparison
+        ]);
+
+        // Security key for comparison
+        $expectedKey = 'Sendra@2025!'; // Replace this with your secure key
+
+        // Compare the security key
+        if ($request->security_key !== $expectedKey) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Clé de sécurité invalide.',
+            ], 403); // 403 Forbidden
+        }
+
+        $phoneExists = User::where('telephone', $request->telephone)->exists();
+
+        return response()->json([
+            'exists' => $phoneExists
+        ], 200);
+    }
+
+    /**
+ * Envoyer un code de vérification
+ *
+ * Cette API envoie un code de vérification au numéro de téléphone de l'utilisateur.
+ *
+ * @group Authentification
+ * @bodyParam telephone string requis Le numéro de téléphone auquel envoyer le code de vérification. Exemple: 774208140
+ * @response 200 {
+ *   "success": true,
+ *   "message": "Code de vérification envoyé avec succès."
+ * }
+ * @response 400 {
+ *   "success": false,
+ *   "message": "Échec de l'envoi du code de vérification."
+ * }
+ */
+    public function sendVerificationCode(Request $request)
+    {
+        $request->validate([
+            'telephone' => 'required|regex:/^\d{9}$/', // Phone number format validation
+            'security_key' => 'required|string',        // New field for comparison
+        ]);
+
+        // Security key for comparison
+        $expectedKey = 'Sendra@2025!'; // Replace this with your secure key
+
+        // Compare the security key
+        if ($request->security_key !== $expectedKey) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Clé de sécurité invalide.',
+            ], 403); // 403 Forbidden
+        }
+       
+
+        $verificationCode = rand(100000, 999999); // Generate a 6-digit code
+
+        // Save or update the verification code
+        UserVerificationCode::updateOrCreate(
+            ['phone' => $request->telephone],
+            [
+                'code' => $verificationCode,
+                'expires_at' => now()->addMinutes(10), // Code expires in 10 minutes
+            ]
+        );
+
+        // Send the code via SMS
+        $this->smsService->sendSms(
+            'Code de vérification',
+            'EPAVIE',
+            '221'.$request->telephone,
+            "Votre code de vérification est: $verificationCode"
+        );
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Code de vérification envoyé.',
+        ]);
+    }
+
+
+    /**
+ * Vérifier le code
+ *
+ * Cette API permet de vérifier le code envoyé au numéro de téléphone de l'utilisateur.
+ *
+ * @group Authentification
+ * @bodyParam telephone string requis Le numéro de téléphone à vérifier. Exemple: 774208140
+ * @bodyParam code string requis Le code de vérification envoyé à l'utilisateur. Exemple: 123456
+ * @response 200 {
+ *   "success": true,
+ *   "message": "Vérification réussie."
+ * }
+ * @response 400 {
+ *   "success": false,
+ *   "message": "Code de vérification invalide ou expiré."
+ * }
+ */
+    public function verifyCode(Request $request)
+    {
+        $request->validate([
+            'telephone' => 'required|regex:/^\d{9}$/',
+            'code' => 'required|digits:6',
+        ]);
+
+        $verification = UserVerificationCode::where('phone', $request->telephone)->first();
+
+        if (!$verification) {
+            return response()->json(['success' => false,
+            'message' => 'Numéro de téléphone invalide.'], 404);
+        }
+
+        if ($verification->isExpired()) {
+            return response()->json(['success' => false,
+            'message' => 'Le code vérification a expiré.'], 400);
+        }
+
+        if ($verification->code !== $request->code) {
+            return response()->json(['success' => false,
+            'message' => 'Le code de vérification est invalide.'], 400);
+        }
+        
+        // Verification successful
+        return response()->json(['success' => true,
+        'message' => 'Vérifié avec succés.'], 200);
+    }
+
+
+    /**
+ * Inscription d'un utilisateur
+ *
+ * Cette API permet à un nouvel utilisateur de s'inscrire en fournissant ses informations personnelles.
+ *
+ * @group Authentification
+ * @bodyParam first_name string requis Le prénom de l'utilisateur. Exemple: Jean
+ * @bodyParam last_name string requis Le nom de famille de l'utilisateur. Exemple: Dupont
+ * @bodyParam telephone string requis Le numéro de téléphone de l'utilisateur. Exemple: 774208140
+ * @bodyParam password string requis Le mot de passe de l'utilisateur. Exemple: motdepasse123
+ * @response 200 {
+ *   "success": true,
+ *   "message": "Utilisateur enregistré avec succès."
+ * }
+ */
+    public function register(RegisterRequest $request)
+    {
+        $request->validate([
+            'telephone' => 'required|regex:/^\d{9}$/',
+            'first_name' => 'required|string|max:50',
+            'last_name' => 'required|string|max:50',
+            'password' => 'required|string|min:6',
+        ]);
+
+        // Check if the phone number is verified
+        $verification = UserVerificationCode::where('phone', $request->telephone)->first();
+
+        if (!$verification || $verification->isExpired()) {
+            return response()->json(['message' => 'Phone number is not verified or the verification code has expired.'], 400);
+        }
+
+        // Create the user
+        $user = new User();
+        $user->first_name = $request->first_name;
+        $user->last_name = $request->last_name;
+        $user->telephone = $request->telephone;
+        $user->role_id = 5; // Default role
+        $user->password = Hash::make($request->password);
+        $user->save();
+
+        // Delete the verification record after successful registration
+        $verification->delete();
+
+        return response()->json(['message' => 'Registration successful.']);
+    }
+
+    /**
+     * Get the authenticated User.
+     *
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function me()
+    {
+        return response()->json(auth()->user());
+    }
+
+    /**
+     * Log the user out (Invalidate the token).
+     *
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function logout()
+    {
+        auth()->logout();
+
+        return response()->json(['message' => 'Successfully logged out']);
+    }
+
+    /**
+     * Refresh a token.
+     *
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function refresh()
+    {
+        return $this->respondWithToken(auth()->refresh());
+    }
+
+    /**
+     * Get the token array structure.
+     *
+     * @param  string $token
+     *
+     * @return \Illuminate\Http\JsonResponse
+     */
+    protected function respondWithToken($token)
+    {
+        return response()->json([
+            'success' => true,
+            'token' => $token,
+            'id' => Auth::user()->id,
+            'fullName' => Auth::user()->first_name . " " . Auth::user()->last_name,
+            'phone' => Auth::user()->telephone,
+            'token_type' => 'bearer',
+        ]);
+    }
+
+    public function deleteUser(Request $request)
+    {
+        $request->validate([
+            'telephone' => 'required|string|exists:users,telephone',
+        ]);
+    
+        $user = User::where('telephone', $request->telephone)->first();
+    
+        if (!$user) {
+            return response()->json(['message' => 'Utilisateur non trouvé.'], 404);
+        }
+    
+        $user->delete();
+    
+        return response()->json(['message' => 'Utilisateur supprimé avec succès.']);
+    }
+    
+}
