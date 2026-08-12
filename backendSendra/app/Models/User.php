@@ -10,6 +10,15 @@ class User extends Authenticatable implements JWTSubject
 {
     use Notifiable;
 
+    // Correction API-C-4 : empêche /me (et toute sérialisation JSON de
+    // User) de renvoyer le hash du mot de passe et les secrets 2FA.
+    protected $hidden = [
+        'password',
+        'remember_token',
+        'two_factor_secret',
+        'two_factor_recovery_codes',
+    ];
+
     // Rest omitted for brevity
 
     /**
