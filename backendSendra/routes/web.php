@@ -18,12 +18,3 @@ Route::get('/', function () {
     abort(403, 'Forbidden');
 });
 
-Route::get('/test-env', function () {
-    return response()->json([
-        'login' => env('ORANGE_SMS_LOGIN'),
-        'token' => env('ORANGE_SMS_TOKEN'),
-        'api_key' => env('ORANGE_SMS_API_KEY'),
-        'base_uri' => env('ORANGE_SMS_BASE_URI'),
-    ]);
-});
-
