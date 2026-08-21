@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:walletium/views/screens/vehicule_screen.dart';
 import '../../utils/strings.dart';
-import 'approbation_screen.dart';
 import 'carto.dart';
 import 'dommages_screen.dart';
 import 'enlevement_screen.dart';
@@ -251,19 +250,53 @@ class _DepositMoneyDetailsScreenState extends State<DepositMoneyDetailsScreen> {
   }
 
   Widget _buildContent(Map<String, dynamic> signalementData) {
-    return SingleChildScrollView(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _localisationButton(),
-          _menuItem('Informations de base', signalementData),
-          _menuItem('Véhicule', signalementData),
-          _menuItem('Infraction', signalementData),
-          _menuItem('Dommages', signalementData),
-          _menuItem('Approbation', signalementData),
-          _menuItem('Enlèvement', signalementData),
-          const SizedBox(height: 16),
-        ],
+    return RefreshIndicator(
+      onRefresh: fetchSignalementData,
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _localisationButton(),
+            _menuItem('Informations de base', signalementData),
+            _menuItem('Véhicule', signalementData),
+            _menuItem('Infraction', signalementData),
+            _menuItem('Dommages', signalementData),
+            if (signalementData['dommages_saisis'] == true &&
+                signalementData['is_approve'] != true)
+              _approvalStatus(signalementData['etat']?.toString()),
+            if (signalementData['is_approve'] == true)
+              _menuItem('Enlèvement', signalementData),
+            const SizedBox(height: 16),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _approvalStatus(String? etat) {
+    final rejected = etat == 'REJETE';
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      child: Card(
+        color: rejected ? Colors.red.shade50 : Colors.orange.shade50,
+        child: ListTile(
+          leading: Icon(
+            rejected ? Icons.cancel_outlined : Icons.hourglass_top,
+            color: rejected ? Colors.red : Colors.orange.shade800,
+          ),
+          title: Text(
+            rejected
+                ? 'Demande d’approbation rejetée'
+                : 'En attente d’approbation administrative',
+            style: const TextStyle(fontWeight: FontWeight.bold),
+          ),
+          subtitle: Text(
+            rejected
+                ? 'L’enlèvement reste indisponible.'
+                : 'Faites glisser la page vers le bas pour actualiser le statut.',
+          ),
+        ),
       ),
     );
   }
@@ -330,7 +363,7 @@ class _DepositMoneyDetailsScreenState extends State<DepositMoneyDetailsScreen> {
             Icons.arrow_forward_ios,
             color: Colors.grey, // Icône de navigation dans une couleur discrète
           ),
-          onTap: () {
+          onTap: () async {
             final signalementId = signalementData?['signalementId'];
             if (title == 'Informations de base') {
               Navigator.of(context).push(MaterialPageRoute(
@@ -349,15 +382,14 @@ class _DepositMoneyDetailsScreenState extends State<DepositMoneyDetailsScreen> {
                 builder: (context) => InfractionForm(signalementId: signalementId),
               ));
             } else if (title == 'Dommages') {
-              Navigator.of(context).push(MaterialPageRoute(
+              final updated = await Navigator.of(context).push<bool>(MaterialPageRoute(
                 builder: (context) => DommagesScreen(
                   signalementId: signalementId,
                 ),
               ));
-            } else if (title == 'Approbation') {
-              Navigator.of(context).push(MaterialPageRoute(
-                builder: (context) => ApprovalForm(signalementId: signalementId),
-              ));
+              if (updated == true && mounted) {
+                await fetchSignalementData();
+              }
             } else if (title == 'Enlèvement') {
               Navigator.of(context).push(MaterialPageRoute(
                 builder: (context) => RemovalForm(signalementId: signalementId),
@@ -381,8 +413,6 @@ class _DepositMoneyDetailsScreenState extends State<DepositMoneyDetailsScreen> {
       case 'Dommages':
         return Icons.draw; // Icône de rapport pour dommages (plus approprié)
         //return Icons.report_problem;; // Icône de rapport pour dommages (plus approprié)
-      case 'Approbation':
-        return Icons.check_circle; // Icône d'approbation (icône de coche plus nette)
       case 'Enlèvement':
         return Icons.remove_circle; // Icône de suppression définitive (plus explicite pour "enlèvement")
       default:

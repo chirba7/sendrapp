@@ -27,6 +27,8 @@ class SignalementRessource extends JsonResource
             'titre' => $this->title,
             'commune' => $this->commune,
             'etat' => $this->etat,
+            'is_approve' => (bool) $this->is_approve,
+            'dommages_saisis' => !empty($this->dommage_image),
             'formatted_date' => $this->created_at->format('d/m/Y \à H\hi'),
             // Utilise l'hôte réellement appelé par le téléphone (par exemple
             // 192.168.x.x:8000), au lieu de APP_URL=localhost qui n'est

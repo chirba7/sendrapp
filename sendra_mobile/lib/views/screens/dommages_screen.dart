@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -9,7 +8,6 @@ import 'package:http/http.dart' as http;
 
 import 'package:walletium/utils/strings.dart';
 
-import 'approbation_screen.dart';
 
 class DommagesScreen extends StatefulWidget {
   final int signalementId;
@@ -237,12 +235,9 @@ class _DommagesScreenState extends State<DommagesScreen> {
       ));
 
       Future.delayed(Duration(seconds: 1), () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => ApprovalForm(signalementId: widget.signalementId),
-          ),
-        );
+        if (mounted) {
+          Navigator.pop(context, true);
+        }
       });
 
     } else {
@@ -376,4 +371,3 @@ class ImagePainter extends CustomPainter {
     return true;
   }
 }
-
