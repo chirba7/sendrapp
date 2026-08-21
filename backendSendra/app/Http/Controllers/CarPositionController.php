@@ -8,6 +8,7 @@ use App\Models\CarPhoto;
 use App\Models\CarPosition;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 
 class CarPositionController extends Controller
@@ -18,80 +19,43 @@ class CarPositionController extends Controller
      */
     public function store(StoreCarPositionRequest $request)
     {
-        $carPosition = new CarPosition();
-        $carPosition->latitude = $request->latitude;
-        $carPosition->longitude = $request->longitude;
-        $carPosition->title = $request->titre;
-        $carPosition->commune = $request->commune;
-        $carPosition->user_id = Auth::user()->id;
+        // Correction API-H-3 : le base64 n'était jamais vérifié comme étant
+        // une image réelle avant écriture disque, et CarPosition/CarPhoto
+        // étaient sauvegardés en deux temps sans transaction (un signalement
+        // sans photo pouvait rester en base si l'écriture du fichier échouait).
+        $imageBinary = base64_decode($request->input('image'), true);
 
-        if ($carPosition->save()) {
-            // Décodez l'image base64 en binaire
-            $imageBinary = base64_decode($request->input('image'));
+        if ($imageBinary === false || @getimagesizefromstring($imageBinary) === false) {
+            return response()->json(['message' => 'Le fichier fourni n\'est pas une image valide'], 422);
+        }
 
-            // Générez un nom de fichier unique
-            $filename = uniqid('car_photo') . '.png';
+        try {
+            $carPhoto = DB::transaction(function () use ($request, $imageBinary) {
+                $carPosition = new CarPosition();
+                $carPosition->latitude = $request->latitude;
+                $carPosition->longitude = $request->longitude;
+                $carPosition->title = $request->titre;
+                $carPosition->commune = $request->commune;
+                $carPosition->user_id = Auth::user()->id;
+                $carPosition->save();
 
-            // Enregistrez l'image dans le stockage Laravel (dans ce cas, public/storage)
-            Storage::disk('public')->put('signalement/photo/' . $filename, $imageBinary);
+                $filename = uniqid('car_photo') . '.png';
+                Storage::disk('public')->put('signalement/photo/' . $filename, $imageBinary);
 
-            // Enregistrez le chemin de l'image dans la base de données
-            $carPhoto = new CarPhoto();
-            $carPhoto->card_id = $carPosition->id;
-            $carPhoto->filepath = 'signalement/photo/' . $filename;
-            $carPhoto->save();
+                $carPhoto = new CarPhoto();
+                $carPhoto->card_id = $carPosition->id;
+                $carPhoto->filepath = 'signalement/photo/' . $filename;
+                $carPhoto->save();
 
-            // Réponse JSON en cas de succès
-            return response()->json(['message' => 'Signalisation effectuée avec succès'], 200);
-        } else {
-            // Réponse JSON en cas d'échec
+                return $carPhoto;
+            });
+        } catch (\Throwable $e) {
             return response()->json(['message' => 'Erreur lors de la signalisation'], 500);
         }
+
+        return response()->json(['message' => 'Signalisation effectuée avec succès'], 200);
     }
 
-    // public function store(Request $request)
-    // {
-    //     // Validation des données de la requête
-    //     $request->validate([
-    //         'titre' => 'required|string',
-    //         'commune' => 'required|string',
-    //         'latitude' => 'required|numeric',
-    //         'longitude' => 'required|numeric',
-    //         'image' => 'required|string', // Assurez-vous que l'image est envoyée en tant que chaîne base64
-    //     ]);
-
-    //     // Création d'une nouvelle position de voiture
-    //     $carPosition = new CarPosition();
-    //     $carPosition->latitude = $request->latitude;
-    //     $carPosition->longitude = $request->longitude;
-    //     $carPosition->title = $request->titre;
-    //     $carPosition->commune = $request->commune;
-    //     $carPosition->userid = Auth::user()->id;
-
-    //     // Sauvegarde de la position de la voiture
-    //     if ($carPosition->save()) {
-    //         // Décodez l'image base64 en binaire
-    //         $imageBinary = base64_decode($request->input('image'));
-
-    //         // Générez un nom de fichier unique
-    //         $filename = uniqid('car_photo') . '.png';
-
-    //         // Enregistrez l'image dans le stockage Laravel (dans ce cas, public/storage)
-    //         Storage::disk('public')->put('signalement/photo/' . $filename, $imageBinary);
-
-    //         // Enregistrez le chemin de l'image dans la base de données
-    //         $carPhoto = new CarPhoto();
-    //         $carPhoto->card_id = $carPosition->id;
-    //         $carPhoto->filepath = 'signalement/photo/' . $filename;
-    //         $carPhoto->save();
-
-    //         // Réponse JSON en cas de succès
-    //         return response()->json(['message' => 'Signalisation effectuée avec succès'], 200);
-    //     } else {
-    //         // Réponse JSON en cas d'échec
-    //         return response()->json(['message' => 'Erreur lors de la signalisation'], 500);
-    //     }
-    // }
     /**
      * Remove the specified resource from storage.
      */
@@ -131,12 +95,14 @@ class CarPositionController extends Controller
 
     public function statistiques()
     {
+        // Correction API-M-3 : count(->get()) charge toute la collection en
+        // mémoire juste pour la compter — ->count() fait l'agrégation en SQL.
         return response()->json(
             [
-                'signalements' => count(CarPosition::all()),
-                'signales' => count(CarPosition::where('etat', 'SIGNALE')->get()),
-                'enleves' => count(CarPosition::where('etat', 'ENLEVE')->get()),
-                'encours' => count(CarPosition::where('etat', 'EN COURS')->get())
+                'signalements' => CarPosition::count(),
+                'signales' => CarPosition::where('etat', 'SIGNALE')->count(),
+                'enleves' => CarPosition::where('etat', 'ENLEVE')->count(),
+                'encours' => CarPosition::where('etat', 'EN COURS')->count()
             ]
         );
     }

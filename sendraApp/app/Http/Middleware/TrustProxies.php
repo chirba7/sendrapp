@@ -10,9 +10,15 @@ class TrustProxies extends Middleware
     /**
      * The trusted proxies for this application.
      *
+     * Correction WEB-M-3 : jamais configuré — derrière le reverse-proxy
+     * Apache de production, Laravel ne voyait donc jamais la vraie IP/le
+     * vrai schéma (http/https) du client, seulement ceux de l'hôte
+     * intermédiaire. L'app n'étant joignable qu'à travers ce proxy (jamais
+     * directement), on fait confiance à tous les sauts sur ce chemin.
+     *
      * @var array<int, string>|string|null
      */
-    protected $proxies;
+    protected $proxies = '*';
 
     /**
      * The headers that should be used to detect proxies.

@@ -21,8 +21,14 @@ class UserFactory extends Factory
     public function definition(): array
     {
         return [
-            // 'name' => $this->faker->name(),
-            // 'email' => $this->faker->unique()->safeEmail(),
+            // Correction : email et role_id n'étaient jamais définis, alors
+            // que role_id est NOT NULL en base — toute création via factory
+            // (donc la quasi-totalité des tests Jetstream par défaut)
+            // plantait avant même d'atteindre le test lui-même.
+            'first_name' => $this->faker->firstName(),
+            'last_name' => $this->faker->lastName(),
+            'email' => $this->faker->unique()->safeEmail(),
+            'role_id' => 1,
             'email_verified_at' => now(),
             'password' => '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', // password
             'two_factor_secret' => null,

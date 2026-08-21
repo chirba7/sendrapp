@@ -67,7 +67,7 @@
                                     <div class="row justify-content-center align-items-center g-2">
                                         <div class="col-md-6">
                                             <div class="profile_card_5 mb-1">
-                                                <img class="circle-rounded" src="{{asset('https://backend.sendra.sn/storage/'. $photo->filepath)}}" alt="" width="90%" height="90%">
+                                                <img class="circle-rounded" src="{{ config('services.backend.storage_url') . '/' . $photo->filepath }}" alt="" width="90%" height="90%">
                                             </div>
                                         </div>
                                         <div class="col-md-6">
@@ -153,8 +153,8 @@
         class="form-check-input is-valid me-3" 
         type="checkbox" 
         name="meteo[]" 
-        id="pluie" 
-        value="1" 
+        id="pluie"
+        value="pluie" {{-- Correction WEB-H-4 : envoyait "1", jamais reconnu par in_array('pluie', ...) côté contrôleur --}}
         {{ $carPosition->pluie ? 'checked' : '' }}>
     <label class="form-label form-check-label" for="pluie">Pluie</label>
 </div>

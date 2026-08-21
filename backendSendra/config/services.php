@@ -31,11 +31,4 @@ return [
         'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
     ],
 
-    // Correction API-C-5 : la clé était codée en dur ('Sendra@2025!')
-    // directement dans AuthControllerApi. La valeur par défaut ci-dessous
-    // est identique à l'ancienne valeur pour ne pas casser l'app mobile
-    // déjà publiée ; elle doit être déplacée dans .env et changée dès que
-    // possible (voir AUDIT_SENDRA.md, finding API-C-5).
-    'mobile_security_key' => env('MOBILE_SECURITY_KEY', 'Sendra@2025!'),
-
 ];

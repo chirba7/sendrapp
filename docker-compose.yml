@@ -1,0 +1,49 @@
+services:
+  mysql:
+    image: mysql:8.0
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: sendra
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_USER: sendra
+      MYSQL_PASSWORD: sendra
+    ports:
+      - "3306:3306"
+    volumes:
+      - sendra_mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-proot"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  backend:
+    build:
+      context: ./docker/php
+    restart: "no"
+    working_dir: /var/www/html
+    volumes:
+      - ./backendSendra:/var/www/html
+    ports:
+      - "8000:8000"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    command: php artisan serve --host=0.0.0.0 --port=8000
+
+  app:
+    build:
+      context: ./docker/php
+    restart: "no"
+    working_dir: /var/www/html
+    volumes:
+      - ./sendraApp:/var/www/html
+    ports:
+      - "8001:8000"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    command: php artisan serve --host=0.0.0.0 --port=8000
+
+volumes:
+  sendra_mysql_data:

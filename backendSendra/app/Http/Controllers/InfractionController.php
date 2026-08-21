@@ -11,7 +11,9 @@ class InfractionController extends Controller
 {
     public function index()
     {
-        $carPosition = CarPosition::whereNotNull('adresse_precise')->get();
+        // Correction API-M-3 : pas de pagination, tout le jeu de résultats
+        // était chargé et sérialisé d'un coup.
+        $carPosition = CarPosition::whereNotNull('adresse_precise')->paginate(20);
         return response()->json(InfractionResource::collection($carPosition));
     }
 
@@ -21,28 +23,19 @@ class InfractionController extends Controller
         return response()->json(new InfractionResource($carPosition));
     }
 
-    /*public function update(InfractionRequest $request, CarPosition $carPosition)
-    {
-        $carPosition->adresse_precise = $request->input('adresse_precise');
-        $carPosition->motif_infraction = $request->input('motif_infraction');
-        $carPosition->lieu = $request->input('lieu');
-        $carPosition->nuit = $request->has('meteo') && in_array('nuit', $request->input('meteo', []));
-        $carPosition->pluie = $request->has('meteo') && in_array('pluie', $request->input('meteo', []));
-
-        $carPosition->update();
-
-        return response()->json($carPosition);
-    }
-     */
-
-
-
    public function update(InfractionRequest $request, CarPosition $carPosition)
  {
     // Mise à jour des champs simples
     $carPosition->adresse_precise = $request->input('adresse_precise');
     $carPosition->motif_infraction = $request->input('motif_infraction');
-    $carPosition->lieu = $request->input('lieu');
+
+    // Correction API-H-4 : la colonne `lieu` est NOT NULL en base ; ne
+    // l'assigner que si le client l'a réellement envoyé, sinon `input()`
+    // renvoie null et fait planter la mise à jour SQL même sur une requête
+    // valide selon le FormRequest (qui autorise l'omission du champ).
+    if ($request->filled('lieu')) {
+        $carPosition->lieu = $request->input('lieu');
+    }
 
      // Gestion explicite des champs booléens
     $carPosition->nuit = $request->boolean('nuit', false); // Par défaut false si absent

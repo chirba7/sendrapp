@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+Autorise le trafic HTTP en clair uniquement vers le backend Docker local de
+dev (192.168.1.22:8000) — pas d'affaiblissement de la sécurité pour le
+reste de l'app, qui continue d'exiger HTTPS partout ailleurs.
+-->
+<network-security-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">192.168.1.22</domain>
+    </domain-config>
+</network-security-config>

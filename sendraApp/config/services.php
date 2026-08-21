@@ -31,4 +31,12 @@ return [
         'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
     ],
 
+    // Correction WEB-H-3 : plusieurs vues pointaient en dur vers
+    // 'https://backend.sendra.sn/storage/', et SignalementRessource.php
+    // (côté backendSendra) vers un domaine personnel tiers totalement
+    // différent — aucun des deux n'était le domaine réel de cette app.
+    'backend' => [
+        'storage_url' => env('BACKEND_STORAGE_URL', 'https://backend.sendra.sn/storage'),
+    ],
+
 ];

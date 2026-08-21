@@ -17,7 +17,7 @@ class AuthMail extends Mailable
     /**
      * Create a new message instance.
      */
-    public function __construct(public User $user)
+    public function __construct(public User $user, public string $plainPassword)
     {
         //
     }
@@ -40,9 +40,15 @@ class AuthMail extends Mailable
         return new Content(
             view: 'mail.newCompte',
             with: [
-                'password' => $this->user->password,
+                // Correction WEB-H-5 : le mot de passe HASHÉ ($user->password)
+                // était passé à la vue au lieu du mot de passe en clair
+                // généré à la création du compte.
+                'password' => $this->plainPassword,
                 'email' => $this->user->email,
-                'nom' => $this->user->nom
+                // Correction WEB-L-1 : 'nom' n'existe pas sur User (colonnes
+                // réelles : first_name/last_name) — la vue affichait
+                // "Bienvenue,  !" avec un nom vide.
+                'nom' => trim($this->user->first_name . ' ' . $this->user->last_name),
             ],
         );
     }

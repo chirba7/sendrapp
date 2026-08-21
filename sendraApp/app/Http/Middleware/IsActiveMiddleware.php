@@ -17,11 +17,17 @@ class IsActiveMiddleware
      */
     public function handle(Request $request, Closure $next): Response
     {
+        // Correction WEB-L-2 : la ligne après le if/else était morte (les
+        // deux branches retournent déjà), et Auth::user() n'était jamais
+        // gardé contre un utilisateur non authentifié.
+        if (!Auth::user()) {
+            return Redirect::route('login');
+        }
+
         if (Auth::user()->is_enabled == true) {
             return $next($request);
-        } else {
-            return Redirect::to('/modifier/motDePasse');
         }
-        return $next($request);
+
+        return Redirect::to('/modifier/motDePasse');
     }
 }

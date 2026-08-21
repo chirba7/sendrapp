@@ -14,13 +14,16 @@ class ApprobationController extends Controller
             'motifApprobation' => 'nullable|string|max:225',
         ]);
 
+        // Correction API-M-1 : l'état était forcé à "EN COURS" même en cas
+        // de refus, ce qui ne laissait aucune trace distincte d'un rejet.
         if ($request->approbation == "OUI") {
             $carPosition->is_approve = true;
+            $carPosition->etat = "EN COURS";
         } elseif ($request->approbation == "NON") {
             $carPosition->is_approve = false;
+            $carPosition->etat = "REJETE";
         }
 
-        $carPosition->etat = "EN COURS";
         $carPosition->motife_approbation = $request->motifApprobation;
 
         $carPosition->save();

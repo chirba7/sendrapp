@@ -161,6 +161,13 @@ class CarPositionController extends Controller
     }
     public function enlevement(ConstationCarPositionRequest $request, CarPosition $carPosition)
     {
+        // Correction API-M-2 (même bug dupliqué côté back-office) :
+        // l'onglet est masqué côté vue tant que non approuvé, mais rien ne
+        // l'empêchait côté serveur en appelant directement la route.
+        if (!$carPosition->is_approve) {
+            return redirect()->back()->withErrors(['approbation' => 'Ce signalement n\'a pas été approuvé, l\'enlèvement ne peut pas être enregistré.']);
+        }
+
         $carPosition->motif_enlevement = $request->motif_enlevement;
         $carPosition->date_enlevement = $request->date_enlevement;
         $carPosition->lieu_enlevement = $request->lieu_enlevement;
@@ -178,12 +185,15 @@ class CarPositionController extends Controller
             'motife_approbation' => 'nullable|string|max:225',
         ]);
 
+        // Correction API-M-1 (même bug dupliqué côté back-office) : l'état
+        // était forcé à "EN COURS" même en cas de refus.
         if ($request->approbation == "OUI") {
             $carPosition->is_approve = true;
+            $carPosition->etat = "EN COURS";
         } elseif ($request->approbation == "NON") {
             $carPosition->is_approve = false;
+            $carPosition->etat = "REJETE";
         }
-        $carPosition->etat = "EN COURS";
         $carPosition->motife_approbation = $request->motife_approbation;
 
         $carPosition->update();
@@ -229,19 +239,25 @@ class CarPositionController extends Controller
     }
 
 
-    public function signatureshow()
-    {
-        return view('carPosition.pdf.dommage');
-    }
-
     public function signaturestore(Request $request, CarPosition $carPosition)
     {
+        // Correction WEB-M-4 : aucune validation de format/taille avant —
+        // un payload malformé faisait planter explode(), un payload énorme
+        // pouvait remplir le stockage sans limite.
+        $request->validate([
+            'signature' => ['required', 'string', 'max:2097152', 'regex:/^data:image\/(png|jpeg);base64,/'],
+        ]);
+
         $dataUrl = $request->input('signature');
 
-        list($type, $data) = explode(';', $dataUrl);
-        list(, $data) = explode(',', $data);
+        list($type, $data) = explode(';', $dataUrl, 2);
+        list(, $data) = explode(',', $data, 2);
 
-        $imageBinary = base64_decode($data);
+        $imageBinary = base64_decode($data, true);
+
+        if ($imageBinary === false || @getimagesizefromstring($imageBinary) === false) {
+            return redirect()->back()->withErrors(['signature' => 'La signature fournie n\'est pas une image valide.']);
+        }
 
         // Générez un nom de fichier unique
         $filename = uniqid('dommages') . '.png';

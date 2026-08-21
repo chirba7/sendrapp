@@ -8,12 +8,13 @@ use Tests\TestCase;
 class ExampleTest extends TestCase
 {
     /**
-     * A basic test example.
+     * '/' est volontairement bloquée (abort(403)) — cette API n'expose
+     * aucune page publique à la racine.
      */
-    public function test_the_application_returns_a_successful_response(): void
+    public function test_the_root_route_is_forbidden(): void
     {
         $response = $this->get('/');
 
-        $response->assertStatus(200);
+        $response->assertStatus(403);
     }
 }

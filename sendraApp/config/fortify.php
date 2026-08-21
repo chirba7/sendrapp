@@ -150,7 +150,13 @@ return [
         // Le formulaire /register était en plus déjà cassé (la table users
         // n'a pas de colonne `name`), mais restait joignable publiquement.
         // Features::registration(),
-        Features::resetPasswords(),
+        // Correction (même famille que WEB-C-2) : aucun lien "mot de passe
+        // oublié" nulle part dans l'app — le changement de mot de passe se
+        // fait uniquement via /update/pass (connecté) ou le flux forcé de
+        // première connexion (IsActiveMiddleware). La vue par défaut de
+        // Fortify (auth.reset-password) n'a jamais été publiée : la route
+        // restait joignable mais cassée.
+        // Features::resetPasswords(),
         // Features::emailVerification(),
         Features::updateProfileInformation(),
         Features::updatePasswords(),

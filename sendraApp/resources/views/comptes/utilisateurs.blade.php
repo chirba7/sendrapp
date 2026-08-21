@@ -7,7 +7,9 @@
             <div class="row align-items-center">
                 <div class="col-md-6">
                     <div class="title">
-                        <h2 class="text-success">Comptes Utilisateurs</h2>
+                        {{-- Correction WEB-M-1 : cet écran liste en réalité role_id=4
+                             (Autorité préfecture), pas les citoyens ("Utilisateurs"). --}}
+                        <h2 class="text-success">Comptes Autorité préfecture</h2>
                     </div>
                 </div>
             </div>

@@ -16,6 +16,12 @@ class EnlevementController extends Controller
             'nom_responsable' => 'required|string|max:255',
         ]);
 
+        // Correction API-M-2 : l'enlèvement pouvait être enregistré sans
+        // approbation préalable du signalement.
+        if (!$carPosition->is_approve) {
+            return response()->json(['message' => 'Ce signalement n\'a pas été approuvé, l\'enlèvement ne peut pas être enregistré.'], 403);
+        }
+
         $carPosition->motif_enlevement = $request->input('motif');
         $carPosition->date_enlevement = $request->input('date');
         $carPosition->lieu_enlevement = $request->input('lieu');

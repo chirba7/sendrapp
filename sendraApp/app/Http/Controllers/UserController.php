@@ -10,6 +10,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Str;
 
 class UserController extends Controller
 {
@@ -82,18 +83,23 @@ class UserController extends Controller
         $user->telephone = $request->telephone;
         $user->role_id = $request->role;
         $user->email = $request->email;
-        $user->password = Hash::make('sendra2024@');
+        // Correction WEB-H-5 : mot de passe par défaut identique
+        // ('sendra2024@') pour tous les nouveaux comptes staff — un mot de
+        // passe aléatoire par compte est généré à la place. Toujours envoyé
+        // par e-mail ; is_enabled reste false par défaut donc le
+        // changement forcé à la première connexion (IsActiveMiddleware)
+        // s'applique déjà.
+        $temporaryPassword = Str::random(12);
+        $user->password = Hash::make($temporaryPassword);
         if ($user->save()) {
-            Mail::to($request->email)->send(new AuthMail($user));
+            Mail::to($request->email)->send(new AuthMail($user, $temporaryPassword));
         }
         return back()->with('success', 'Compte ajouter avec success');
     }
 
-    public function test()
-    {
-        $user = Auth::user();
-        Mail::to('fayemouhamadou17@gmail.com')->send(new AuthMail($user));
-    }
+    // Correction WEB-M-5 : route /test et cette méthode supprimées — elle
+    // envoyait par e-mail les données de l'utilisateur connecté (y compris
+    // le hash du mot de passe) vers une adresse personnelle codée en dur.
 
     public function modifier(UpdateAgentRequest $request, User $user)
     {

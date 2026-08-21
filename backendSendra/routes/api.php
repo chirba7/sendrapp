@@ -26,12 +26,24 @@ use App\Http\Controllers\SMSController;
 Route::group([
     'middleware' => 'api',
 ], function () {
+    // Endpoint de découverte réseau : l'app mobile scanne le sous-réseau
+    // local pour retrouver l'IP du backend Docker (qui change à chaque bail
+    // DHCP) — cette signature lui permet de distinguer ce serveur d'un
+    // autre appareil qui répondrait par hasard sur le port 8000.
+    Route::get('/ping', fn () => response()->json(['app' => 'sendra-backend']));
+
     // Authentication
     Route::post('/login', [AuthControllerApi::class, 'login'])->name('login');
-    Route::post('/send-verification-code', [AuthControllerApi::class, 'sendVerificationCode']);
-    Route::post('/check-phone', [AuthControllerApi::class, 'checkPhone']);
     Route::post('/verify-code', [AuthControllerApi::class, 'verifyCode']);
     Route::post('/register', [AuthControllerApi::class, 'register']);
+
+    // Correction API-C-5 : ces deux routes n'ont plus de clé statique en
+    // entrée (extractible de l'app mobile, donc sans valeur de protection
+    // réelle) — le rate-limiting protège maintenant contre l'énumération.
+    Route::middleware('throttle:10,1')->group(function () {
+        Route::post('/send-verification-code', [AuthControllerApi::class, 'sendVerificationCode']);
+        Route::post('/check-phone', [AuthControllerApi::class, 'checkPhone']);
+    });
 });
 
 // Protected routes (Authentication required with JWT)
@@ -65,10 +77,6 @@ Route::middleware('jwt.auth')->group(function () {
         Route::get('/infraction/{carPosition}', [InfractionController::class, 'show']);
         Route::put('/infraction/{carPosition}', [InfractionController::class, 'update']);
 
-        // Approbation routes
-        Route::put('/soumettreApprobation/{carPosition}', [ApprobationController::class, 'soumettreApprobation']);
-        Route::get('/motifsApprobation/{carPosition}', [ApprobationController::class, 'motifsApprobation']);
-
         // Enlevement routes
         Route::put('/enlevement/{carPosition}', [EnlevementController::class, 'ajouterEnlevement']);
         Route::get('/enlevement/{carPosition}', [EnlevementController::class, 'obtenirEnlevement']);
@@ -79,5 +87,15 @@ Route::middleware('jwt.auth')->group(function () {
 
         // Statistiques
         Route::get('/statistiques', [CarPositionController::class, 'statistiques']);
+    });
+
+    // Correction ACL : l'approbation est réservée à Admin/Autorité commune/
+    // Autorité préfecture — le spec fonctionnel (AUDIT_SENDRA.md §1.1)
+    // exclut explicitement l'Agent ("traite les signalements, pas d'accès
+    // à l'approbation"), qui pouvait pourtant approuver comme n'importe
+    // quel autre rôle staff avant ce correctif.
+    Route::middleware('role:1,3,4')->group(function () {
+        Route::put('/soumettreApprobation/{carPosition}', [ApprobationController::class, 'soumettreApprobation']);
+        Route::get('/motifsApprobation/{carPosition}', [ApprobationController::class, 'motifsApprobation']);
     });
 });

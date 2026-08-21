@@ -64,7 +64,7 @@
                                 <tr>
                                     <td>
                                         <div class="employee-image">
-                                            <img src="{{asset('https://backend.sendra.sn/storage/'. $signalement->photo[0]->filepath) }}" alt="" />
+                                            <img src="{{ $signalement->photo->isNotEmpty() ? config('services.backend.storage_url') . '/' . $signalement->photo[0]->filepath : '' }}" alt="" />
                                         </div>
                                     </td>
                                     <td>

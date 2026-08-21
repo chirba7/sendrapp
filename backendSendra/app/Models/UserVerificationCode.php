@@ -9,7 +9,12 @@ class UserVerificationCode extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['phone', 'code', 'expires_at'];
+    protected $fillable = ['phone', 'code', 'expires_at', 'verified_at'];
+
+    protected $casts = [
+        'expires_at' => 'datetime',
+        'verified_at' => 'datetime',
+    ];
 
     // Check if the verification code has expired
     public function isExpired()

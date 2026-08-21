@@ -77,7 +77,7 @@
                         <a href="{{route('autorites')}}" class="{{request()->is('dashboard/comptes/autorites') ? 'active' : ''}}"> Autorités </a>
                     </li>
                     <li>
-                        <a href="{{route('utilisateurs')}}" class="{{request()->is('dashboard/comptes/utilisateurs') ? 'active' : ''}}"> Utilisateurs </a>
+                        <a href="{{route('utilisateurs')}}" class="{{request()->is('dashboard/comptes/utilisateurs') ? 'active' : ''}}"> Autorité préfecture </a>
                     </li>
                 </ul>
             </li>

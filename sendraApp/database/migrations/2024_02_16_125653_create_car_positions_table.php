@@ -33,7 +33,12 @@ return new class extends Migration
             $table->string('qrcode_file', 254)->nullable();
             $table->text('pv_enlevement')->nullable();
             $table->string('commune', 254)->nullable();
-            $table->enum('etat', ['SIGNALE', 'ENLEVE', 'EN COURS'])->default('SIGNALE');
+            // 'REJETE' ajouté ici (au lieu de seulement dans la migration
+            // ALTER MySQL-only 2026_08_12_..._add_rejete...) pour que les
+            // installations fraîches (dont les tests, sur sqlite) aient le
+            // bon schéma dès le départ. Sans effet sur une base déjà
+            // migrée (ce fichier ne se réexécute pas).
+            $table->enum('etat', ['SIGNALE', 'ENLEVE', 'EN COURS', 'REJETE'])->default('SIGNALE');
             $table->enum('lieu', ['PUBLIC', 'PRIVE'])->default('PUBLIC');
             $table->enum('pays_etranger', ['OUI', 'NON'])->default('NON');
             $table->integer('step')->nullable();

@@ -25,7 +25,10 @@ class AuthControllerApi extends Controller
 
     public function __construct(OrangeSmsService $smsService=null)
     {
-        $this->middleware('auth:api', ['except' => ['login', 'register', 'sendVerificationCode', 'verifyCode','checkPhone']]);
+        // Correction API-M-6 : l'auth était vérifiée deux fois — ici via
+        // 'auth:api', et par le middleware 'jwt.auth' déjà posé sur les
+        // routes protégées dans routes/api.php. On garde une seule couche
+        // (le middleware de route), plus explicite à lire.
         $this->smsService = $smsService;
     }
 
@@ -62,21 +65,13 @@ class AuthControllerApi extends Controller
 
     public function checkPhone(Request $request)
     {
+        // Correction API-C-5 : la clé statique ('Sendra@2025!') était forcément
+        // extractible de l'app mobile et n'apportait donc aucune protection
+        // réelle contre l'énumération de numéros. Protection déplacée sur le
+        // throttling de la route (voir routes/api.php).
         $request->validate([
             'telephone' => 'required|regex:/^\d{9}$/', // Phone number format validation
-            'security_key' => 'required|string',        // New field for comparison
         ]);
-
-        // Security key for comparison (voir config/services.php — API-C-5)
-        $expectedKey = config('services.mobile_security_key');
-
-        // Compare the security key
-        if ($request->security_key !== $expectedKey) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Clé de sécurité invalide.',
-            ], 403); // 403 Forbidden
-        }
 
         $phoneExists = User::where('telephone', $request->telephone)->exists();
 
@@ -103,22 +98,11 @@ class AuthControllerApi extends Controller
  */
     public function sendVerificationCode(Request $request)
     {
+        // Correction API-C-5 : idem checkPhone(), clé statique retirée au
+        // profit du throttling de route.
         $request->validate([
             'telephone' => 'required|regex:/^\d{9}$/', // Phone number format validation
-            'security_key' => 'required|string',        // New field for comparison
         ]);
-
-        // Security key for comparison (voir config/services.php — API-C-5)
-        $expectedKey = config('services.mobile_security_key');
-
-        // Compare the security key
-        if ($request->security_key !== $expectedKey) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Clé de sécurité invalide.',
-            ], 403); // 403 Forbidden
-        }
-       
 
         $verificationCode = rand(100000, 999999); // Generate a 6-digit code
 
@@ -182,11 +166,21 @@ class AuthControllerApi extends Controller
             'message' => 'Le code vérification a expiré.'], 400);
         }
 
-        if ($verification->code !== $request->code) {
+        // Correction API-H-5 : comparaison stricte entre la valeur en base
+        // (string) et une valeur potentiellement numérique côté client
+        // mobile — toujours fausse dans ce cas. On compare en string des
+        // deux côtés.
+        if ((string) $verification->code !== (string) $request->code) {
             return response()->json(['success' => false,
             'message' => 'Le code de vérification est invalide.'], 400);
         }
-        
+
+        // Correction API-H-6 : marquer explicitement la vérification comme
+        // réussie, pour que register() puisse s'appuyer dessus au lieu de
+        // se contenter de l'existence d'un code non expiré.
+        $verification->verified_at = now();
+        $verification->save();
+
         // Verification successful
         return response()->json(['success' => true,
         'message' => 'Vérifié avec succés.'], 200);
@@ -217,11 +211,13 @@ class AuthControllerApi extends Controller
             'password' => 'required|string|min:6',
         ]);
 
-        // Check if the phone number is verified
+        // Correction API-H-6 : on exigeait seulement l'existence d'un code
+        // non expiré, jamais qu'un verifyCode() ait réellement réussi — un
+        // compte pouvait donc être créé sans jamais soumettre le bon code.
         $verification = UserVerificationCode::where('phone', $request->telephone)->first();
 
-        if (!$verification || $verification->isExpired()) {
-            return response()->json(['message' => 'Phone number is not verified or the verification code has expired.'], 400);
+        if (!$verification || $verification->isExpired() || !$verification->verified_at) {
+            return response()->json(['message' => 'Le numéro de téléphone n\'a pas été vérifié ou le code a expiré.'], 400);
         }
 
         // Create the user
@@ -280,8 +276,14 @@ class AuthControllerApi extends Controller
      */
     protected function respondWithToken($token)
     {
+        // Correction API-M-7 (partielle) : reformater entièrement cette
+        // réponse casserait le contrat déjà consommé par l'app mobile
+        // publiée (token/id/fullName/phone à la racine). On ajoute juste
+        // 'message' pour se rapprocher du format {success, message, ...}
+        // utilisé ailleurs, sans retirer/renommer les champs existants.
         return response()->json([
             'success' => true,
+            'message' => 'Connexion réussie.',
             'token' => $token,
             'id' => Auth::user()->id,
             'fullName' => Auth::user()->first_name . " " . Auth::user()->last_name,

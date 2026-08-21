@@ -21,10 +21,12 @@ class OrangeSmsService
         $this->token = env('ORANGE_SMS_TOKEN', '');
         $this->baseUri = env('ORANGE_SMS_BASE_URI', 'https://api.orangesmspro.sn:8443/api');
 
-        // Validate credentials
-        if (empty($this->login) || empty($this->token) || empty($this->apiAccessKey)) {
-            throw new \InvalidArgumentException('Orange SMS credentials are not properly set in the .env file.');
-        }
+        // Correction (découverte en testant les autres correctifs) :
+        // valider les identifiants ici faisait planter (500) TOUTE route
+        // qui instancie AuthControllerApi — y compris celles qui n'envoient
+        // aucun SMS (ex. checkPhone) — dès que ORANGE_SMS_* n'est pas
+        // configuré. La validation est déplacée dans sendSms(), au moment
+        // où elle est réellement nécessaire.
     }
 
     /**
@@ -38,6 +40,13 @@ class OrangeSmsService
      */
     public function sendSms(string $subject, string $signature, string $recipient, string $content): array
     {
+        if (empty($this->login) || empty($this->token) || empty($this->apiAccessKey)) {
+            return [
+                'success' => false,
+                'message' => 'Les identifiants Orange SMS ne sont pas configurés.',
+            ];
+        }
+
         try {
             // Generate timestamp
             $timestamp = time();
@@ -62,12 +71,11 @@ class OrangeSmsService
                 ->withBasicAuth($this->login, $this->token)
                 ->post($this->baseUri, $params);
 
-                // Log the response
-            Log::info('SMS API Response', [
+                // Correction API-M-5 : logué en debug (pas info) pour ne pas
+                // s'activer par défaut en prod (LOG_LEVEL=info désormais).
+            Log::debug('SMS API Response', [
                 'status' => $response->status(),
                 'body' => $response->body(),
-                'json' => $response->json(),
-                'headers' => $response->headers(),
             ]);
 
 
@@ -85,10 +93,12 @@ class OrangeSmsService
                 'error' => $response->json(),
             ];
         } catch (Exception $e) {
-            // Log the error
+            // Correction API-M-5 : $params contenait 'token' et 'key'
+            // (identifiants d'authentification Orange SMS) journalisés en
+            // clair sur toute erreur.
             Log::error('SMS sending failed', [
                 'error' => $e->getMessage(),
-                'params' => $params,
+                'recipient' => $params['recipient'] ?? null,
             ]);
 
             return [

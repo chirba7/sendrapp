@@ -53,7 +53,8 @@ class DommagesController extends Controller
                  'message' => 'Aucun signalement trouvé pour ce véhicule.',
              ], 404);
          }
-         $dommage_url='https://backend.sendra.sn/storage/dommages/';
+         // Correction API-M-4 : URL de production codée en dur.
+         $dommage_url = config('app.url') . '/storage/dommages/';
          // Vérifier si le champ dommages existe et le retourner
          $dommages = $carPosition->dommage_image; // Assurez-vous que le champ s'appelle bien 'dommage_image'
          $dommages = $dommage_url.$dommages;

@@ -12,26 +12,11 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        // \App\Models\User::factory(10)->create();
-        \App\Models\Role::factory()->create([
-            'nomRole' => 'Admin'
-        ]);
-        \App\Models\Role::factory()->create([
-            'nomRole' => 'Agent'
-        ]);
-        \App\Models\Role::factory()->create([
-            'nomRole' => 'Autorite commune'
-        ]);
-        \App\Models\Role::factory()->create([
-            'nomRole' => 'Autorite prefecture'
-        ]);
-        \App\Models\Role::factory()->create([
-            'nomRole' => 'user'
-        ]);
+        $this->call(RoleSeeder::class);
+
         \App\Models\User::factory()->create([
-            // 'name' => 'Test User',
             'email' => 'faye@gmail.com',
-            'role_id' => 1
+            'role_id' => 1,
         ]);
     }
 }

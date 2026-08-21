@@ -95,7 +95,7 @@
         for (let index = 0; index < initialMarkers.length; index++) {
             const data = initialMarkers[index];
             const marker = generateMarker(data, index);
-            const baseUrl = "{{ asset('https://backend.sendra.sn/storage') }}";
+            const baseUrl = "{{ config('services.backend.storage_url') }}";
             const imageUrl = baseUrl + "/" + data.image;
             const popupContent = `
                 <div class="square-popup">
