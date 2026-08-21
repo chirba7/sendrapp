@@ -100,7 +100,11 @@ class CarPositionController extends Controller
     public function show(CarPosition $carPosition)
     {
         $photo = CarPhoto::where('card_id', $carPosition->id)->first();
-        $carPosition = $carPosition->with('user')->first();
+        // Le binding de route fournit déjà le bon signalement. Appeler
+        // first() sur une nouvelle requête repartait de toute la table et
+        // affichait systématiquement le signalement n° 1 avec la photo du
+        // signalement demandé.
+        $carPosition->load('user');
         return view('carPosition.show', compact('carPosition', 'photo'));
     }
 
@@ -219,7 +223,7 @@ class CarPositionController extends Controller
 
     public function pdf_constation(CarPosition $carPosition)
     {
-        $carPosition = $carPosition->with('agent')->first();
+        $carPosition->load('agent');
         $pdf = Pdf::loadView('carPosition.pdf.constation', compact('carPosition'));
 
         return $pdf->stream("$carPosition->numero_vehicule.pdf");

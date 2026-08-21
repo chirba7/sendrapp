@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 
+import '../../routes/routes.dart';
 import '../../utils/strings.dart';
-import 'deposit_money_details_screen.dart'; // Pour encoder les données en JSON
 
 class RemovalForm extends StatefulWidget {
   final int signalementId;
@@ -206,9 +207,24 @@ class _RemovalFormState extends State<RemovalForm> {
     final url = '${Strings.apiURI}enlevement/${widget.signalementId}';
     print(url);
 
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('token');
+
+    if (token == null || token.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Votre session a expiré. Veuillez vous reconnecter.')),
+      );
+      setState(() => _isSubmitting = false);
+      return;
+    }
+
     final response = await http.put(
       Uri.parse(url),
-      headers: {'Content-Type': 'application/json'},
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
       body: json.encode({
         'motif': _motifController.text,
         'date': dateController.text,
@@ -229,15 +245,30 @@ class _RemovalFormState extends State<RemovalForm> {
 
       // Rediriger vers la page de d'accueil
       Future.delayed(Duration(seconds: 1), () {
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(
-            builder: (context) => DepositMoneyDetailsScreen(),
-          ),
+        if (!mounted) return;
+        Navigator.pushNamedAndRemoveUntil(
+          context,
+          Routes.depositMoneyDetailsScreen,
+          ModalRoute.withName(Routes.bottomNavigationScreen),
+          arguments: widget.signalementId,
         );
       });
     } else {
+      String message = 'Échec de l’enregistrement de l’enlèvement';
+      try {
+        final responseBody = jsonDecode(response.body);
+        if (responseBody['message'] is String) {
+          message = responseBody['message'];
+        } else if (response.statusCode == 422 && responseBody['errors'] is Map) {
+          message = (responseBody['errors'] as Map)
+              .values
+              .expand((errors) => errors is List ? errors : [errors])
+              .join('\n');
+        }
+      } catch (_) {}
+
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Échec de l\'enregistrement de l\'enlèvement')),
+        SnackBar(content: Text(message)),
       );
     }
 
