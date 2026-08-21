@@ -434,3 +434,4 @@
 #18 /var/www/html/artisan(35): Illuminate\\Foundation\\Console\\Kernel->handle(Object(Symfony\\Component\\Console\\Input\\ArgvInput), Object(Symfony\\Component\\Console\\Output\\ConsoleOutput))
 #19 {main}
 "} 
+[2026-08-21 16:04:28] local.ERROR: Échec de l’envoi de la demande d’approbation. {"signalement_id":2,"exception":"Connection could not be established with host \"smtp-relay.brevo.com:584\": stream_socket_client(): Unable to connect to smtp-relay.brevo.com:584 (Connection refused)"} 

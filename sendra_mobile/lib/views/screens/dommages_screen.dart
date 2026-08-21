@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 
+import 'package:walletium/routes/routes.dart';
 import 'package:walletium/utils/strings.dart';
 
 
@@ -236,7 +237,16 @@ class _DommagesScreenState extends State<DommagesScreen> {
 
       Future.delayed(Duration(seconds: 1), () {
         if (mounted) {
-          Navigator.pop(context, true);
+          // Dommages peut être ouvert depuis la page Infraction. Un simple
+          // pop ramenait donc l'agent vers le formulaire précédent. La
+          // constatation est recréée ici afin de recharger immédiatement le
+          // statut de la demande d'approbation.
+          Navigator.pushNamedAndRemoveUntil(
+            context,
+            Routes.depositMoneyDetailsScreen,
+            ModalRoute.withName(Routes.bottomNavigationScreen),
+            arguments: widget.signalementId,
+          );
         }
       });
 
