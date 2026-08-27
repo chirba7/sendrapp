@@ -36,6 +36,14 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _allSlidesSeen = false;
   bool _isInitialLoading = true;
   String? _loadError;
+  String _selectedStatusFilter = 'TOUS';
+
+  List<dynamic> get _filteredSignalements {
+    if (_selectedStatusFilter == 'TOUS') return allSignalements;
+    return allSignalements
+        .where((signalement) => signalement['etat'] == _selectedStatusFilter)
+        .toList();
+  }
 
   // Déclarez une variable pour suivre l'index de la diapositive actuelle
   int _currentPageIndex = 0;
@@ -442,7 +450,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: Column(
                   children: [
                     if (allSignalements.isNotEmpty)
-                      _transactionHistoryWidget(context, allSignalements),
+                      _transactionHistoryWidget(context, _filteredSignalements),
                     if (allSignalements.isEmpty)
                       Container(
                         height: MediaQuery.of(context).size.height * 0.7,
@@ -696,6 +704,154 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           addVerticalSpace(5.h),
           _transactionHistoryListWidget(context, signalements),
+          _statusFilterWidget(),
+        ],
+      ),
+    );
+  }
+
+  Widget _statusFilterWidget() {
+    final filters = <({String value, String label, IconData icon, Color color})>[
+      (
+        value: 'TOUS',
+        label: 'Tous',
+        icon: Icons.view_list_rounded,
+        color: Colors.blueGrey,
+      ),
+      (
+        value: 'SIGNALE',
+        label: 'Signalés',
+        icon: Icons.report_outlined,
+        color: Colors.red,
+      ),
+      (
+        value: 'EN COURS',
+        label: 'En cours',
+        icon: Icons.pending_actions_outlined,
+        color: Colors.orange,
+      ),
+      (
+        value: 'ENLEVE',
+        label: 'Résolus',
+        icon: Icons.check_circle_outline,
+        color: Colors.green,
+      ),
+    ];
+
+    int countFor(String value) => value == 'TOUS'
+        ? allSignalements.length
+        : allSignalements.where((item) => item['etat'] == value).length;
+
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.fromLTRB(8, 24, 8, 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF5F8F6),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFDCE8DF)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Filtrer les signalements',
+            style: TextStyle(
+              fontSize: 19,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF173C26),
+            ),
+          ),
+          const SizedBox(height: 5),
+          Text(
+            'Affichez les dossiers selon leur état de traitement.',
+            style: TextStyle(fontSize: 13, color: Colors.grey[700]),
+          ),
+          const SizedBox(height: 16),
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              childAspectRatio: 2.25,
+              crossAxisSpacing: 10,
+              mainAxisSpacing: 10,
+            ),
+            itemCount: filters.length,
+            itemBuilder: (context, index) {
+              final filter = filters[index];
+              final selected = _selectedStatusFilter == filter.value;
+              return InkWell(
+                onTap: () => setState(() {
+                  _selectedStatusFilter = filter.value;
+                }),
+                borderRadius: BorderRadius.circular(14),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 180),
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  decoration: BoxDecoration(
+                    color: selected ? filter.color : Colors.white,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: selected ? filter.color : const Color(0xFFDCE3DE),
+                    ),
+                    boxShadow: selected
+                        ? [
+                            BoxShadow(
+                              color: filter.color.withValues(alpha: 0.22),
+                              blurRadius: 8,
+                              offset: const Offset(0, 3),
+                            ),
+                          ]
+                        : null,
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        filter.icon,
+                        color: selected ? Colors.white : filter.color,
+                        size: 24,
+                      ),
+                      const SizedBox(width: 9),
+                      Expanded(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              filter.label,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: selected ? Colors.white : const Color(0xFF26332B),
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            Text(
+                              '${countFor(filter.value)}',
+                              style: TextStyle(
+                                color: selected ? Colors.white : filter.color,
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+          if (_filteredSignalements.isEmpty) ...[
+            const SizedBox(height: 14),
+            const Center(
+              child: Text(
+                'Aucun signalement dans cette catégorie.',
+                style: TextStyle(color: Colors.grey),
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -839,7 +995,9 @@ class _HomeScreenState extends State<HomeScreen> {
                         SizedBox(height: 5),
                         Text(
                           signalement['etat'] == 'SIGNALE' ? 'Signalé' :
-                          signalement['etat'] == 'EN COURS' ? 'En cours' : 'Résolu',
+                          signalement['etat'] == 'EN COURS' ? 'En cours' :
+                          signalement['etat'] == 'ENLEVE' ? 'Résolu' :
+                          signalement['etat'] == 'REJETE' ? 'Rejeté' : 'Inconnu',
                           style: TextStyle(
                             color: iconColor,
                             fontSize: 14,
@@ -865,4 +1023,3 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 }
-

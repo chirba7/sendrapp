@@ -32,28 +32,29 @@ class DommagesController extends Controller
         // Sauvegarde de l'image dans le stockage Laravel (dossier public/storage/dommages)
         Storage::disk('public')->put('dommages/' . $filename, $imageBinary);
 
-        // Une nouvelle saisie déclenche une seule demande d'approbation. Une
-        // correction ultérieure du dessin ne doit pas inonder les admins.
-        $premiereSoumission = empty($carPosition->dommage_image);
-
         // Mise à jour de l'enregistrement du signalement avec le nom de fichier de l'image
         $carPosition->dommage_image = $filename;
         $carPosition->update();
 
-        if ($premiereSoumission) {
-            $this->notifierAdministrateurs($carPosition);
+        // Tant que l'administration n'a pas statué, chaque validation des
+        // dommages représente une demande (ou une nouvelle version) à
+        // examiner. Se baser sur la seule présence d'une ancienne image
+        // empêchait toute notification lors d'une correction ultérieure.
+        $notificationEnvoyee = false;
+        if (!$carPosition->is_approve) {
+            $notificationEnvoyee = $this->notifierAdministrateurs($carPosition);
         }
 
         return response()->json([
-            'message' => $premiereSoumission
+            'message' => $notificationEnvoyee
                 ? 'Les dommages ont été enregistrés. Une demande d’approbation a été envoyée à l’administration.'
-                : 'Les dommages ont été mis à jour avec succès.',
+                : 'Les dommages ont été enregistrés avec succès.',
             'dommage_image' => $filename,
             'signalement' => $carPosition,
         ], 200);
     }
 
-    private function notifierAdministrateurs(CarPosition $carPosition): void
+    private function notifierAdministrateurs(CarPosition $carPosition): bool
     {
         $emails = User::query()
             ->where('role_id', 1)
@@ -66,21 +67,28 @@ class DommagesController extends Controller
             Log::warning('Demande d’approbation non envoyée : aucun administrateur avec e-mail.', [
                 'signalement_id' => $carPosition->id,
             ]);
-            return;
+            return false;
         }
 
         try {
-            Mail::raw(
-                "Une nouvelle constatation est en attente d’approbation.\n\n"
-                . "Signalement n° {$carPosition->id}\n"
-                . "Titre : {$carPosition->title}\n"
-                . "Commune : {$carPosition->commune}\n\n"
-                . "Connectez-vous au back-office Sendra pour examiner les dommages et valider ou rejeter la demande.",
+            $backofficeUrl = rtrim(config('services.sendra.backoffice_url'), '/');
+            $detailsUrl = "{$backofficeUrl}/dashboard/signalement/{$carPosition->id}";
+
+            Mail::send(
+                [
+                    'html' => 'emails.approval-request',
+                    'text' => 'emails.approval-request-text',
+                ],
+                [
+                    'signalement' => $carPosition,
+                    'detailsUrl' => $detailsUrl,
+                ],
                 function ($message) use ($emails, $carPosition) {
                     $message->to($emails->all())
                         ->subject("Sendra — demande d’approbation n° {$carPosition->id}");
                 }
             );
+            return true;
         } catch (\Throwable $exception) {
             // La saisie des dommages reste enregistrée même si le serveur
             // mail est momentanément indisponible.
@@ -88,6 +96,7 @@ class DommagesController extends Controller
                 'signalement_id' => $carPosition->id,
                 'exception' => $exception->getMessage(),
             ]);
+            return false;
         }
     }
 
