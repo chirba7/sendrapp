@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Découvre automatiquement l'IP LAN du backend local (Docker) en scannant
@@ -14,9 +13,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 class BackendDiscoveryService {
   static const _prefsKey = 'backend_host_ip';
   static const _port = 8000;
-  static const _pingPath = '/api/ping';
-  static const _expectedSignature = 'sendra-backend';
-  static const _probeTimeout = Duration(milliseconds: 400);
+  static const _probeTimeout = Duration(milliseconds: 350);
   static const _batchSize = 40;
 
   /// Tente de retrouver le backend, met à jour [onFound] avec l'IP trouvée.
@@ -29,13 +26,21 @@ class BackendDiscoveryService {
       return cached;
     }
 
-    final prefix = await _localSubnetPrefix();
-    if (prefix == null) {
+    final prefixes = await _localSubnetPrefixes();
+    if (prefixes.isEmpty) {
       // Pas de Wi-Fi détecté : on retente l'IP en cache par défaut, sinon rien.
       return cached;
     }
 
-    final found = await _scanSubnet(prefix);
+    // Un téléphone peut exposer simultanément Wi-Fi, données mobiles et
+    // interfaces VPN. Scanner seulement la première interface privée pouvait
+    // donc chercher le backend sur le mauvais réseau. Les sous-réseaux sont
+    // testés en parallèle, avec priorité aux réseaux Wi-Fi 192.168.x.x.
+    final results = await Future.wait(prefixes.map(_scanSubnet));
+    final found = results.firstWhere(
+      (host) => host != null,
+      orElse: () => null,
+    );
     if (found != null) {
       await prefs.setString(_prefsKey, found);
       return found;
@@ -46,12 +51,13 @@ class BackendDiscoveryService {
 
   /// Déduit le préfixe /24 du réseau Wi-Fi actuel du téléphone
   /// (ex: "192.168.1.") à partir de ses propres interfaces réseau.
-  static Future<String?> _localSubnetPrefix() async {
+  static Future<List<String>> _localSubnetPrefixes() async {
     try {
       final interfaces = await NetworkInterface.list(
         type: InternetAddressType.IPv4,
         includeLoopback: false,
       );
+      final prefixes = <String>{};
       for (final interface in interfaces) {
         for (final addr in interface.addresses) {
           final ip = addr.address;
@@ -60,15 +66,22 @@ class BackendDiscoveryService {
               _isPrivate172(ip)) {
             final parts = ip.split('.');
             if (parts.length == 4) {
-              return '${parts[0]}.${parts[1]}.${parts[2]}.';
+              prefixes.add('${parts[0]}.${parts[1]}.${parts[2]}.');
             }
           }
         }
       }
+      final ordered = prefixes.toList()
+        ..sort((a, b) {
+          final aWifi = a.startsWith('192.168.') ? 0 : 1;
+          final bWifi = b.startsWith('192.168.') ? 0 : 1;
+          return aWifi.compareTo(bWifi);
+        });
+      return ordered;
     } catch (_) {
       // Pas de permission réseau ou pas de Wi-Fi actif.
     }
-    return null;
+    return const [];
   }
 
   static bool _isPrivate172(String ip) {
@@ -94,13 +107,18 @@ class BackendDiscoveryService {
   }
 
   static Future<bool> _probe(String ip) async {
+    Socket? socket;
     try {
-      final uri = Uri.parse('http://$ip:$_port$_pingPath');
-      final response = await http.get(uri).timeout(_probeTimeout);
-      return response.statusCode == 200 &&
-          response.body.contains(_expectedSignature);
+      // Tester l'ouverture du port est instantané, même lorsque Laravel met
+      // plusieurs secondes à traiter sa première requête sous Docker/Windows.
+      // L'ancienne sonde HTTP de 400 ms rejetait donc systématiquement le bon
+      // serveur avant qu'il ait eu le temps de répondre.
+      socket = await Socket.connect(ip, _port, timeout: _probeTimeout);
+      return true;
     } catch (_) {
       return false;
+    } finally {
+      socket?.destroy();
     }
   }
 }

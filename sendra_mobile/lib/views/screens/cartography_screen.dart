@@ -29,11 +29,19 @@ class _CartographyScreenState extends State<CartographyScreen> {
   }
 
   Future<void> _loadSignalements() async {
+    if (mounted) {
+      setState(() {
+        _isLoading = true;
+        _errorMessage = null;
+      });
+    }
     try {
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('token') ?? '';
       final response = await http.get(
-        Uri.parse('${Strings.apiURI}voirSignalements'),
+        // La cartographie de l'agent doit afficher tous les signalements
+        // métier récents, pas uniquement ceux créés par son propre compte.
+        Uri.parse('${Strings.apiURI}listerSignalements'),
         headers: {'Authorization': 'Bearer $token'},
       );
 
@@ -109,10 +117,22 @@ class _CartographyScreenState extends State<CartographyScreen> {
                 child: Padding(
                   padding: const EdgeInsets.all(16),
                   child: Text(
-                    _errorMessage ??
-                        'Aucun signalement à afficher. La carte reste accessible et vous pouvez créer le premier signalement avec le bouton « Signaler ».',
+                    _errorMessage ?? 'Aucun signalement récent à afficher.',
                     textAlign: TextAlign.center,
                   ),
+                ),
+              ),
+            ),
+          if (!_isLoading && _errorMessage != null)
+            Positioned(
+              top: 90,
+              left: 0,
+              right: 0,
+              child: Center(
+                child: ElevatedButton.icon(
+                  onPressed: _loadSignalements,
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('Réessayer'),
                 ),
               ),
             ),

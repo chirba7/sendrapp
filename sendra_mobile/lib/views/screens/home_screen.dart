@@ -35,6 +35,7 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _hasNextPage = false;
   bool _allSlidesSeen = false;
   bool _isInitialLoading = true;
+  String? _loadError;
 
   // Déclarez une variable pour suivre l'index de la diapositive actuelle
   int _currentPageIndex = 0;
@@ -84,6 +85,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _fetchData() async {
     setState(() {
       _isInitialLoading = true;
+      _loadError = null;
     });
 
     try {
@@ -92,7 +94,11 @@ class _HomeScreenState extends State<HomeScreen> {
         allSignalements = fetchedSignalements;
       });
     } catch (e) {
-      // Handle errors
+      if (mounted) {
+        setState(() {
+          _loadError = 'Impossible de joindre le serveur. Vérifiez le Wi-Fi puis réessayez.';
+        });
+      }
     } finally {
       setState(() {
         _isInitialLoading = false;
@@ -459,12 +465,26 @@ class _HomeScreenState extends State<HomeScreen> {
                               ),
                             ],
                           )
-                              : Text(
-                            'Aucun signalement disponible',
-                            style: TextStyle(
-                              fontSize: 16,
-                              color: Colors.grey[600],
-                            ),
+                              : Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                _loadError ?? 'Aucun signalement récent disponible',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  color: _loadError == null ? Colors.grey[600] : Colors.red[700],
+                                ),
+                              ),
+                              if (_loadError != null) ...[
+                                const SizedBox(height: 16),
+                                ElevatedButton.icon(
+                                  onPressed: _fetchData,
+                                  icon: const Icon(Icons.refresh),
+                                  label: const Text('Réessayer'),
+                                ),
+                              ],
+                            ],
                           ),
                         ),
                       ),
@@ -845,5 +865,4 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 }
-
 

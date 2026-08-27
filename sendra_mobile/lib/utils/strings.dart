@@ -159,7 +159,7 @@ class Strings {
   // nécessaire — à ajuster si l'adresse de la machine change.
   // Repli si la découverte réseau automatique (BackendDiscoveryService)
   // échoue au démarrage (pas de Wi-Fi, permissions réseau refusées...).
-  static const String apiHostLan = 'http://192.168.1.22:8000';
+  static const String apiHostLan = 'http://192.168.1.31:8000';
   static const String apiHostWeb = 'http://localhost:8000';
 
   // Non-const (contrairement à avant) : mis à jour au démarrage de l'app
