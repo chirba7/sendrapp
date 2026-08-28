@@ -63,7 +63,7 @@
                     </span>
                     <span class="text">Comptes</span>
                 </a>
-                <ul id="ddmenu_3" class="collapse dropdown-nav {{request()->is('dashboard/comptes/agents') || request()->is('dashboard/comptes/admin') || request()->is('dashboard/comptes/autorites') || request()->is('dashboard/comptes/ajouter') ? 'show' : ''}}">
+                <ul id="ddmenu_3" class="collapse dropdown-nav {{request()->is('dashboard/comptes/agents') || request()->is('dashboard/comptes/admin') || request()->is('dashboard/comptes/autorites') || request()->is('dashboard/comptes/ajouter') || request()->is('dashboard/comptes/citoyens') ? 'show' : ''}}">
                     <li>
                         <a href="{{route('ajouter')}}" class="{{request()->is('dashboard/comptes/ajouter') ? 'active' : ''}}"> Ajouter un compte</a>
                     </li>
@@ -78,6 +78,10 @@
                     </li>
                     <li>
                         <a href="{{route('utilisateurs')}}" class="{{request()->is('dashboard/comptes/utilisateurs') ? 'active' : ''}}"> Autorité préfecture </a>
+                    </li>
+                    <li>
+                        {{-- Correction WEB-M-1 --}}
+                        <a href="{{route('citoyens')}}" class="{{request()->is('dashboard/comptes/citoyens') ? 'active' : ''}}"> Citoyens </a>
                     </li>
                 </ul>
             </li>

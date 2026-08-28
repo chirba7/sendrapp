@@ -37,6 +37,14 @@ class UserController extends Controller
         $users = User::with('role')->where('role_id', 4)->paginate(5);
         return view('comptes.utilisateurs', compact('users'));
     }
+    // Correction WEB-M-1 : aucun écran n'affichait les comptes citoyens
+    // (role_id=5, créés depuis l'app mobile) — invisibles depuis le
+    // back-office alors qu'ils existent bien en base.
+    public function citoyens()
+    {
+        $users = User::with('role')->where('role_id', 5)->paginate(5);
+        return view('comptes.citoyens', compact('users'));
+    }
     public function ajouter()
     {
         return view('comptes.add');
