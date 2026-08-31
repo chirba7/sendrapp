@@ -8,12 +8,13 @@ import 'package:http/http.dart' as http;
 
 import 'package:walletium/routes/routes.dart';
 import 'package:walletium/utils/strings.dart';
-
+import 'package:walletium/utils/sendra_theme.dart';
 
 class DommagesScreen extends StatefulWidget {
   final int signalementId;
 
-  const DommagesScreen({Key? key, required this.signalementId}) : super(key: key);
+  const DommagesScreen({Key? key, required this.signalementId})
+      : super(key: key);
 
   @override
   _DommagesScreenState createState() => _DommagesScreenState();
@@ -38,7 +39,7 @@ class _DommagesScreenState extends State<DommagesScreen> {
     ]);
 
     fetchSignalementDetails(widget.signalementId);
-    _loadImageFromApi(widget.signalementId);  // Charge l'image depuis l'API
+    _loadImageFromApi(widget.signalementId); // Charge l'image depuis l'API
   }
 
   @override
@@ -123,7 +124,8 @@ class _DommagesScreenState extends State<DommagesScreen> {
         print('Réponse d\'image obtenue: ${jsonResponse.toString()}');
 
         // Vérifiez si la clé "dommages" est présente
-        if (jsonResponse.containsKey('dommages') && jsonResponse['dommages'] != null) {
+        if (jsonResponse.containsKey('dommages') &&
+            jsonResponse['dommages'] != null) {
           final imageUrl = jsonResponse['dommages'];
           final imageBytes = await _fetchImageFromUrl(imageUrl);
           final image = await _decodeImage(imageBytes);
@@ -147,18 +149,16 @@ class _DommagesScreenState extends State<DommagesScreen> {
     }
   }
 
-
 // Fonction utilitaire pour récupérer l'image depuis une URL
   Future<Uint8List> _fetchImageFromUrl(String imageUrl) async {
     final response = await http.get(Uri.parse(imageUrl));
     if (response.statusCode == 200) {
       return response.bodyBytes;
     } else {
-      throw Exception('Erreur lors du téléchargement de l\'image depuis $imageUrl');
+      throw Exception(
+          'Erreur lors du téléchargement de l\'image depuis $imageUrl');
     }
   }
-
-
 
   // Fonction utilitaire pour décoder les données d'image
   Future<ui.Image> _decodeImage(Uint8List bytes) async {
@@ -175,7 +175,8 @@ class _DommagesScreenState extends State<DommagesScreen> {
 
     // Calculer le facteur de mise à l'échelle
     double scaleX = _imageWidth / MediaQuery.of(context).size.width;
-    double scaleY = _imageHeight / (MediaQuery.of(context).size.width * (_imageHeight / _imageWidth));
+    double scaleY = _imageHeight /
+        (MediaQuery.of(context).size.width * (_imageHeight / _imageWidth));
 
     final recorder = ui.PictureRecorder();
     final canvas = Canvas(
@@ -184,7 +185,8 @@ class _DommagesScreenState extends State<DommagesScreen> {
     );
 
     // Dessiner l'image
-    final Rect srcRect = Rect.fromLTWH(0, 0, _image!.width.toDouble(), _image!.height.toDouble());
+    final Rect srcRect = Rect.fromLTWH(
+        0, 0, _image!.width.toDouble(), _image!.height.toDouble());
     final Rect dstRect = Rect.fromLTWH(0, 0, _imageWidth, _imageHeight);
     canvas.drawImageRect(_image!, srcRect, dstRect, Paint());
 
@@ -207,7 +209,8 @@ class _DommagesScreenState extends State<DommagesScreen> {
     }
 
     final picture = recorder.endRecording();
-    final img = await picture.toImage(_imageWidth.toInt(), _imageHeight.toInt());
+    final img =
+        await picture.toImage(_imageWidth.toInt(), _imageHeight.toInt());
     final byteData = await img.toByteData(format: ui.ImageByteFormat.png);
     final Uint8List imageBytes = byteData!.buffer.asUint8List();
     final String base64Image = base64Encode(imageBytes);
@@ -226,12 +229,14 @@ class _DommagesScreenState extends State<DommagesScreen> {
       'signature': 'data:image/png;base64,' + base64Image,
     });
 
-    final response = await http.put(Uri.parse(url), headers: headers, body: body);
+    final response =
+        await http.put(Uri.parse(url), headers: headers, body: body);
 
     if (response.statusCode == 200) {
       final jsonResponse = jsonDecode(response.body);
       print('Réponse après enregistrement: ${jsonResponse.toString()}');
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(jsonResponse['message']),
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(jsonResponse['message']),
         duration: Duration(seconds: 1),
       ));
 
@@ -249,101 +254,114 @@ class _DommagesScreenState extends State<DommagesScreen> {
           );
         }
       });
-
     } else {
       print('Erreur lors de l\'enregistrement du dessin');
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Échec de l\'enregistrement des dommages')));
+      ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Échec de l\'enregistrement des dommages')));
     }
   }
-
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(
-          'Dommages',
-          style: TextStyle(
-            color: Colors.green[700],
-            fontWeight: FontWeight.bold, // Met le texte en gras
-          ),
-        ),
+        title: const Text('Constatation / Dommages'),
         leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: Colors.black),
+          icon: const Icon(Icons.arrow_back_rounded),
           onPressed: () => Navigator.of(context).pop(),
         ),
         backgroundColor: Colors.white,
         elevation: 0,
       ),
-
-      body: Column(
-        children: [
-          if (signalementDetails != null) ...[
-            Text('Détails du signalement :'),
-            Text('ID : ${signalementDetails!['signalementId']}'),
-          ],
-          Expanded(
-            child: Stack(
-              children: [
-                if (_image != null)
-                  Positioned(
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    child: SizedBox(
-                      width: MediaQuery.of(context).size.width,
-                      height: _imageHeight * (MediaQuery.of(context).size.width / _imageWidth),
-                      child: CustomPaint(
-                        painter: ImagePainter(_image!, _points),
+      backgroundColor: SendraTheme.surface,
+      body: SafeArea(
+        top: false,
+        child: Column(
+          children: [
+            if (signalementDetails != null) ...[
+              Container(
+                width: double.infinity,
+                margin: const EdgeInsets.fromLTRB(16, 12, 16, 10),
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: SendraTheme.border),
+                ),
+                child: Text(
+                  'Étape finale · Signalement n° ${signalementDetails!['signalementId']}',
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
+              ),
+            ],
+            Expanded(
+              child: Stack(
+                children: [
+                  if (_image != null)
+                    Positioned(
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      child: SizedBox(
+                        width: MediaQuery.of(context).size.width,
+                        height: _imageHeight *
+                            (MediaQuery.of(context).size.width / _imageWidth),
+                        child: CustomPaint(
+                          painter: ImagePainter(_image!, _points),
+                        ),
                       ),
                     ),
+                  GestureDetector(
+                    onPanUpdate: (details) {
+                      setState(() {
+                        double dx = details.localPosition.dx;
+                        double dy = details.localPosition.dy;
+                        _points.add(Offset(dx, dy));
+                      });
+                    },
+                    onPanEnd: (details) {
+                      _points.add(null);
+                    },
                   ),
-                GestureDetector(
-                  onPanUpdate: (details) {
-                    setState(() {
-                      double dx = details.localPosition.dx;
-                      double dy = details.localPosition.dy;
-                      _points.add(Offset(dx, dy));
-                    });
-                  },
-                  onPanEnd: (details) {
-                    _points.add(null);
-                  },
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-
-          Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.red[700],
+            Container(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                border: Border(top: BorderSide(color: SendraTheme.border)),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.white,
+                      foregroundColor: Colors.red[700],
+                    ),
+                    onPressed: () async {
+                      setState(() {
+                        _points.clear(); // Efface les points
+                      });
+                      await _loadDefaultImage(); // Charge l'image par défaut
+                    },
+                    icon: Icon(Icons.delete, color: Colors.white),
+                    label: const Text('Effacer'),
                   ),
-                  onPressed: () async {
-                    setState(() {
-                      _points.clear(); // Efface les points
-                    });
-                    await _loadDefaultImage(); // Charge l'image par défaut
-                  },
-                  icon: Icon(Icons.delete, color: Colors.white),
-                  label: Text('Effacer', style: TextStyle(color: Colors.white)),
-                ),
-                ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green[700],
+                  ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: SendraTheme.green,
+                    ),
+                    onPressed: _saveDrawing,
+                    icon: Icon(Icons.save, color: Colors.white),
+                    label: const Text('Envoyer pour approbation'),
                   ),
-                  onPressed: _saveDrawing,
-                  icon: Icon(Icons.save, color: Colors.white),
-                  label: Text('Enregistrer', style: TextStyle(color: Colors.white)),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -358,7 +376,8 @@ class ImagePainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     // Dessiner l'image sur l'écran sans mise à l'échelle
-    final Rect srcRect = Rect.fromLTWH(0, 0, image.width.toDouble(), image.height.toDouble());
+    final Rect srcRect =
+        Rect.fromLTWH(0, 0, image.width.toDouble(), image.height.toDouble());
     final Rect dstRect = Rect.fromLTWH(0, 0, size.width, size.height);
     canvas.drawImageRect(image, srcRect, dstRect, Paint());
 

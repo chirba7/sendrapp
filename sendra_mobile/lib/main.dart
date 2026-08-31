@@ -3,10 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:walletium/routes/routes.dart';
 import 'firebase_options.dart';
+import 'utils/sendra_theme.dart';
 
 // Observer pour les routes
 class RouteObserverMiddleware extends GetMiddleware {
@@ -35,7 +35,9 @@ Future<String> getInitialRoute() async {
   final lastRoute = prefs.getString('lastRoute');
 
   if (token != null && token.isNotEmpty) {
-    if (lastRoute != null && lastRoute.isNotEmpty && lastRoute != Routes.signInScreen) {
+    if (lastRoute != null &&
+        lastRoute.isNotEmpty &&
+        lastRoute != Routes.signInScreen) {
       return lastRoute;
     }
     return Routes.bottomNavigationScreen;
@@ -52,8 +54,7 @@ void main() async {
   ]);
 
   SystemChrome.setSystemUIOverlayStyle(
-      const SystemUiOverlayStyle(statusBarColor: Colors.transparent)
-  );
+      const SystemUiOverlayStyle(statusBarColor: Colors.transparent));
 
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
@@ -74,17 +75,15 @@ class MyApp extends StatelessWidget {
       designSize: const Size(414, 896),
       builder: (_, child) => GetMaterialApp(
         debugShowCheckedModeBanner: false,
-        theme: ThemeData(
-          textTheme: GoogleFonts.poppinsTextTheme(Theme.of(context).textTheme),
-          bottomSheetTheme:
-          const BottomSheetThemeData(backgroundColor: Colors.transparent),
-        ),
+        theme: SendraTheme.light,
         initialRoute: initialRoute,
         getPages: Routes.list,
         navigatorObservers: [
           GetObserver(
-                (route) {
-              if (route != null && route.isBottomSheet != true && route.isDialog != true) {
+            (route) {
+              if (route != null &&
+                  route.isBottomSheet != true &&
+                  route.isDialog != true) {
                 saveLastRoute(route.current);
               }
             },
@@ -95,8 +94,7 @@ class MyApp extends StatelessWidget {
           ScreenUtil.init(context);
           return MediaQuery(
               data: MediaQuery.of(context).copyWith(textScaleFactor: 1.0),
-              child: widget!
-          );
+              child: widget!);
         },
       ),
     );

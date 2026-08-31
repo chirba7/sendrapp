@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:walletium/views/screens/vehicule_screen.dart';
 import '../../utils/session.dart';
 import '../../utils/strings.dart';
+import '../../utils/sendra_theme.dart';
 import 'carto.dart';
 import 'dommages_screen.dart';
 import 'enlevement_screen.dart';
@@ -34,7 +35,8 @@ class _DepositMoneyDetailsScreenState extends State<DepositMoneyDetailsScreen> {
     });
   }
 
-  Future<Map<String, dynamic>> fetchSignalementDetails(int signalementId) async {
+  Future<Map<String, dynamic>> fetchSignalementDetails(
+      int signalementId) async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('token');
     final url = Strings.apiURI + 'listerSignalement/$signalementId';
@@ -97,18 +99,22 @@ class _DepositMoneyDetailsScreenState extends State<DepositMoneyDetailsScreen> {
       LocationPermission permission = await Geolocator.checkPermission();
 
       // Si les permissions ne sont pas accordées, demandez la permission
-      if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
         // Si la permission est refusée ou refusée définitivement, demander la permission
         permission = await Geolocator.requestPermission();
-        if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
+        if (permission == LocationPermission.denied ||
+            permission == LocationPermission.deniedForever) {
           // Si l'utilisateur refuse toujours la permission, affichez un message
           _showPermissionDeniedDialog();
           return;
         }
       }
       // Récupérer la position du signalement
-      double signalementLat = double.parse(signalementData['latitude'].toString());
-      double signalementLng = double.parse(signalementData['longitude'].toString());
+      double signalementLat =
+          double.parse(signalementData['latitude'].toString());
+      double signalementLng =
+          double.parse(signalementData['longitude'].toString());
 
       // Rediriger vers NavigationScreen avec les coordonnées du signalement
       Navigator.push(
@@ -143,7 +149,8 @@ class _DepositMoneyDetailsScreenState extends State<DepositMoneyDetailsScreen> {
       builder: (BuildContext context) {
         return AlertDialog(
           title: Text('Services de localisation désactivés'),
-          content: Text('Veuillez activer les services de localisation pour continuer.'),
+          content: Text(
+              'Veuillez activer les services de localisation pour continuer.'),
           actions: <Widget>[
             TextButton(
               child: Text('OK'),
@@ -165,7 +172,8 @@ class _DepositMoneyDetailsScreenState extends State<DepositMoneyDetailsScreen> {
         return AlertDialog(
           title: Row(
             children: [
-              Icon(Icons.error, color: Colors.orange, size: 32), // Icône d'erreur plus grande
+              Icon(Icons.error,
+                  color: Colors.orange, size: 32), // Icône d'erreur plus grande
               SizedBox(width: 15),
               Expanded(
                 child: Text(
@@ -173,40 +181,52 @@ class _DepositMoneyDetailsScreenState extends State<DepositMoneyDetailsScreen> {
                   style: TextStyle(
                     color: Colors.orange,
                     fontWeight: FontWeight.bold,
-                    fontSize: 18, // Augmenter la taille de la police pour une meilleure visibilité
+                    fontSize:
+                        18, // Augmenter la taille de la police pour une meilleure visibilité
                   ),
                   softWrap: true, // Permet au texte de passer à la ligne
-                  overflow: TextOverflow.visible, // Pas d'ellipses, texte complet
+                  overflow:
+                      TextOverflow.visible, // Pas d'ellipses, texte complet
                 ),
               ),
             ],
           ),
           content: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8.0), // Ajout d'un peu de padding autour du texte
+            padding: const EdgeInsets.symmetric(
+                vertical: 8.0), // Ajout d'un peu de padding autour du texte
             child: Text(
               'Pour afficher l\'itinéraire, veuillez activer la localisation dans les paramètres de votre appareil.',
-              style: TextStyle(fontSize: 16, height: 1.5), // Augmentation de la lisibilité
+              style: TextStyle(
+                  fontSize: 16, height: 1.5), // Augmentation de la lisibilité
               softWrap: true, // Permet au texte de passer à la ligne
-              textAlign: TextAlign.center, // Centrer le texte pour une meilleure présentation
+              textAlign: TextAlign
+                  .center, // Centrer le texte pour une meilleure présentation
             ),
           ),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12), // Coins arrondis plus marqués pour un effet plus moderne
+            borderRadius: BorderRadius.circular(
+                12), // Coins arrondis plus marqués pour un effet plus moderne
           ),
           elevation: 6, // Ajouter une ombre pour un effet flottant
-          backgroundColor: Colors.white, // Fond blanc pour un contraste plus marqué
-          actionsPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 10), // Espacement des boutons
+          backgroundColor:
+              Colors.white, // Fond blanc pour un contraste plus marqué
+          actionsPadding: EdgeInsets.symmetric(
+              horizontal: 20, vertical: 10), // Espacement des boutons
           actions: <Widget>[
             TextButton(
               style: TextButton.styleFrom(
                 foregroundColor: Colors.blue, // Couleur du texte
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8), // Coins arrondis du bouton
+                  borderRadius:
+                      BorderRadius.circular(8), // Coins arrondis du bouton
                 ),
-                backgroundColor: Colors.blue.withValues(alpha: 0.1), // Fond léger pour le bouton
+                backgroundColor: Colors.blue
+                    .withValues(alpha: 0.1), // Fond léger pour le bouton
               ),
               child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 20), // Un peu de padding pour le bouton
+                padding: const EdgeInsets.symmetric(
+                    vertical: 10,
+                    horizontal: 20), // Un peu de padding pour le bouton
                 child: Text(
                   'OK',
                   style: TextStyle(fontSize: 16), // Taille de police du bouton
@@ -222,24 +242,17 @@ class _DepositMoneyDetailsScreenState extends State<DepositMoneyDetailsScreen> {
     );
   }
 
-
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
-          'Constatation',
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,  // Ajout du gras
-          ),
-        ),
+        title: const Text('Détail du signalement'),
         leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: Colors.white),
+          icon: const Icon(Icons.arrow_back_rounded),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        backgroundColor: Colors.green[700],
+        backgroundColor: Colors.white,
+        foregroundColor: SendraTheme.ink,
         elevation: 0,
       ),
       body: SafeArea(
@@ -273,6 +286,7 @@ class _DepositMoneyDetailsScreenState extends State<DepositMoneyDetailsScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            _workflowHeader(signalementData),
             _localisationButton(),
             _menuItem('Informations de base', signalementData),
             // Le workflow métier (véhicule, infraction, dommages, enlèvement)
@@ -292,6 +306,79 @@ class _DepositMoneyDetailsScreenState extends State<DepositMoneyDetailsScreen> {
             const SizedBox(height: 16),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _workflowHeader(Map<String, dynamic> data) {
+    final status = data['etat']?.toString() ?? 'SIGNALE';
+    final color = status == 'ENLEVE'
+        ? SendraTheme.green
+        : status == 'EN COURS'
+            ? SendraTheme.amber
+            : Colors.red.shade600;
+    final label = status == 'ENLEVE'
+        ? 'Résolu'
+        : status == 'EN COURS'
+            ? 'En cours'
+            : status == 'REJETE'
+                ? 'Rejeté'
+                : 'À constater';
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: SendraTheme.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: .11),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  label,
+                  style: TextStyle(
+                      color: color, fontWeight: FontWeight.w700, fontSize: 12),
+                ),
+              ),
+              const Spacer(),
+              Text(
+                'N° ${data['signalementId'] ?? ''}',
+                style: const TextStyle(
+                    color: SendraTheme.muted, fontWeight: FontWeight.w600),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Text(
+            data['titre']?.toString() ?? 'Signalement',
+            style: const TextStyle(fontSize: 21, fontWeight: FontWeight.w800),
+          ),
+          const SizedBox(height: 5),
+          Row(
+            children: [
+              const Icon(Icons.location_on_outlined,
+                  size: 18, color: SendraTheme.green),
+              const SizedBox(width: 5),
+              Expanded(
+                child: Text(
+                  data['commune']?.toString() ?? 'Commune non renseignée',
+                  style: const TextStyle(color: SendraTheme.muted),
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -320,7 +407,8 @@ class _DepositMoneyDetailsScreenState extends State<DepositMoneyDetailsScreen> {
             label,
             style: TextStyle(fontWeight: FontWeight.bold, color: color),
           ),
-          subtitle: const Text('Faites glisser la page vers le bas pour actualiser le statut.'),
+          subtitle: const Text(
+              'Faites glisser la page vers le bas pour actualiser le statut.'),
         ),
       ),
     );
@@ -355,53 +443,57 @@ class _DepositMoneyDetailsScreenState extends State<DepositMoneyDetailsScreen> {
 
   Widget _localisationButton() {
     return Padding(
-      padding: const EdgeInsets.all(16.0),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 6),
       child: ElevatedButton.icon(
         onPressed: _showRouteToSignalement,
         icon: Icon(
           Icons.location_on,
-          size: 30.0, // Augmenter la taille de l'icône pour plus de visibilité
+          size: 22,
         ),
         label: Text(
           'Voir l\'itinéraire',
           style: TextStyle(
-            fontSize: 18.0, // Augmenter la taille du texte pour une meilleure lisibilité
-            fontWeight: FontWeight.bold, // Rendre le texte plus audacieux
+            fontSize: 15,
+            fontWeight: FontWeight.w700,
           ),
         ),
         style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.green[700], // Couleur de fond verte
-          foregroundColor: Colors.white, // Couleur du texte et de l'icône en blanc
-          padding: EdgeInsets.symmetric(vertical: 18.0, horizontal: 24.0), // Espacement équilibré
-          textStyle: TextStyle(fontSize: 18.0, fontWeight: FontWeight.bold), // Texte plus lisible
+          backgroundColor: SendraTheme.green,
+          foregroundColor:
+              Colors.white, // Couleur du texte et de l'icône en blanc
+          minimumSize: const Size(double.infinity, 52),
+          textStyle: TextStyle(
+              fontSize: 18.0,
+              fontWeight: FontWeight.bold), // Texte plus lisible
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(15.0), // Coins plus arrondis pour un effet moderne
+            borderRadius: BorderRadius.circular(14),
           ),
-          elevation: 6.0, // Ajouter de l'ombre pour donner du relief au bouton
-          shadowColor: Colors.green[600], // Ombre verte pour un effet plus doux
-          splashFactory: InkRipple.splashFactory, // Effet de splash plus dynamique
+          elevation: 0,
+          splashFactory:
+              InkRipple.splashFactory, // Effet de splash plus dynamique
         ),
       ),
     );
   }
 
-
   Widget _menuItem(String title, [Map<String, dynamic>? signalementData]) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 10.0),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
       child: Card(
-        elevation: 4.0, // Augmentation de l'élévation pour un effet de profondeur
+        elevation: 0,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16.0), // Coins arrondis plus prononcés
+          borderRadius: BorderRadius.circular(16),
+          side: const BorderSide(color: SendraTheme.border),
         ),
         color: Colors.white, // Couleur de fond claire
-        shadowColor: Colors.grey.withValues(alpha: 0.5), // Ombre douce
         child: ListTile(
-          contentPadding: EdgeInsets.symmetric(vertical: 12.0, horizontal: 16.0),
+          contentPadding:
+              EdgeInsets.symmetric(vertical: 12.0, horizontal: 16.0),
           leading: Icon(
-            _getIconForTitle(title), // Fonction pour obtenir l'icône en fonction du titre
+            _getIconForTitle(
+                title), // Fonction pour obtenir l'icône en fonction du titre
             size: 28.0, // Taille de l'icône augmentée
-            color: Colors.blue, // Icônes colorées
+            color: SendraTheme.green,
           ),
           title: Text(
             title,
@@ -431,10 +523,12 @@ class _DepositMoneyDetailsScreenState extends State<DepositMoneyDetailsScreen> {
               ));
             } else if (title == 'Infraction') {
               Navigator.of(context).push(MaterialPageRoute(
-                builder: (context) => InfractionForm(signalementId: signalementId),
+                builder: (context) =>
+                    InfractionForm(signalementId: signalementId),
               ));
             } else if (title == 'Dommages') {
-              final updated = await Navigator.of(context).push<bool>(MaterialPageRoute(
+              final updated =
+                  await Navigator.of(context).push<bool>(MaterialPageRoute(
                 builder: (context) => DommagesScreen(
                   signalementId: signalementId,
                 ),
@@ -457,21 +551,24 @@ class _DepositMoneyDetailsScreenState extends State<DepositMoneyDetailsScreen> {
   IconData _getIconForTitle(String title) {
     switch (title) {
       case 'Informations de base':
-        return Icons.library_books; // Icône de livre ou de données (plus spécifique pour les informations)
+        return Icons
+            .library_books; // Icône de livre ou de données (plus spécifique pour les informations)
       case 'Véhicule':
-        return Icons.directions_car_filled; // Icône de voiture remplie (plus explicite)
+        return Icons
+            .directions_car_filled; // Icône de voiture remplie (plus explicite)
       case 'Infraction':
-        return Icons.report_problem; // Icône de rapport de problème (plus adapté aux infractions)
+        return Icons
+            .report_problem; // Icône de rapport de problème (plus adapté aux infractions)
       case 'Dommages':
         return Icons.draw; // Icône de rapport pour dommages (plus approprié)
-        //return Icons.report_problem;; // Icône de rapport pour dommages (plus approprié)
+      //return Icons.report_problem;; // Icône de rapport pour dommages (plus approprié)
       case 'Enlèvement':
-        return Icons.remove_circle; // Icône de suppression définitive (plus explicite pour "enlèvement")
+        return Icons
+            .remove_circle; // Icône de suppression définitive (plus explicite pour "enlèvement")
       default:
         return Icons.list; // Icône de liste générique pour un menu
     }
   }
-
 
   Widget _buildLoading() {
     return Center(

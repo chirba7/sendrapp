@@ -1,72 +1,59 @@
+import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
-import 'dart:io'; // Ajoutez cette ligne pour importer SocketException
-import 'dart:async'; // Ajoutez cette ligne pour importer TimeoutException
-import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+
 import '../../controller/sign_in_controller.dart';
 import '../../routes/routes.dart';
-import '../../utils/custom_color.dart';
-import '../../utils/dimsensions.dart';
 import '../../utils/session.dart';
 import '../../utils/strings.dart';
-import '../../widgets/buttons/primary_button_widget.dart';
-import '../../widgets/inputs/input_text_field.dart';
-import '../../widgets/labels/text_labels_widget.dart';
 
 class SignInScreen extends StatefulWidget {
+  const SignInScreen({super.key});
+
   @override
-  _SignInScreenState createState() => _SignInScreenState();
+  State<SignInScreen> createState() => _SignInScreenState();
 }
 
 class _SignInScreenState extends State<SignInScreen> {
-  final _controller = Get.put(SignInController());
-  final formKey = GlobalKey<FormState>();
+  static const _green = Color(0xFF07883F);
+  static const _forest = Color(0xFF075C32);
+  static const _ink = Color(0xFF18221D);
+  static const _muted = Color(0xFF66716B);
+
+  final SignInController _controller = Get.put(SignInController());
+  final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
+
   String _errorMessage = '';
   bool _obscureText = true;
-  bool isLoading = false;
-
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: _bodyWidget(context),
-    );
-  }
+  bool _isLoading = false;
 
   String _formatPhoneNumber(String text) {
-    // Supprimer tous les espaces existants
-    text = text.replaceAll(' ', '');
-
-    // Si le texte a moins de 9 caractères, formatter par groupes de 2-3-2-2
-    if (text.length <= 9) {
-      String formatted = '';
-      for (int i = 0; i < text.length; i++) {
-        // Ajouter un espace après 2 chiffres
-        if (i == 2) formatted += ' ';
-        // Ajouter un espace après 5 chiffres
-        if (i == 5) formatted += ' ';
-        // Ajouter un espace après 7 chiffres
-        if (i == 7) formatted += ' ';
-        formatted += text[i];
-      }
-      return formatted;
+    final digits = text.replaceAll(' ', '');
+    final limited = digits.length > 9 ? digits.substring(0, 9) : digits;
+    final buffer = StringBuffer();
+    for (var i = 0; i < limited.length; i++) {
+      if (i == 2 || i == 5 || i == 7) buffer.write(' ');
+      buffer.write(limited[i]);
     }
-    return text.substring(0, 9); // Limiter à 9 chiffres
+    return buffer.toString();
   }
 
-  String _cleanPhoneNumber(String phone) {
-    // Supprimer tous les espaces pour le traitement
-    return phone.replaceAll(' ', '');
-  }
+  String _cleanPhoneNumber(String phone) => phone.replaceAll(' ', '');
 
-  Future<void> saveUserData(String fullName, String phone, id, token, int? roleId) async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
+  Future<void> _saveUserData(
+    String fullName,
+    String phone,
+    String id,
+    String token,
+    int? roleId,
+  ) async {
+    final prefs = await SharedPreferences.getInstance();
     await prefs.setString('fullName', fullName);
     await prefs.setString('phone', phone);
     await prefs.setString('userId', id);
@@ -75,355 +62,325 @@ class _SignInScreenState extends State<SignInScreen> {
   }
 
   Future<void> _signIn() async {
-    // Activer l'indicateur de chargement
+    FocusScope.of(context).unfocus();
+    if (!_formKey.currentState!.validate()) return;
+
     setState(() {
-      isLoading = true;
+      _isLoading = true;
+      _errorMessage = '';
     });
 
-    String telephone = _cleanPhoneNumber(_controller.emailOrUserNameController.text);
-    String password = _controller.passwordController.text;
-
-    if (telephone.isEmpty || password.isEmpty) {
-      setState(() {
-        _errorMessage = 'Veuillez saisir le numéro de téléphone et le mot de passe.';
-        isLoading = false; // Désactiver l'indicateur de chargement en cas d'erreur
-      });
-      return;
-    }
+    final phone =
+        _cleanPhoneNumber(_controller.emailOrUserNameController.text);
+    final password = _controller.passwordController.text;
 
     try {
-      Map<String, String> requestBody = {
-        'telephone': telephone,
-        'password': password,
-      };
+      final response = await http
+          .post(
+            Uri.parse('${Strings.apiURI}login'),
+            body: {'telephone': phone, 'password': password},
+          )
+          .timeout(const Duration(seconds: 25));
 
-      final response = await http.post(
-        Uri.parse(Strings.apiURI + 'login'),
-        body: requestBody,
-      );
+      if (!mounted) return;
 
       if (response.statusCode == 200) {
-        Map<String, dynamic> jsonResponse = jsonDecode(response.body);
-        bool success = jsonResponse['success'];
-        if (success) {
-          String fullName = jsonResponse['fullName'].toString();
-          String userId = jsonResponse['userId'].toString();
-          String token = jsonResponse['token'].toString();
-          int? roleId = jsonResponse['role_id'] is int
-              ? jsonResponse['role_id']
+        final jsonResponse = jsonDecode(response.body) as Map<String, dynamic>;
+        if (jsonResponse['success'] == true) {
+          final roleId = jsonResponse['role_id'] is int
+              ? jsonResponse['role_id'] as int
               : int.tryParse(jsonResponse['role_id']?.toString() ?? '');
-
-          await saveUserData(fullName, telephone, userId, token, roleId);
-
-          // Désactiver l'indicateur de chargement avant la navigation
-          setState(() {
-            isLoading = false;
-          });
+          await _saveUserData(
+            jsonResponse['fullName'].toString(),
+            phone,
+            jsonResponse['userId'].toString(),
+            jsonResponse['token'].toString(),
+            roleId,
+          );
+          if (!mounted) return;
+          setState(() => _isLoading = false);
           Get.offAllNamed(Routes.bottomNavigationScreen);
-        } else {
-          String errorMessage = jsonResponse['error'].toString();
-          setState(() {
-            _errorMessage = errorMessage;
-            isLoading = false; // Désactiver l'indicateur de chargement
-          });
+          return;
         }
-      } else if (response.statusCode == 401) {
-        // Désactiver l'indicateur de chargement
         setState(() {
-          isLoading = false;
+          _errorMessage = jsonResponse['error']?.toString() ??
+              'Impossible de vous connecter.';
+          _isLoading = false;
         });
-        showDialog(
-          context: context,
-          barrierColor: Colors.black54,
-          builder: (BuildContext context) {
-            return Dialog(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20),
-              ),
-              elevation: 8,
-              backgroundColor: Colors.white,
-              child: Container(
-                padding: EdgeInsets.all(20),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      padding: EdgeInsets.all(15),
-                      decoration: BoxDecoration(
-                        color: Colors.red.shade50,
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(
-                        Icons.error_outline,
-                        color: Colors.red,
-                        size: 50,
-                      ),
-                    ),
-                    SizedBox(height: 20),
-                    Text(
-                      'Identifiants invalides',
-                      style: TextStyle(
-                        color: Colors.red.shade700,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 20,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                    SizedBox(height: 15),
-                    Text(
-                      'Les informations saisies sont incorrectes. Veuillez vérifier le numéro de téléphone et le mot de passe.',
-                      style: TextStyle(
-                        color: Colors.black87,
-                        fontSize: 16,
-                        height: 1.4,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                    SizedBox(height: 25),
-                    ElevatedButton(
-                      onPressed: () {
-                        Navigator.of(context).pop();
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.green[700],
-                        foregroundColor: Colors.white,
-                        minimumSize: Size(double.infinity, 50),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        elevation: 2,
-                      ),
-                      child: Text(
-                        'Réessayer',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-        );
-      } else {
-        // Désactiver l'indicateur de chargement
-        setState(() {
-          isLoading = false;
-        });
-        showDialog(
-          context: context,
-          builder: (BuildContext context) {
-            return AlertDialog(
-              title: Text(
-                'Erreur',
-                style: TextStyle(
-                  color: CustomColor.textColor,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Une erreur s\'est produite lors de la demande. Veuillez réessayer plus tard.',
-                    style: TextStyle(
-                      color: CustomColor.textColor,
-                    ),
-                  ),
-                ],
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () {
-                    Navigator.of(context).pop();
-                  },
-                  child: Text('OK'),
-                ),
-              ],
-            );
-          },
-        );
+        return;
       }
-    } catch (error) {
-      String errorMessage;
-      if (error is SocketException) {
-        errorMessage = 'Erreur de connexion réseau. Veuillez vérifier votre connexion internet.';
-      } else if (error is TimeoutException) {
-        errorMessage = 'La demande a expiré. Veuillez réessayer plus tard.';
-      } else {
-        errorMessage = 'Une erreur s\'est produite : $error';
-      }
+
       setState(() {
-        _errorMessage = errorMessage;
-        isLoading = false; // Désactiver l'indicateur de chargement en cas d'erreur
+        _errorMessage = response.statusCode == 401
+            ? 'Numéro de téléphone ou mot de passe incorrect.'
+            : 'Le service est momentanément indisponible. Réessayez plus tard.';
+        _isLoading = false;
       });
+    } on SocketException {
+      _showRequestError(
+        'Connexion indisponible. Vérifiez votre accès à Internet.',
+      );
+    } on TimeoutException {
+      _showRequestError('La connexion prend trop de temps. Veuillez réessayer.');
+    } catch (_) {
+      _showRequestError('Une erreur inattendue est survenue. Veuillez réessayer.');
     }
   }
 
-  Widget _bodyWidget(BuildContext context) {
-    return Container(
-      // Utiliser tout l'espace disponible sans fixer de dimensions
-      constraints: BoxConstraints.expand(),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            Colors.white,
-            Colors.green.shade900,
-          ],
-        ),
-      ),
-      child: SafeArea(
-        child: SingleChildScrollView(
-          physics: BouncingScrollPhysics(),
-          // Utiliser EdgeInsets.symmetric avec MediaQuery pour un padding adaptif
-          padding: EdgeInsets.symmetric(
-            horizontal: MediaQuery.of(context).size.width * 0.05,
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              _backButton(context),
-              _titleAndDesWidget(context),
-              SizedBox(height: MediaQuery.of(context).size.height * 0.0),
-              _inputWidgets(context),
-              SizedBox(height: MediaQuery.of(context).size.height * 0.0),
-              _signInButtonWidget(context),
-              SizedBox(height: MediaQuery.of(context).size.height * 0.0),
-              _forgotPasswordWidget(context),
-              // Ajouter un espace relatif en bas pour s'assurer que tout est visible
-              SizedBox(height: MediaQuery.of(context).size.height * 0.05),
-            ],
-          ),
-        ),
-      ),
+  void _showRequestError(String message) {
+    if (!mounted) return;
+    setState(() {
+      _errorMessage = message;
+      _isLoading = false;
+    });
+  }
+
+  InputDecoration _fieldDecoration({
+    required String hint,
+    required IconData icon,
+    Widget? suffixIcon,
+  }) {
+    OutlineInputBorder border(Color color, [double width = 1]) {
+      return OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: BorderSide(color: color, width: width),
+      );
+    }
+
+    return InputDecoration(
+      hintText: hint,
+      hintStyle: const TextStyle(color: Color(0xFF9AA39E)),
+      prefixIcon: Icon(icon, color: _muted, size: 21),
+      suffixIcon: suffixIcon,
+      filled: true,
+      fillColor: Colors.white,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 17),
+      enabledBorder: border(const Color(0xFFD8E1DC)),
+      focusedBorder: border(_green, 1.6),
+      errorBorder: border(const Color(0xFFD92D20), 1.3),
+      focusedErrorBorder: border(const Color(0xFFD92D20), 1.6),
+      errorMaxLines: 2,
     );
   }
 
-  Widget _backButton(BuildContext context) {
-    return Container(
-      alignment: Alignment.topLeft,
-      margin: EdgeInsets.all(Dimensions.marginSize * 0.2),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFFF7FAF8),
+      body: Stack(
         children: [
-          SizedBox(height: 50), // Ajoute un espacement vertical
-          Text(
-            Strings.signIn,
-            style: TextStyle(
-              color: CustomColor.textColor,
-              fontSize: 24.sp,
-              fontWeight: FontWeight.bold,
-            ),
+          const Positioned(
+            top: -105,
+            left: -95,
+            child: _DecorativeCircle(size: 255, color: Color(0xFFE1F3E8)),
           ),
-        ],
-      ),
-    );
-  }
-
-
-  Widget _titleAndDesWidget(BuildContext context) {
-    return Container(
-      margin: EdgeInsets.symmetric(horizontal: Dimensions.marginSize), // Ajustez la marge horizontale selon vos besoins
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          Image.asset(
-            'assets/images/EPAVIE2.png',
-            fit: BoxFit.contain,
-            width: MediaQuery.of(context).size.width * 0.8,
-            height: MediaQuery.of(context).size.width * 0.9 * (3 / 4),
+          const Positioned(
+            top: 115,
+            right: -85,
+            child: _DecorativeCircle(size: 190, color: Color(0xFFECF7F0)),
           ),
-        ],
-      ),
-    );
-  }
-
-  Widget _inputWidgets(BuildContext context) {
-    return Form(
-      key: formKey,
-      child: Column(
-        children: [
-          TextLabelsWidget(
-            textLabels: Strings.phoneNumber,
-            textColor: CustomColor.whiteColor,
-          ),
-          Container(
-            margin: EdgeInsets.symmetric(horizontal: Dimensions.marginSize * 0.5),
-            child: TextFormField(
-              keyboardType: TextInputType.number,
-              controller: _controller.emailOrUserNameController,
-              inputFormatters: [
-                LengthLimitingTextInputFormatter(12),  // 9 chiffres + 3 espaces
-                FilteringTextInputFormatter.allow(RegExp(r'[0-9 ]')), // Permet uniquement les chiffres et espaces
-              ],
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'Veuillez saisir votre numéro de téléphone';
-                }
-                // Vérifier si le numéro (sans espaces) a exactement 9 chiffres
-                String cleaned = _cleanPhoneNumber(value);
-                if (cleaned.length != 9 || !RegExp(r'^[0-9]+$').hasMatch(cleaned)) {
-                  return 'Le numéro doit contenir exactement 9 chiffres';
-                }
-                return null;
-              },
-              onChanged: (value) {
-                // Formatter le numéro pendant la saisie
-                String formatted = _formatPhoneNumber(value);
-                if (formatted != value) {
-                  _controller.emailOrUserNameController.value = TextEditingValue(
-                    text: formatted,
-                    selection: TextSelection.collapsed(offset: formatted.length),
-                  );
-                }
-              },
-              decoration: InputDecoration(
-                hintText: 'XX XXX XX XX',
-                hintStyle: TextStyle(color: CustomColor.gray),
-                enabledBorder: UnderlineInputBorder(
-                  borderSide: BorderSide(color: CustomColor.gray),
-                ),
-              ),
-            ),
-          ),
-          TextLabelsWidget(
-            textLabels: Strings.password,
-            textColor: CustomColor.whiteColor,
-          ),
-          Container(
-            margin: EdgeInsets.symmetric(horizontal: Dimensions.marginSize * 0.5),
-            child: TextFormField(
-              controller: _controller.passwordController,
-              validator: (value) {
-                if (value!.isEmpty) {
-                  return 'Veuillez saisir votre mot de passe';
-                }
-                return null;
-              },
-              decoration: InputDecoration(
-                hintText: Strings.password,
-                hintStyle: TextStyle(color: CustomColor.gray),
-                enabledBorder: UnderlineInputBorder(
-                  borderSide: BorderSide(color: CustomColor.gray),
-                ),
-                suffixIcon: IconButton(
-                  icon: Icon(
-                    _obscureText ? Icons.visibility : Icons.visibility_off,
-                    color: CustomColor.gray,
+          SafeArea(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                return SingleChildScrollView(
+                  keyboardDismissBehavior:
+                      ScrollViewKeyboardDismissBehavior.onDrag,
+                  padding: const EdgeInsets.fromLTRB(24, 18, 24, 20),
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      minHeight: constraints.maxHeight - 38,
+                    ),
+                    child: IntrinsicHeight(
+                      child: Form(
+                        key: _formKey,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            _brand(),
+                            const SizedBox(height: 28),
+                            const Text(
+                              'Bienvenue',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: _ink,
+                                fontSize: 30,
+                                height: 1.15,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                            const SizedBox(height: 9),
+                            const Text(
+                              'Connectez-vous pour accéder à vos signalements',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: _muted,
+                                fontSize: 15,
+                                height: 1.4,
+                              ),
+                            ),
+                            const SizedBox(height: 30),
+                            _label('Numéro de téléphone'),
+                            const SizedBox(height: 8),
+                            TextFormField(
+                              controller:
+                                  _controller.emailOrUserNameController,
+                              keyboardType: TextInputType.phone,
+                              textInputAction: TextInputAction.next,
+                              autofillHints: const [AutofillHints.telephoneNumber],
+                              inputFormatters: [
+                                LengthLimitingTextInputFormatter(12),
+                                FilteringTextInputFormatter.allow(
+                                  RegExp(r'[0-9 ]'),
+                                ),
+                              ],
+                              onChanged: (value) {
+                                final formatted = _formatPhoneNumber(value);
+                                if (formatted != value) {
+                                  _controller.emailOrUserNameController.value =
+                                      TextEditingValue(
+                                    text: formatted,
+                                    selection: TextSelection.collapsed(
+                                      offset: formatted.length,
+                                    ),
+                                  );
+                                }
+                                if (_errorMessage.isNotEmpty) {
+                                  setState(() => _errorMessage = '');
+                                }
+                              },
+                              validator: (value) {
+                                final cleaned =
+                                    _cleanPhoneNumber(value?.trim() ?? '');
+                                if (cleaned.isEmpty) {
+                                  return 'Veuillez saisir votre numéro de téléphone.';
+                                }
+                                if (!RegExp(r'^\d{9}$').hasMatch(cleaned)) {
+                                  return 'Le numéro doit contenir exactement 9 chiffres.';
+                                }
+                                return null;
+                              },
+                              decoration: _fieldDecoration(
+                                hint: '77 123 45 67',
+                                icon: Icons.phone_outlined,
+                              ),
+                            ),
+                            const SizedBox(height: 20),
+                            _label('Mot de passe'),
+                            const SizedBox(height: 8),
+                            TextFormField(
+                              controller: _controller.passwordController,
+                              obscureText: _obscureText,
+                              textInputAction: TextInputAction.done,
+                              autofillHints: const [AutofillHints.password],
+                              onFieldSubmitted: (_) => _signIn(),
+                              onChanged: (_) {
+                                if (_errorMessage.isNotEmpty) {
+                                  setState(() => _errorMessage = '');
+                                }
+                              },
+                              validator: (value) => value == null || value.isEmpty
+                                  ? 'Veuillez saisir votre mot de passe.'
+                                  : null,
+                              decoration: _fieldDecoration(
+                                hint: 'Votre mot de passe',
+                                icon: Icons.lock_outline_rounded,
+                                suffixIcon: IconButton(
+                                  tooltip: _obscureText
+                                      ? 'Afficher le mot de passe'
+                                      : 'Masquer le mot de passe',
+                                  onPressed: () => setState(
+                                    () => _obscureText = !_obscureText,
+                                  ),
+                                  icon: Icon(
+                                    _obscureText
+                                        ? Icons.visibility_outlined
+                                        : Icons.visibility_off_outlined,
+                                    color: _muted,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            Align(
+                              alignment: Alignment.centerRight,
+                              child: TextButton(
+                                onPressed: _isLoading
+                                    ? null
+                                    : () => _forgotPasswordScreen(context),
+                                child: const Text(
+                                  'Mot de passe oublié ?',
+                                  style: TextStyle(
+                                    color: _forest,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            if (_errorMessage.isNotEmpty) ...[
+                              _errorBanner(),
+                              const SizedBox(height: 14),
+                            ],
+                            SizedBox(
+                              height: 56,
+                              child: ElevatedButton(
+                                onPressed: _isLoading ? null : _signIn,
+                                style: ElevatedButton.styleFrom(
+                                  elevation: 0,
+                                  backgroundColor: _green,
+                                  disabledBackgroundColor:
+                                      _green.withValues(alpha: .65),
+                                  foregroundColor: Colors.white,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(14),
+                                  ),
+                                ),
+                                child: _isLoading
+                                    ? const SizedBox.square(
+                                        dimension: 23,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2.5,
+                                          color: Colors.white,
+                                        ),
+                                      )
+                                    : const Text(
+                                        'Se connecter',
+                                        style: TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w800,
+                                        ),
+                                      ),
+                              ),
+                            ),
+                            const Spacer(),
+                            const SizedBox(height: 26),
+                            const Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.verified_user_outlined,
+                                  color: _green,
+                                  size: 19,
+                                ),
+                                SizedBox(width: 8),
+                                Flexible(
+                                  child: Text(
+                                    'Accès réservé aux agents autorisés',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      color: _muted,
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
                   ),
-                  onPressed: () {
-                    setState(() {
-                      _obscureText = !_obscureText; // Basculer l'état du mot de passe
-                    });
-                  },
-                ),
-              ),
-              obscureText: _obscureText, // L'état du mot de passe (visible ou caché)
+                );
+              },
             ),
           ),
         ],
@@ -431,151 +388,134 @@ class _SignInScreenState extends State<SignInScreen> {
     );
   }
 
-  Widget _signInButtonWidget(BuildContext context) {
+  Widget _brand() {
     return Column(
       children: [
-        PrimaryButtonWidget(
-          title: Strings.signIn,
-          onPressed: () {
-            if (formKey.currentState != null && formKey.currentState!.validate()) {
-              _signIn();
-            }
-          },
-          isLoading: isLoading, // Transmettre l'état de chargement au bouton
-          borderColor: Color.fromARGB(255, 27, 27, 55),
-          backgroundColor: CustomColor.textColor,
-          textColor: CustomColor.whiteColor,
+        Image.asset(
+          'assets/images/logo.png',
+          height: 86,
+          width: 250,
+          fit: BoxFit.contain,
+          errorBuilder: (_, __, ___) => const Icon(
+            Icons.recycling_rounded,
+            size: 72,
+            color: _green,
+          ),
         ),
-        Text(
-          _errorMessage,
-          style: TextStyle(color: Colors.white),
+        const SizedBox(height: 2),
+        const Text(
+          'Sénégalaise de Déconstruction et de Recyclage Automobile',
+          textAlign: TextAlign.center,
+          style: TextStyle(color: _muted, fontSize: 10.5),
         ),
       ],
     );
   }
 
-  Widget _forgotPasswordWidget(BuildContext context) {
-    return Container(
-      alignment: Alignment.center,
-      margin: EdgeInsets.only(top: 53.h),
-      child: GestureDetector(
-        onTap: () {
-          _forgotPasswordScreen(context);
-        },
-        child: Text(
-          Strings.forgotPassword,
-          style: TextStyle(
-            color: CustomColor.whiteColor,
-            fontSize: 16.sp,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
+  Widget _label(String text) {
+    return Text(
+      text,
+      style: const TextStyle(
+        color: _forest,
+        fontSize: 14,
+        fontWeight: FontWeight.w700,
       ),
     );
   }
 
-  Future _forgotPasswordScreen(BuildContext context) {
-    final forgotFormKey = GlobalKey<FormState>();
-    var width = MediaQuery.of(context).size.width;
-    return showDialog(
-        context: context,
-        builder: (_) => AlertDialog(
-            backgroundColor: CustomColor.whiteColor,
-            alignment: Alignment.center,
-            insetPadding: EdgeInsets.all(Dimensions.defaultPaddingSize * 0.2),
-            contentPadding: EdgeInsets.zero,
-            clipBehavior: Clip.antiAliasWithSaveLayer,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-            content: Builder(
-              builder: (context) {
-                return Container(
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(10),
-                      color: CustomColor.primaryBackgroundColor,
-                    ),
-                    padding: const EdgeInsets.all(10),
-                    width: width * 0.9,
-                    height: 500,
-                    child: Stack(
-                      children: [
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          children: [
-                            SizedBox(height: 20.h),
-                            Container(
-                              decoration: const BoxDecoration(
-                                color: CustomColor.primaryBackgroundColor,
-                              ),
-                              child: Image.asset(
-                                Strings.forgotPassImage,
-                                height: 100,
-                              ),
-                            ),
-                            SizedBox(height: 20.h),
-                            Text(
-                              Strings.forgotPasswordTitle,
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                  color: CustomColor.textColor,
-                                  fontSize: Dimensions.largeTextSize + 5,
-                                  fontWeight: FontWeight.w700),
-                            ),
-                            SizedBox(height: 20.h),
-                            Container(
-                              margin: EdgeInsets.symmetric(horizontal: Dimensions.marginSize),
-                              width: double.infinity,
-                              child: Text(
-                                Strings.forgotPasswordDescription,
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  color: CustomColor.textColor.withOpacity(0.6),
-                                ),
-                              ),
-                            ),
-                            TextLabelsWidget(
-                              margin: 0.5,
-                              textLabels: Strings.phoneNumber,
-                              textColor: CustomColor.textColor,
-                            ),
-                            Form(
-                              key: forgotFormKey,
-                              child: Container(
-                                margin: EdgeInsets.symmetric(horizontal: Dimensions.marginSize * 0.5),
-                                child: InputTextField(
-                                  hintText: Strings.enterPhoneNumber,
-                                  hintTextColor: CustomColor.textColor,
-                                  backgroundColor: CustomColor.whiteColor,
-                                  controller: _controller.emailController,
-                                  borderColor: CustomColor.gray,
-                                ),
-                              ),
-                            ),
-                            PrimaryButtonWidget(
-                              title: Strings.conTinue,
-                              onPressed: () {
-                                Get.toNamed(Routes.otpVerificationScreen);
-                              },
-                              textColor: CustomColor.whiteColor,
-                              backgroundColor: CustomColor.textColor,
-                              borderColor: CustomColor.textColor,
-                            ),
-                          ],
-                        ),
-                        Positioned(
-                            top: 5,
-                            right: 5,
-                            child: IconButton(
-                              onPressed: () {
-                                Get.back();
-                              },
-                              icon: Icon(
-                                Icons.close,
-                                color: CustomColor.gray,
-                              ),
-                            ))
-                      ],
-                    ));
+  Widget _errorBanner() {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF1F0),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFFECACA)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.error_outline, color: Color(0xFFD92D20), size: 20),
+          const SizedBox(width: 9),
+          Expanded(
+            child: Text(
+              _errorMessage,
+              style: const TextStyle(
+                color: Color(0xFF9E1C13),
+                fontSize: 13,
+                height: 1.35,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _forgotPasswordScreen(BuildContext context) async {
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        icon: const CircleAvatar(
+          radius: 28,
+          backgroundColor: Color(0xFFE5F4EB),
+          child: Icon(Icons.lock_reset_rounded, color: _green, size: 30),
+        ),
+        title: const Text(
+          'Mot de passe oublié',
+          textAlign: TextAlign.center,
+          style: TextStyle(color: _ink, fontWeight: FontWeight.w800),
+        ),
+        content: const Text(
+          'Nous allons vérifier votre numéro de téléphone avant de réinitialiser votre mot de passe.',
+          textAlign: TextAlign.center,
+          style: TextStyle(color: _muted, height: 1.4),
+        ),
+        actionsPadding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+        actions: [
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: () {
+                Navigator.of(dialogContext).pop();
+                Get.toNamed(Routes.otpVerificationScreen);
               },
-            )));
+              style: ElevatedButton.styleFrom(
+                elevation: 0,
+                backgroundColor: _green,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: const Text(
+                'Continuer',
+                style: TextStyle(fontWeight: FontWeight.w700),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DecorativeCircle extends StatelessWidget {
+  const _DecorativeCircle({required this.size, required this.color});
+
+  final double size;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return IgnorePointer(
+      child: Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+      ),
+    );
   }
 }

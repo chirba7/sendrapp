@@ -6,11 +6,12 @@ import 'dart:convert';
 
 import '../../routes/routes.dart';
 import '../../utils/strings.dart';
+import '../../utils/sendra_theme.dart';
 
 class RemovalForm extends StatefulWidget {
   final int signalementId;
 
-  RemovalForm({required this.signalementId});
+  const RemovalForm({super.key, required this.signalementId});
 
   @override
   _RemovalFormState createState() => _RemovalFormState();
@@ -21,35 +22,41 @@ class _RemovalFormState extends State<RemovalForm> {
   final TextEditingController dateController = TextEditingController();
   final TextEditingController _motifController = TextEditingController();
   final TextEditingController _lieuController = TextEditingController();
-  final TextEditingController _nomResponsableController = TextEditingController();
+  final TextEditingController _nomResponsableController =
+      TextEditingController();
   bool _isSubmitting = false;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(
-          'Enlèvement',
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.bold, // Mettre le texte en gras
-          ),
-        ),
-        backgroundColor: Colors.green[700],
-        iconTheme: IconThemeData(color: Colors.white),
+        title: const Text('Enlèvement'),
+        backgroundColor: Colors.white,
+        foregroundColor: SendraTheme.ink,
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(25.0),
+      body: SafeArea(
+        top: false,
         child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(20, 18, 20, 120),
           child: Form(
             key: _formKey,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                const Text(
+                  'Informations d’enlèvement',
+                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
+                ),
+                const SizedBox(height: 5),
+                const Text(
+                  'Renseignez les informations après approbation administrative.',
+                  style: TextStyle(color: SendraTheme.muted, height: 1.4),
+                ),
+                const SizedBox(height: 14),
                 _buildField(
                   'Motif d\'enlèvement',
                   _motifController,
-                      (value) {
+                  (value) {
                     if (value == null || value.isEmpty) {
                       return _isSubmitting ? 'Ce champ est obligatoire' : null;
                     }
@@ -63,7 +70,7 @@ class _RemovalFormState extends State<RemovalForm> {
                 _buildField(
                   'Lieu de l\'enlèvement',
                   _lieuController,
-                      (value) {
+                  (value) {
                     if (value == null || value.isEmpty) {
                       return _isSubmitting ? 'Ce champ est obligatoire' : null;
                     }
@@ -76,7 +83,7 @@ class _RemovalFormState extends State<RemovalForm> {
                 _buildField(
                   'Nom Responsable de l\'enlèvement',
                   _nomResponsableController,
-                      (value) {
+                  (value) {
                     if (value == null || value.isEmpty) {
                       return _isSubmitting ? 'Ce champ est obligatoire' : null;
                     }
@@ -86,32 +93,42 @@ class _RemovalFormState extends State<RemovalForm> {
                     return null;
                   },
                 ),
-                SizedBox(height: 20),
-                _buildSubmitButton(),
               ],
             ),
           ),
         ),
       ),
+      bottomNavigationBar: SafeArea(
+        top: false,
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            border: Border(top: BorderSide(color: SendraTheme.border)),
+          ),
+          child: _buildSubmitButton(),
+        ),
+      ),
     );
   }
 
-  Widget _buildField(String label, TextEditingController controller, FormFieldValidator<String>? validator) {
+  Widget _buildField(String label, TextEditingController controller,
+      FormFieldValidator<String>? validator) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 15.0),
+      padding: const EdgeInsets.symmetric(vertical: 9),
       child: TextFormField(
         controller: controller,
         decoration: InputDecoration(
-          prefixIcon: Icon(Icons.text_fields, color: Colors.green[700]),
+          prefixIcon: const Icon(Icons.edit_outlined, color: SendraTheme.green),
           labelText: label,
           labelStyle: TextStyle(color: Colors.black),
           filled: true,
-          fillColor: Colors.grey[100],
+          fillColor: Colors.white,
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12.0),
           ),
           focusedBorder: OutlineInputBorder(
-            borderSide: BorderSide(color: Colors.green[700]!, width: 2),
+            borderSide: const BorderSide(color: SendraTheme.green, width: 1.5),
             borderRadius: BorderRadius.circular(12.0),
           ),
         ),
@@ -122,20 +139,21 @@ class _RemovalFormState extends State<RemovalForm> {
 
   Widget _buildDateField(String label) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 15.0),
+      padding: const EdgeInsets.symmetric(vertical: 9),
       child: TextFormField(
         controller: dateController,
         decoration: InputDecoration(
-          prefixIcon: Icon(Icons.calendar_today, color: Colors.green[700]),
+          prefixIcon: const Icon(Icons.calendar_today_outlined,
+              color: SendraTheme.green),
           labelText: label,
           labelStyle: TextStyle(color: Colors.black),
           filled: true,
-          fillColor: Colors.grey[100],
+          fillColor: Colors.white,
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12.0),
           ),
           focusedBorder: OutlineInputBorder(
-            borderSide: BorderSide(color: Colors.green[700]!, width: 2),
+            borderSide: const BorderSide(color: SendraTheme.green, width: 1.5),
             borderRadius: BorderRadius.circular(12.0),
           ),
         ),
@@ -161,7 +179,8 @@ class _RemovalFormState extends State<RemovalForm> {
           );
 
           if (selectedDate != null) {
-            String formattedDate = DateFormat('yyyy-MM-dd').format(selectedDate);
+            String formattedDate =
+                DateFormat('yyyy-MM-dd').format(selectedDate);
             setState(() {
               dateController.text = formattedDate;
             });
@@ -172,8 +191,10 @@ class _RemovalFormState extends State<RemovalForm> {
   }
 
   Widget _buildSubmitButton() {
-    return Center(
-      child: ElevatedButton(
+    return SizedBox(
+      width: double.infinity,
+      height: 54,
+      child: ElevatedButton.icon(
         onPressed: () {
           setState(() {
             _isSubmitting = true;
@@ -182,19 +203,24 @@ class _RemovalFormState extends State<RemovalForm> {
             _submitForm();
           } else {
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Veuillez remplir tous les champs'),),
+              SnackBar(
+                content: Text('Veuillez remplir tous les champs'),
+              ),
             );
           }
         },
-        child: Text(
-          'Enregistrer',
-          style: TextStyle(color: Colors.white),
-        ),
+        icon: _isSubmitting
+            ? const SizedBox.square(
+                dimension: 20,
+                child: CircularProgressIndicator(
+                    color: Colors.white, strokeWidth: 2),
+              )
+            : const Icon(Icons.check_circle_outline_rounded),
+        label: const Text('Enregistrer l’enlèvement'),
         style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.green[700],
+          backgroundColor: SendraTheme.green,
           foregroundColor: Colors.white,
-          padding: EdgeInsets.symmetric(vertical: 16.0, horizontal: 40.0),
-          textStyle: TextStyle(fontSize: 18.0, fontWeight: FontWeight.bold),
+          textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12.0),
           ),
@@ -213,7 +239,9 @@ class _RemovalFormState extends State<RemovalForm> {
     if (token == null || token.isEmpty) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Votre session a expiré. Veuillez vous reconnecter.')),
+        const SnackBar(
+            content:
+                Text('Votre session a expiré. Veuillez vous reconnecter.')),
       );
       setState(() => _isSubmitting = false);
       return;
@@ -259,7 +287,8 @@ class _RemovalFormState extends State<RemovalForm> {
         final responseBody = jsonDecode(response.body);
         if (responseBody['message'] is String) {
           message = responseBody['message'];
-        } else if (response.statusCode == 422 && responseBody['errors'] is Map) {
+        } else if (response.statusCode == 422 &&
+            responseBody['errors'] is Map) {
           message = (responseBody['errors'] as Map)
               .values
               .expand((errors) => errors is List ? errors : [errors])
