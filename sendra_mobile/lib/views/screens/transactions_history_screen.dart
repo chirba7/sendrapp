@@ -96,7 +96,7 @@ class _TransactionsHistoryScreenState extends State<TransactionsHistoryScreen> {
                 Navigator.pushNamed(
                   context,
                   '/depositMoneyDetailsScreen',
-                  arguments: transaction['signalementId'],
+                  arguments: transaction,
                 );
               },
               child: Container(

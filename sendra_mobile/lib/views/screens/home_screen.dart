@@ -8,6 +8,7 @@ import '../../routes/routes.dart';
 import '../../utils/custom_color.dart';
 import '../../utils/custom_style.dart';
 import '../../utils/dimsensions.dart';
+import '../../utils/session.dart';
 import '../../utils/size.dart';
 import '../../utils/strings.dart';
 import '../screens/drawer_screen.dart';
@@ -125,7 +126,13 @@ class _HomeScreenState extends State<HomeScreen> {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     String token = prefs.getString('token') ?? '';
 
-    final url = Uri.parse(Strings.apiURI + 'listerSignalements');
+    // Le staff (Admin/Agent/Autorités) voit tous les signalements
+    // (listerSignalements, paginé) ; un citoyen ne voit que les siens
+    // (voirSignalements, non paginé) — endpoints réservés côté backend
+    // (role:1,2,3,4 vs auto-scopé au user connecté).
+    final isStaff = await Session.isStaff();
+    final endpoint = isStaff ? 'listerSignalements' : 'voirSignalements';
+    final url = Uri.parse(Strings.apiURI + endpoint);
     print('URL de la requête liste signalements: $url');
 
     final response = await http.get(
@@ -142,8 +149,8 @@ class _HomeScreenState extends State<HomeScreen> {
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
       setState(() {
-        _hasNextPage = data['links']['next'] != null;
-        nextPageUrl = data['links']['next'] ?? '';
+        _hasNextPage = isStaff && data['links']?['next'] != null;
+        nextPageUrl = isStaff ? (data['links']?['next'] ?? '') : '';
       });
       return data['data'];
     } else if (response.statusCode == 401) {
@@ -154,6 +161,7 @@ class _HomeScreenState extends State<HomeScreen> {
       await prefs.remove('fullName');
       await prefs.remove('phone');
       await prefs.remove('lastRoute');
+      await prefs.remove('role_id');
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -892,7 +900,7 @@ class _HomeScreenState extends State<HomeScreen> {
             Navigator.pushNamed(
               context,
               '/depositMoneyDetailsScreen',
-              arguments: signalement['signalementId'],
+              arguments: signalement,
             );
           },
           child: SizedBox(

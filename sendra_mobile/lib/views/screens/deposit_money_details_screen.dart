@@ -3,6 +3,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:walletium/views/screens/vehicule_screen.dart';
+import '../../utils/session.dart';
 import '../../utils/strings.dart';
 import 'carto.dart';
 import 'dommages_screen.dart';
@@ -23,6 +24,7 @@ class _DepositMoneyDetailsScreenState extends State<DepositMoneyDetailsScreen> {
   late Future<Map<String, dynamic>> signalementDataFuture = Future.value({});
   bool isLoading = true;
   Map<String, dynamic> signalementData = {};
+  bool _isStaff = false;
 
   @override
   void initState() {
@@ -53,9 +55,23 @@ class _DepositMoneyDetailsScreenState extends State<DepositMoneyDetailsScreen> {
 
   Future<void> fetchSignalementData() async {
     try {
-      final signalementId = ModalRoute.of(context)!.settings.arguments.toString();
-      signalementDataFuture = fetchSignalementDetails(int.parse(signalementId));
-      signalementData = await signalementDataFuture;
+      _isStaff = await Session.isStaff();
+      final args = ModalRoute.of(context)!.settings.arguments;
+
+      if (args is Map) {
+        // Reçu depuis un écran citoyen (liste "mes signalements") : les
+        // données sont déjà complètes, pas de re-fetch via l'API staff-only
+        // listerSignalement/{id} (403 pour un citoyen).
+        signalementData = Map<String, dynamic>.from(args);
+        signalementDataFuture = Future.value(signalementData);
+      } else {
+        // Reçu depuis un écran staff (liste globale, redirection après
+        // enlèvement/dommages) : simple ID, on va chercher le détail à jour.
+        final signalementId = int.parse(args.toString());
+        signalementDataFuture = fetchSignalementDetails(signalementId);
+        signalementData = await signalementDataFuture;
+      }
+
       setState(() {
         isLoading = false;
       });
@@ -259,16 +275,52 @@ class _DepositMoneyDetailsScreenState extends State<DepositMoneyDetailsScreen> {
           children: [
             _localisationButton(),
             _menuItem('Informations de base', signalementData),
-            _menuItem('Véhicule', signalementData),
-            _menuItem('Infraction', signalementData),
-            _menuItem('Dommages', signalementData),
-            if (signalementData['dommages_saisis'] == true &&
-                signalementData['is_approve'] != true)
-              _approvalStatus(signalementData['etat']?.toString()),
-            if (signalementData['is_approve'] == true)
-              _menuItem('Enlèvement', signalementData),
+            // Le workflow métier (véhicule, infraction, dommages, enlèvement)
+            // est réservé au staff côté API (role:1,2,3,4) — masqué pour un
+            // citoyen, qui n'a qu'une vue de suivi de son signalement.
+            if (_isStaff) ...[
+              _menuItem('Véhicule', signalementData),
+              _menuItem('Infraction', signalementData),
+              _menuItem('Dommages', signalementData),
+              if (signalementData['dommages_saisis'] == true &&
+                  signalementData['is_approve'] != true)
+                _approvalStatus(signalementData['etat']?.toString()),
+              if (signalementData['is_approve'] == true)
+                _menuItem('Enlèvement', signalementData),
+            ] else
+              _citizenStatusCard(signalementData['etat']?.toString()),
             const SizedBox(height: 16),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _citizenStatusCard(String? etat) {
+    final label = switch (etat) {
+      'SIGNALE' => 'Signalement reçu, en attente de traitement',
+      'EN COURS' => 'Traitement en cours',
+      'ENLEVE' => 'Véhicule enlevé',
+      'REJETE' => 'Signalement rejeté',
+      _ => 'Statut : ${etat ?? 'inconnu'}',
+    };
+    final color = switch (etat) {
+      'ENLEVE' => Colors.green,
+      'REJETE' => Colors.red,
+      'EN COURS' => Colors.orange,
+      _ => Colors.blueGrey,
+    };
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      child: Card(
+        color: color.withOpacity(0.08),
+        child: ListTile(
+          leading: Icon(Icons.timeline, color: color),
+          title: Text(
+            label,
+            style: TextStyle(fontWeight: FontWeight.bold, color: color),
+          ),
+          subtitle: const Text('Faites glisser la page vers le bas pour actualiser le statut.'),
         ),
       ),
     );

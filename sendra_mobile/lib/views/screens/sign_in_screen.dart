@@ -13,6 +13,7 @@ import '../../controller/sign_in_controller.dart';
 import '../../routes/routes.dart';
 import '../../utils/custom_color.dart';
 import '../../utils/dimsensions.dart';
+import '../../utils/session.dart';
 import '../../utils/strings.dart';
 import '../../widgets/buttons/primary_button_widget.dart';
 import '../../widgets/inputs/input_text_field.dart';
@@ -64,12 +65,13 @@ class _SignInScreenState extends State<SignInScreen> {
     return phone.replaceAll(' ', '');
   }
 
-  Future<void> saveUserData(String fullName, String phone, id, token) async {
+  Future<void> saveUserData(String fullName, String phone, id, token, int? roleId) async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     await prefs.setString('fullName', fullName);
     await prefs.setString('phone', phone);
     await prefs.setString('userId', id);
     await prefs.setString('token', token);
+    await Session.saveRoleId(roleId);
   }
 
   Future<void> _signIn() async {
@@ -107,8 +109,11 @@ class _SignInScreenState extends State<SignInScreen> {
           String fullName = jsonResponse['fullName'].toString();
           String userId = jsonResponse['userId'].toString();
           String token = jsonResponse['token'].toString();
+          int? roleId = jsonResponse['role_id'] is int
+              ? jsonResponse['role_id']
+              : int.tryParse(jsonResponse['role_id']?.toString() ?? '');
 
-          await saveUserData(fullName, telephone, userId, token);
+          await saveUserData(fullName, telephone, userId, token, roleId);
 
           // Désactiver l'indicateur de chargement avant la navigation
           setState(() {

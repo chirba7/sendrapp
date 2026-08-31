@@ -416,6 +416,7 @@ class DrawerScreen extends StatelessWidget {
     await prefs.remove('fullName');
     await prefs.remove('phone');
     await prefs.remove('lastRoute');
+    await prefs.remove('role_id');
 
     // Petite pause pour l'animation
     await Future.delayed(Duration(milliseconds: 800));

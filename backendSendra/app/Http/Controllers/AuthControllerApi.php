@@ -288,6 +288,7 @@ class AuthControllerApi extends Controller
             'id' => Auth::user()->id,
             'fullName' => Auth::user()->first_name . " " . Auth::user()->last_name,
             'phone' => Auth::user()->telephone,
+            'role_id' => Auth::user()->role_id,
             'token_type' => 'bearer',
         ]);
     }

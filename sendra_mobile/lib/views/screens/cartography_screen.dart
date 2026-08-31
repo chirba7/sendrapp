@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../utils/custom_color.dart';
+import '../../utils/session.dart';
 import '../../utils/strings.dart';
 
 class CartographyScreen extends StatefulWidget {
@@ -38,10 +39,13 @@ class _CartographyScreenState extends State<CartographyScreen> {
     try {
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('token') ?? '';
+      // La cartographie du staff affiche tous les signalements métier
+      // récents ; un citoyen (endpoint listerSignalements interdit côté
+      // API, 403) ne voit que les siens.
+      final isStaff = await Session.isStaff();
+      final endpoint = isStaff ? 'listerSignalements' : 'voirSignalements';
       final response = await http.get(
-        // La cartographie de l'agent doit afficher tous les signalements
-        // métier récents, pas uniquement ceux créés par son propre compte.
-        Uri.parse('${Strings.apiURI}listerSignalements'),
+        Uri.parse('${Strings.apiURI}$endpoint'),
         headers: {'Authorization': 'Bearer $token'},
       );
 
