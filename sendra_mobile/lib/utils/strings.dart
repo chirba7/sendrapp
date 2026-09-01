@@ -1,5 +1,3 @@
-import 'package:flutter/foundation.dart' show kIsWeb;
-
 class Strings {
   static const String appName = 'Sendra';
   static const String appVersion = '1.0.0';
@@ -147,26 +145,14 @@ class Strings {
   static const String details = 'Détails du signalement';
 
   static const String apiURL = 'https://demo.sendra.sn/sendra_api/';
-  // Correction : le host était vide ('https:///api/'), cassant tous les
-  // appels API réels (login, signalements, véhicule, infraction...).
-  // Pointe vers le backendSendra local (Docker, port 8000) sur l'IP LAN de
-  // la machine de dev — à repasser sur 'https://backend.sendra.sn/api/'
-  // pour cibler la prod.
-  // Sur le web (Chrome lancé sur la machine de dev), le backend Docker est
-  // joignable directement en loopback : pas besoin de passer par l'IP LAN,
-  // qui dépend du bail DHCP et casse dès qu'elle change.
-  // Sur mobile (téléphone physique sur le même Wi-Fi), l'IP LAN reste
-  // nécessaire — à ajuster si l'adresse de la machine change.
-  // Repli si la découverte réseau automatique (BackendDiscoveryService)
-  // échoue au démarrage (pas de Wi-Fi, permissions réseau refusées...).
-  static const String apiHostLan = 'http://192.168.1.31:8000';
-  static const String apiHostWeb = 'http://localhost:8000';
 
-  // Non-const (contrairement à avant) : mis à jour au démarrage de l'app
-  // par BackendDiscoveryService une fois l'IP réelle du backend trouvée sur
-  // le réseau local, au lieu de dépendre d'une IP codée en dur qui casse à
-  // chaque changement de réseau/bail DHCP.
-  static String apiHost = kIsWeb ? apiHostWeb : apiHostLan;
+  // Backend de préprod distant — remplace le backend local Docker comme
+  // cible par défaut de l'app.
+  static const String apiHostProd = 'https://backpreprod.sendra.sn';
+  static const String apiHostLan = 'https://backpreprod.sendra.sn';
+  static const String apiHostWeb = 'https://backpreprod.sendra.sn';
+
+  static String apiHost = apiHostProd;
   static String get apiURI => '$apiHost/api/';
 
   //?wallet screen

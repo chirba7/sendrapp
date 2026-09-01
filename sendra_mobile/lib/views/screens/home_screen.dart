@@ -5,14 +5,10 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../routes/routes.dart';
-import '../../utils/custom_color.dart';
-import '../../utils/custom_style.dart';
-import '../../utils/dimsensions.dart';
-import '../../utils/size.dart';
+import '../../utils/session.dart';
 import '../../utils/strings.dart';
+import '../../utils/sendra_theme.dart';
 import '../screens/drawer_screen.dart';
-import 'package:flutter_screenutil/flutter_screenutil.dart';
-import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:get/get.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -21,6 +17,7 @@ class HomeScreen extends StatefulWidget {
   @override
   _HomeScreenState createState() => _HomeScreenState();
 }
+
 class Slide {
   final String title;
   final String description;
@@ -63,9 +60,12 @@ class _HomeScreenState extends State<HomeScreen> {
   late SharedPreferences _prefs;
   bool _showSlides = true;
   bool _showScrollIndicator = true; // Définition de la variable ici
-  double _scrollIndicatorPosition = 0; // Position initiale de l'indicateur de défilement
-  bool _scrolling = false; // Variable pour indiquer si le défilement est en cours
-  double _lastScrollIndicatorPosition = 0.0; // Dernière position de l'indicateur
+  double _scrollIndicatorPosition =
+      0; // Position initiale de l'indicateur de défilement
+  bool _scrolling =
+      false; // Variable pour indiquer si le défilement est en cours
+  double _lastScrollIndicatorPosition =
+      0.0; // Dernière position de l'indicateur
 
   late String nextPageUrl;
   String token = '';
@@ -104,7 +104,8 @@ class _HomeScreenState extends State<HomeScreen> {
     } catch (e) {
       if (mounted) {
         setState(() {
-          _loadError = 'Impossible de joindre le serveur. Vérifiez le Wi-Fi puis réessayez.';
+          _loadError =
+              'Impossible de joindre le serveur. Vérifiez le Wi-Fi puis réessayez.';
         });
       }
     } finally {
@@ -125,7 +126,13 @@ class _HomeScreenState extends State<HomeScreen> {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     String token = prefs.getString('token') ?? '';
 
-    final url = Uri.parse(Strings.apiURI + 'listerSignalements');
+    // Le staff (Admin/Agent/Autorités) voit tous les signalements
+    // (listerSignalements, paginé) ; un citoyen ne voit que les siens
+    // (voirSignalements, non paginé) — endpoints réservés côté backend
+    // (role:1,2,3,4 vs auto-scopé au user connecté).
+    final isStaff = await Session.isStaff();
+    final endpoint = isStaff ? 'listerSignalements' : 'voirSignalements';
+    final url = Uri.parse(Strings.apiURI + endpoint);
     print('URL de la requête liste signalements: $url');
 
     final response = await http.get(
@@ -140,12 +147,22 @@ class _HomeScreenState extends State<HomeScreen> {
     print('Réponse du serveur liste signalements: ${response.body}');
 
     if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
+      final decoded = jsonDecode(response.body);
+      // voirSignalements (citoyen) renvoie un tableau JSON brut ([...]) —
+      // pas encapsulé dans {"data": ...} contrairement à listerSignalements
+      // (staff, paginé), car le contrôleur ne passe pas par toResponse().
+      if (decoded is List) {
+        setState(() {
+          _hasNextPage = false;
+          nextPageUrl = '';
+        });
+        return decoded;
+      }
       setState(() {
-        _hasNextPage = data['links']['next'] != null;
-        nextPageUrl = data['links']['next'] ?? '';
+        _hasNextPage = decoded['links']?['next'] != null;
+        nextPageUrl = decoded['links']?['next'] ?? '';
       });
-      return data['data'];
+      return decoded['data'];
     } else if (response.statusCode == 401) {
       // Clear all session data
       final prefs = await SharedPreferences.getInstance();
@@ -154,10 +171,12 @@ class _HomeScreenState extends State<HomeScreen> {
       await prefs.remove('fullName');
       await prefs.remove('phone');
       await prefs.remove('lastRoute');
+      await prefs.remove('role_id');
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Votre session a expiré. Vous allez être redirigé vers la page de connexion.'),
+          content: Text(
+              'Votre session a expiré. Vous allez être redirigé vers la page de connexion.'),
           backgroundColor: Colors.red,
           duration: Duration(seconds: 3),
           behavior: SnackBarBehavior.floating,
@@ -171,8 +190,6 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-
-
   @override
   Widget build(BuildContext context) {
     return _showSlides ? _buildIntroSlides() : _buildHomeScreen();
@@ -181,27 +198,32 @@ class _HomeScreenState extends State<HomeScreen> {
   final List<Slide> slides = [
     Slide(
       title: "Bienvenue sur l'application",
-      description: "Découvrez les fonctionnalités et les informations importantes sur notre application.",
+      description:
+          "Découvrez les fonctionnalités et les informations importantes sur notre application.",
       icon: Icons.mobile_screen_share,
     ),
     Slide(
       title: "Localisation",
-      description: "Découvrez comment localiser facilement les véhicules sur la carte.",
+      description:
+          "Découvrez comment localiser facilement les véhicules sur la carte.",
       icon: Icons.map,
     ),
     Slide(
       title: "Informations de base",
-      description: "Accédez aux informations de base concernant chaque signalement.",
+      description:
+          "Accédez aux informations de base concernant chaque signalement.",
       icon: Icons.library_books,
     ),
     Slide(
       title: "Véhicule",
-      description: "Ajoutez les détails relatifs au véhicule concerné par le signalement.",
+      description:
+          "Ajoutez les détails relatifs au véhicule concerné par le signalement.",
       icon: Icons.directions_car,
     ),
     Slide(
       title: "Infraction",
-      description: "Indiquez les infractions associées au signalement pour un traitement approprié.",
+      description:
+          "Indiquez les infractions associées au signalement pour un traitement approprié.",
       icon: Icons.report_problem,
     ),
     Slide(
@@ -211,7 +233,8 @@ class _HomeScreenState extends State<HomeScreen> {
     ),
     Slide(
       title: "Approbation",
-      description: "Soumettez les signalements pour approbation après vérification.",
+      description:
+          "Soumettez les signalements pour approbation après vérification.",
       icon: Icons.check_circle,
     ),
     Slide(
@@ -220,7 +243,6 @@ class _HomeScreenState extends State<HomeScreen> {
       icon: Icons.remove_circle,
     ),
   ];
-
 
   Widget _buildIntroSlides() {
     return Scaffold(
@@ -247,11 +269,12 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
               style: ElevatedButton.styleFrom(
-                backgroundColor : Colors.white, // Blanc
+                backgroundColor: Colors.white, // Blanc
                 padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8),
-                  side: BorderSide(color: Color(0xFF1B5E20)), // Bordure vert foncé
+                  side: BorderSide(
+                      color: Color(0xFF1B5E20)), // Bordure vert foncé
                 ),
               ),
             ),
@@ -310,7 +333,8 @@ class _HomeScreenState extends State<HomeScreen> {
             child: Text(
               slide.description,
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 16, color: Color(0xFF1B5E20)), // Vert foncé
+              style: TextStyle(
+                  fontSize: 16, color: Color(0xFF1B5E20)), // Vert foncé
             ),
           ),
         ],
@@ -329,7 +353,10 @@ class _HomeScreenState extends State<HomeScreen> {
           margin: EdgeInsets.symmetric(horizontal: 5),
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: _currentPageIndex == i ? Colors.green : Colors.grey, // Couleur différente pour la diapositive actuelle
+            color: _currentPageIndex == i
+                ? Colors.green
+                : Colors
+                    .grey, // Couleur différente pour la diapositive actuelle
           ),
         ),
       );
@@ -347,14 +374,16 @@ class _HomeScreenState extends State<HomeScreen> {
       // Affichez un message à l'utilisateur pour lui indiquer de voir tous les slides.
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Veuillez parcourir tous les slides avant de continuer.', style: TextStyle(color: Colors.white)),
+          content: Text(
+              'Veuillez parcourir tous les slides avant de continuer.',
+              style: TextStyle(color: Colors.white)),
           backgroundColor: Colors.black, // Couleur de fond de la SnackBar
           elevation: 8, // Élévation pour ajouter une ombre
           behavior: SnackBarBehavior.floating, // Centrer le SnackBar
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)), // Coins arrondis
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10)), // Coins arrondis
         ),
       );
-
     }
   }
 
@@ -367,34 +396,29 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildHomeScreen() {
     return Scaffold(
-      backgroundColor: CustomColor.primaryBackgroundColor,
+      backgroundColor: SendraTheme.surface,
       drawer: const DrawerScreen(),
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        flexibleSpace: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.centerLeft,
-              end: Alignment.centerRight,
-              colors: [Colors.grey, Colors.green[900]!],
-            ),
-          ),
-        ),
-        iconTheme: const IconThemeData(color: CustomColor.whiteColor),
-        title: Center(
-          child: Image.asset(
-            'assets/images/EPAVIE2.png',
-            fit: BoxFit.contain,
-          ),
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        iconTheme: const IconThemeData(color: SendraTheme.ink),
+        titleSpacing: 0,
+        title: Row(
+          children: [
+            Image.asset('assets/images/logo.png', width: 132, height: 48),
+            const Spacer(),
+          ],
         ),
         elevation: 0,
         actions: [
           IconButton(
-            icon: Icon(Icons.slideshow),
+            tooltip: 'Guide',
+            icon: const Icon(Icons.play_circle_outline_rounded),
             onPressed: _showSlidesAgain,
           ),
           IconButton(
-            icon: Icon(Icons.info),
+            tooltip: 'Informations',
+            icon: const Icon(Icons.info_outline_rounded),
             onPressed: () {
               showDialog(
                 context: context,
@@ -443,10 +467,12 @@ class _HomeScreenState extends State<HomeScreen> {
                 });
                 await _fetchData();
               },
-              color: Colors.green.shade900, // Couleur du loader assortie à l'app
+              color:
+                  Colors.green.shade900, // Couleur du loader assortie à l'app
               backgroundColor: Colors.white,
               child: SingleChildScrollView(
-                physics: BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
+                physics: BouncingScrollPhysics(
+                    parent: AlwaysScrollableScrollPhysics()),
                 child: Column(
                   children: [
                     if (allSignalements.isNotEmpty)
@@ -457,43 +483,47 @@ class _HomeScreenState extends State<HomeScreen> {
                         child: Center(
                           child: _isInitialLoading
                               ? Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              CircularProgressIndicator(
-                                valueColor: AlwaysStoppedAnimation<Color>(Colors.green.shade900),
-                              ),
-                              SizedBox(height: 20),
-                              Text(
-                                'Chargement des signalements...',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  color: Colors.grey[600],
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ],
-                          )
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    CircularProgressIndicator(
+                                      valueColor: AlwaysStoppedAnimation<Color>(
+                                          Colors.green.shade900),
+                                    ),
+                                    SizedBox(height: 20),
+                                    Text(
+                                      'Chargement des signalements...',
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        color: Colors.grey[600],
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ],
+                                )
                               : Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Text(
-                                _loadError ?? 'Aucun signalement récent disponible',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  color: _loadError == null ? Colors.grey[600] : Colors.red[700],
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Text(
+                                      _loadError ??
+                                          'Aucun signalement récent disponible',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        color: _loadError == null
+                                            ? Colors.grey[600]
+                                            : Colors.red[700],
+                                      ),
+                                    ),
+                                    if (_loadError != null) ...[
+                                      const SizedBox(height: 16),
+                                      ElevatedButton.icon(
+                                        onPressed: _fetchData,
+                                        icon: const Icon(Icons.refresh),
+                                        label: const Text('Réessayer'),
+                                      ),
+                                    ],
+                                  ],
                                 ),
-                              ),
-                              if (_loadError != null) ...[
-                                const SizedBox(height: 16),
-                                ElevatedButton.icon(
-                                  onPressed: _fetchData,
-                                  icon: const Icon(Icons.refresh),
-                                  label: const Text('Réessayer'),
-                                ),
-                              ],
-                            ],
-                          ),
                         ),
                       ),
                   ],
@@ -567,11 +597,10 @@ class _HomeScreenState extends State<HomeScreen> {
               SizedBox(height: 15),
               Text(
                 'Les signalements expirent après 10 jours. Après ce délai, pour découvrir de nouveaux signalements, n\'hésitez pas à en effectuer vous-même ou patientez jusqu\'à ce qu\'un autre utilisateur le fasse.\n\n'
-                    'Cliquez sur le signalement afin d\'accéder à la constatation.',
+                'Cliquez sur le signalement afin d\'accéder à la constatation.',
                 style: TextStyle(fontSize: 16),
                 textAlign: TextAlign.center,
               ),
-
               SizedBox(height: 22),
               Align(
                 alignment: Alignment.bottomCenter,
@@ -655,63 +684,35 @@ class _HomeScreenState extends State<HomeScreen> {
   Container _transactionHistoryWidget(
       BuildContext context, List<dynamic> signalements) {
     return Container(
-      padding: EdgeInsets.all(Dimensions.defaultPaddingSize * 0.5),
-      decoration: BoxDecoration(
-        color: Color.fromRGBO(255, 254, 254, 1),
-        borderRadius: BorderRadius.only(
-          topRight: Radius.circular(30),
-          topLeft: Radius.circular(30),
-        ),
-      ),
+      padding: const EdgeInsets.fromLTRB(16, 20, 16, 120),
+      color: SendraTheme.surface,
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          addVerticalSpace(20.h),
-          Padding(
-            padding: EdgeInsets.only(bottom: 30.0),
-            child: Container(
-              padding: EdgeInsets.symmetric(horizontal: Dimensions.defaultPaddingSize * 0.3),
-              child: Center(
-                child: Text(
-                  Strings.transactionsHistory,
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 24.0,
-                    fontWeight: FontWeight.bold,
-                    fontFamily: 'Roboto',
-                  ),
-                ),
-              ),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    Colors.grey, // Blanc en haut
-                    Colors.green.shade900, // Vert foncé en bas
-                  ],
-                ),
-                borderRadius: BorderRadius.circular(5.0),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.green.withOpacity(0.5),
-                    spreadRadius: 3,
-                    blurRadius: 10,
-                    offset: const Offset(0, 3),
-                  ),
-                ],
-              ),
+          const Text(
+            'Signalements à proximité',
+            style: TextStyle(
+              color: SendraTheme.ink,
+              fontSize: 23,
+              fontWeight: FontWeight.w800,
             ),
           ),
-          addVerticalSpace(5.h),
-          _transactionHistoryListWidget(context, signalements),
+          const SizedBox(height: 4),
+          Text(
+            '${allSignalements.length} dossier${allSignalements.length > 1 ? 's' : ''} disponible${allSignalements.length > 1 ? 's' : ''}',
+            style: const TextStyle(color: SendraTheme.muted, fontSize: 13),
+          ),
           _statusFilterWidget(),
+          const SizedBox(height: 6),
+          _transactionHistoryListWidget(context, signalements),
         ],
       ),
     );
   }
 
   Widget _statusFilterWidget() {
-    final filters = <({String value, String label, IconData icon, Color color})>[
+    final filters =
+        <({String value, String label, IconData icon, Color color})>[
       (
         value: 'TOUS',
         label: 'Tous',
@@ -744,8 +745,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
     return Container(
       width: double.infinity,
-      margin: const EdgeInsets.fromLTRB(8, 24, 8, 16),
-      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.fromLTRB(0, 18, 0, 16),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: const Color(0xFFF5F8F6),
         borderRadius: BorderRadius.circular(18),
@@ -754,20 +755,9 @@ class _HomeScreenState extends State<HomeScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Filtrer les signalements',
-            style: TextStyle(
-              fontSize: 19,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF173C26),
-            ),
-          ),
-          const SizedBox(height: 5),
-          Text(
-            'Affichez les dossiers selon leur état de traitement.',
-            style: TextStyle(fontSize: 13, color: Colors.grey[700]),
-          ),
-          const SizedBox(height: 16),
+          const Text('Filtrer par statut',
+              style: TextStyle(fontWeight: FontWeight.w700)),
+          const SizedBox(height: 10),
           GridView.builder(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
@@ -822,7 +812,9 @@ class _HomeScreenState extends State<HomeScreen> {
                               filter.label,
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
-                                color: selected ? Colors.white : const Color(0xFF26332B),
+                                color: selected
+                                    ? Colors.white
+                                    : const Color(0xFF26332B),
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
@@ -885,48 +877,50 @@ class _HomeScreenState extends State<HomeScreen> {
           default:
             iconData = Icons.info;
             iconColor = Colors.black;
-
         }
         return GestureDetector(
           onTap: () {
             Navigator.pushNamed(
               context,
               '/depositMoneyDetailsScreen',
-              arguments: signalement['signalementId'],
+              arguments: signalement,
             );
           },
           child: SizedBox(
-            height: 120,
+            height: 126,
             child: Padding(
-              padding: EdgeInsets.all(Dimensions.defaultPaddingSize * 0.3),
+              padding: const EdgeInsets.only(bottom: 12),
               child: Container(
                 decoration: BoxDecoration(
                   color: Colors.white,
-                  borderRadius: BorderRadius.circular(30),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.grey.withOpacity(0.5),
-                      spreadRadius: 3,
-                      blurRadius: 7,
-                      offset: const Offset(0, 3),
-                    ),
-                  ],
+                  borderRadius: BorderRadius.circular(17),
+                  border: Border.all(color: SendraTheme.border),
                 ),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     Container(
-                      width: 100,
-                      height: 100,
+                      width: 104,
+                      height: double.infinity,
+                      margin: const EdgeInsets.all(7),
                       child: signalement['image_url'] != null
                           ? ClipRRect(
-                        borderRadius: BorderRadius.circular(30),
-                        child: Image.network(
-                          signalement['image_url'],
-                          fit: BoxFit.cover,
-                        ),
-                      )
-                          : Container(),
+                              borderRadius: BorderRadius.circular(12),
+                              child: Image.network(
+                                signalement['image_url'],
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) => const ColoredBox(
+                                  color: Color(0xFFEAF1ED),
+                                  child: Icon(Icons.directions_car_outlined,
+                                      color: SendraTheme.muted),
+                                ),
+                              ),
+                            )
+                          : const ColoredBox(
+                              color: Color(0xFFEAF1ED),
+                              child: Icon(Icons.directions_car_outlined,
+                                  color: SendraTheme.muted),
+                            ),
                     ),
                     Expanded(
                       child: Padding(
@@ -940,8 +934,8 @@ class _HomeScreenState extends State<HomeScreen> {
                                 signalement['titre'] ?? '',
                                 style: TextStyle(
                                   color: Colors.black,
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w700,
                                 ),
                                 overflow: TextOverflow.ellipsis,
                                 maxLines: 1,
@@ -953,13 +947,12 @@ class _HomeScreenState extends State<HomeScreen> {
                                 signalement['commune'] ?? '',
                                 style: TextStyle(
                                   color: Colors.grey[800],
-                                  fontSize: 16,
+                                  fontSize: 13,
                                 ),
                                 overflow: TextOverflow.ellipsis,
                                 maxLines: 1,
                               ),
                             ),
-
                             SizedBox(height: 5),
                             Row(
                               children: [
@@ -973,9 +966,8 @@ class _HomeScreenState extends State<HomeScreen> {
                                   signalement['formatted_date'] ?? '',
                                   style: TextStyle(
                                     color: Colors.blueGrey,
-                                    fontSize: 14,
-                                    fontFamily: 'Roboto',
-                                    fontWeight: FontWeight.bold,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w500,
                                   ),
                                 ),
                               ],
@@ -984,33 +976,42 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       ),
                     ),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          iconData,
-                          color: iconColor,
-                        ),
-                        SizedBox(height: 5),
-                        Text(
-                          signalement['etat'] == 'SIGNALE' ? 'Signalé' :
-                          signalement['etat'] == 'EN COURS' ? 'En cours' :
-                          signalement['etat'] == 'ENLEVE' ? 'Résolu' :
-                          signalement['etat'] == 'REJETE' ? 'Rejeté' : 'Inconnu',
-                          style: TextStyle(
+                    Container(
+                      margin: const EdgeInsets.only(right: 10),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 9, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: iconColor.withValues(alpha: .10),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            iconData,
                             color: iconColor,
-                            fontSize: 14,
+                            size: 17,
                           ),
-                        ),
-                      ],
-                    ),
-                    SizedBox(width: 5),
-                    Text(
-                      signalement['created_date'] ?? '',
-                      style: TextStyle(
-                        color: Colors.grey[600],
-                        fontSize: 14,
+                          SizedBox(height: 5),
+                          Text(
+                            signalement['etat'] == 'SIGNALE'
+                                ? 'Signalé'
+                                : signalement['etat'] == 'EN COURS'
+                                    ? 'En cours'
+                                    : signalement['etat'] == 'ENLEVE'
+                                        ? 'Résolu'
+                                        : signalement['etat'] == 'REJETE'
+                                            ? 'Rejeté'
+                                            : 'Inconnu',
+                            style: TextStyle(
+                              color: iconColor,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
