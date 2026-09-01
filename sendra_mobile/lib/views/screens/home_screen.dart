@@ -147,12 +147,22 @@ class _HomeScreenState extends State<HomeScreen> {
     print('Réponse du serveur liste signalements: ${response.body}');
 
     if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
+      final decoded = jsonDecode(response.body);
+      // voirSignalements (citoyen) renvoie un tableau JSON brut ([...]) —
+      // pas encapsulé dans {"data": ...} contrairement à listerSignalements
+      // (staff, paginé), car le contrôleur ne passe pas par toResponse().
+      if (decoded is List) {
+        setState(() {
+          _hasNextPage = false;
+          nextPageUrl = '';
+        });
+        return decoded;
+      }
       setState(() {
-        _hasNextPage = isStaff && data['links']?['next'] != null;
-        nextPageUrl = isStaff ? (data['links']?['next'] ?? '') : '';
+        _hasNextPage = decoded['links']?['next'] != null;
+        nextPageUrl = decoded['links']?['next'] ?? '';
       });
-      return data['data'];
+      return decoded['data'];
     } else if (response.statusCode == 401) {
       // Clear all session data
       final prefs = await SharedPreferences.getInstance();
