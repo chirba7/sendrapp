@@ -896,125 +896,133 @@ class _HomeScreenState extends State<HomeScreen> {
                   borderRadius: BorderRadius.circular(17),
                   border: Border.all(color: SendraTheme.border),
                 ),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    Container(
-                      width: 104,
-                      height: double.infinity,
-                      margin: const EdgeInsets.all(7),
-                      child: signalement['image_url'] != null
-                          ? ClipRRect(
-                              borderRadius: BorderRadius.circular(12),
-                              child: Image.network(
-                                signalement['image_url'],
-                                fit: BoxFit.cover,
-                                errorBuilder: (_, __, ___) => const ColoredBox(
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final compact = constraints.maxWidth < 350;
+                    return Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Container(
+                          width: compact ? 82 : 104,
+                          height: double.infinity,
+                          margin: const EdgeInsets.all(7),
+                          child: signalement['image_url'] != null
+                              ? ClipRRect(
+                                  borderRadius: BorderRadius.circular(12),
+                                  child: Image.network(
+                                    signalement['image_url'],
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (_, __, ___) =>
+                                        const ColoredBox(
+                                      color: Color(0xFFEAF1ED),
+                                      child: Icon(Icons.directions_car_outlined,
+                                          color: SendraTheme.muted),
+                                    ),
+                                  ),
+                                )
+                              : const ColoredBox(
                                   color: Color(0xFFEAF1ED),
                                   child: Icon(Icons.directions_car_outlined,
                                       color: SendraTheme.muted),
                                 ),
-                              ),
-                            )
-                          : const ColoredBox(
-                              color: Color(0xFFEAF1ED),
-                              child: Icon(Icons.directions_car_outlined,
-                                  color: SendraTheme.muted),
-                            ),
-                    ),
-                    Expanded(
-                      child: Padding(
-                        padding: const EdgeInsets.all(8.0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Flexible(
-                              child: Text(
-                                signalement['titre'] ?? '',
-                                style: TextStyle(
-                                  color: Colors.black,
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                                overflow: TextOverflow.ellipsis,
-                                maxLines: 1,
-                              ),
-                            ),
-                            SizedBox(height: 5),
-                            Flexible(
-                              child: Text(
-                                signalement['commune'] ?? '',
-                                style: TextStyle(
-                                  color: Colors.grey[800],
-                                  fontSize: 13,
-                                ),
-                                overflow: TextOverflow.ellipsis,
-                                maxLines: 1,
-                              ),
-                            ),
-                            SizedBox(height: 5),
-                            Row(
+                        ),
+                        Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.all(8.0),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                Icon(
-                                  Icons.calendar_today,
-                                  color: Colors.grey[600],
-                                  size: 16,
-                                ),
-                                SizedBox(width: 5),
                                 Text(
-                                  signalement['formatted_date'] ?? '',
-                                  style: TextStyle(
-                                    color: Colors.blueGrey,
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w500,
+                                  signalement['titre'] ?? '',
+                                  style: const TextStyle(
+                                    color: Colors.black,
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w700,
                                   ),
+                                  overflow: TextOverflow.ellipsis,
+                                  maxLines: 1,
+                                ),
+                                const SizedBox(height: 5),
+                                Text(
+                                  signalement['commune'] ?? '',
+                                  style: TextStyle(
+                                    color: Colors.grey[800],
+                                    fontSize: 13,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                  maxLines: 1,
+                                ),
+                                const SizedBox(height: 5),
+                                Row(
+                                  children: [
+                                    Icon(
+                                      Icons.calendar_today,
+                                      color: Colors.grey[600],
+                                      size: 16,
+                                    ),
+                                    const SizedBox(width: 5),
+                                    Expanded(
+                                      child: Text(
+                                        signalement['formatted_date']
+                                                ?.toString() ??
+                                            '',
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                          color: Colors.blueGrey,
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ],
                             ),
-                          ],
+                          ),
                         ),
-                      ),
-                    ),
-                    Container(
-                      margin: const EdgeInsets.only(right: 10),
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 9, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: iconColor.withValues(alpha: .10),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            iconData,
-                            color: iconColor,
-                            size: 17,
+                        Container(
+                          margin: EdgeInsets.only(right: compact ? 6 : 10),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: iconColor.withValues(alpha: .10),
+                            borderRadius: BorderRadius.circular(20),
                           ),
-                          SizedBox(height: 5),
-                          Text(
-                            signalement['etat'] == 'SIGNALE'
-                                ? 'Signalé'
-                                : signalement['etat'] == 'EN COURS'
-                                    ? 'En cours'
-                                    : signalement['etat'] == 'ENLEVE'
-                                        ? 'Résolu'
-                                        : signalement['etat'] == 'REJETE'
-                                            ? 'Rejeté'
-                                            : 'Inconnu',
-                            style: TextStyle(
-                              color: iconColor,
-                              fontSize: 10,
-                              fontWeight: FontWeight.w700,
-                            ),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                iconData,
+                                color: iconColor,
+                                size: 17,
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                signalement['etat'] == 'SIGNALE'
+                                    ? 'Signalé'
+                                    : signalement['etat'] == 'EN COURS'
+                                        ? 'En cours'
+                                        : signalement['etat'] == 'ENLEVE'
+                                            ? 'Résolu'
+                                            : signalement['etat'] == 'REJETE'
+                                                ? 'Rejeté'
+                                                : 'Inconnu',
+                                style: TextStyle(
+                                  color: iconColor,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ],
                           ),
-                        ],
-                      ),
-                    ),
-                  ],
+                        ),
+                      ],
+                    );
+                  },
                 ),
               ),
             ),

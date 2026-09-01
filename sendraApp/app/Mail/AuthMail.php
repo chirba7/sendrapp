@@ -49,6 +49,10 @@ class AuthMail extends Mailable
                 // réelles : first_name/last_name) — la vue affichait
                 // "Bienvenue,  !" avec un nom vide.
                 'nom' => trim($this->user->first_name . ' ' . $this->user->last_name),
+                // L'Agent (role_id=2) et le citoyen (5) n'utilisent que
+                // l'app mobile, jamais app.sendra.sn — leur envoyer le
+                // bouton/lien vers le back-office web n'a pas de sens.
+                'showWebLink' => in_array($this->user->role_id, [1, 3, 4], true),
             ],
         );
     }

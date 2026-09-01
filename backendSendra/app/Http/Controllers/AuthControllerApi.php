@@ -236,6 +236,68 @@ class AuthControllerApi extends Controller
     }
 
     /**
+     * Réinitialiser le mot de passe (flux "mot de passe oublié").
+     *
+     * S'appuie sur le même mécanisme de vérification par code que
+     * l'inscription (send-verification-code / verify-code) : n'accepte la
+     * réinitialisation que si ce numéro a un code vérifié (verified_at) et
+     * non expiré — évite qu'un tiers connaissant seulement le numéro de
+     * téléphone puisse réinitialiser le mot de passe d'un autre compte.
+     */
+    public function resetPassword(Request $request)
+    {
+        $request->validate([
+            'telephone' => 'required|regex:/^\d{9}$/',
+            'password' => 'required|string|min:6|confirmed',
+        ]);
+
+        $verification = UserVerificationCode::where('phone', $request->telephone)->first();
+
+        if (!$verification || $verification->isExpired() || !$verification->verified_at) {
+            return response()->json(['success' => false,
+            'message' => 'Le numéro de téléphone n\'a pas été vérifié ou le code a expiré.'], 400);
+        }
+
+        $user = User::where('telephone', $request->telephone)->first();
+        if (!$user) {
+            return response()->json(['success' => false,
+            'message' => 'Aucun compte associé à ce numéro.'], 404);
+        }
+
+        $user->password = Hash::make($request->password);
+        $user->save();
+
+        $verification->delete();
+
+        return response()->json(['success' => true,
+        'message' => 'Mot de passe réinitialisé avec succès.']);
+    }
+
+    /**
+     * Modifier le mot de passe (utilisateur authentifié, depuis le profil).
+     */
+    public function changePassword(Request $request)
+    {
+        $request->validate([
+            'current_password' => 'required|string',
+            'password' => 'required|string|min:6|confirmed',
+        ]);
+
+        $user = auth()->user();
+
+        if (!Hash::check($request->current_password, $user->password)) {
+            return response()->json(['success' => false,
+            'message' => 'Le mot de passe actuel est incorrect.'], 422);
+        }
+
+        $user->password = Hash::make($request->password);
+        $user->save();
+
+        return response()->json(['success' => true,
+        'message' => 'Mot de passe modifié avec succès.']);
+    }
+
+    /**
      * Get the authenticated User.
      *
      * @return \Illuminate\Http\JsonResponse

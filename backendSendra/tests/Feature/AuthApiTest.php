@@ -162,6 +162,74 @@ class AuthApiTest extends TestCase
         $this->assertDatabaseHas('users', ['telephone' => '770000010']);
     }
 
+    public function test_reset_password_requires_a_verified_code(): void
+    {
+        User::factory()->create(['telephone' => '770000011', 'password' => bcrypt('ancien123')]);
+
+        // Aucun code vérifié pour ce numéro.
+        $this->postJson('/api/reset-password', [
+            'telephone' => '770000011',
+            'password' => 'nouveau123',
+            'password_confirmation' => 'nouveau123',
+        ])->assertStatus(400);
+
+        UserVerificationCode::create([
+            'phone' => '770000011',
+            'code' => '333333',
+            'expires_at' => now()->addMinutes(10),
+            // verified_at absent : code envoyé mais jamais soumis via verify-code.
+        ]);
+
+        $this->postJson('/api/reset-password', [
+            'telephone' => '770000011',
+            'password' => 'nouveau123',
+            'password_confirmation' => 'nouveau123',
+        ])->assertStatus(400);
+    }
+
+    public function test_reset_password_succeeds_after_verification_and_consumes_the_code(): void
+    {
+        User::factory()->create(['telephone' => '770000012', 'password' => bcrypt('ancien123')]);
+        UserVerificationCode::create([
+            'phone' => '770000012',
+            'code' => '444444',
+            'expires_at' => now()->addMinutes(10),
+            'verified_at' => now(),
+        ]);
+
+        $this->postJson('/api/reset-password', [
+            'telephone' => '770000012',
+            'password' => 'nouveau123',
+            'password_confirmation' => 'nouveau123',
+        ])->assertOk()->assertJson(['success' => true]);
+
+        $this->postJson('/api/login', ['telephone' => '770000012', 'password' => 'nouveau123'])
+            ->assertOk();
+
+        $this->assertDatabaseMissing('user_verification_codes', ['phone' => '770000012']);
+    }
+
+    public function test_change_password_requires_the_correct_current_password(): void
+    {
+        User::factory()->create(['telephone' => '770000013', 'password' => bcrypt('ancien123')]);
+        $token = $this->loginAndGetToken('770000013', 'ancien123');
+
+        $this->putJson('/api/change-password', [
+            'current_password' => 'mauvais',
+            'password' => 'nouveau123',
+            'password_confirmation' => 'nouveau123',
+        ], ['Authorization' => "Bearer {$token}"])->assertStatus(422);
+
+        $this->putJson('/api/change-password', [
+            'current_password' => 'ancien123',
+            'password' => 'nouveau123',
+            'password_confirmation' => 'nouveau123',
+        ], ['Authorization' => "Bearer {$token}"])->assertOk()->assertJson(['success' => true]);
+
+        $this->postJson('/api/login', ['telephone' => '770000013', 'password' => 'nouveau123'])
+            ->assertOk();
+    }
+
     private function loginAndGetToken(string $telephone, string $password): string
     {
         return $this->postJson('/api/login', compact('telephone', 'password'))->json('token');

@@ -47,7 +47,10 @@ class DrawerScreen extends StatelessWidget {
                         icon: FontAwesomeIcons.circleInfo,
                         onTap: () => Get.toNamed(Routes.aboutUsScreen),
                         gradient: LinearGradient(
-                          colors: [Colors.amber.shade700, Colors.amber.shade600],
+                          colors: [
+                            Colors.amber.shade700,
+                            Colors.amber.shade600
+                          ],
                         ),
                       ),
                       MenuItemData(
@@ -55,12 +58,14 @@ class DrawerScreen extends StatelessWidget {
                         icon: Icons.privacy_tip_rounded,
                         onTap: () => _launchPrivacyPolicy(context),
                         gradient: LinearGradient(
-                          colors: [Colors.purple.shade700, Colors.purple.shade600],
+                          colors: [
+                            Colors.purple.shade700,
+                            Colors.purple.shade600
+                          ],
                         ),
                       ),
                     ],
                   ),
-
                   _buildSection(
                     context,
                     "COMPTE & PROFIL",
@@ -83,14 +88,11 @@ class DrawerScreen extends StatelessWidget {
                       ),
                     ],
                   ),
-
                   SizedBox(height: 30),
-
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 20),
                     child: Divider(color: Colors.grey.shade300, thickness: 1.0),
                   ),
-
                   _buildLogoutButton(context),
                 ],
               ),
@@ -163,7 +165,8 @@ class DrawerScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildSection(BuildContext context, String title, List<MenuItemData> items) {
+  Widget _buildSection(
+      BuildContext context, String title, List<MenuItemData> items) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -426,6 +429,7 @@ class DrawerScreen extends StatelessWidget {
   }
 
   Future<void> _launchPrivacyPolicy(BuildContext context) async {
+    var loadingDialogVisible = true;
     // Effet de transition avant le lancement
     showDialog(
       context: context,
@@ -449,7 +453,8 @@ class DrawerScreen extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 CircularProgressIndicator(
-                  valueColor: AlwaysStoppedAnimation<Color>(Colors.purple.shade600),
+                  valueColor:
+                      AlwaysStoppedAnimation<Color>(Colors.purple.shade600),
                 ),
                 SizedBox(height: 15),
                 Text(
@@ -466,21 +471,32 @@ class DrawerScreen extends StatelessWidget {
       },
     );
 
-    final Uri url = Uri.parse('https://www.privacypolicies.com/live/12076de3-e527-407e-b179-24c0007dde47');
+    final Uri url = Uri.parse(
+        'https://www.privacypolicies.com/live/12076de3-e527-407e-b179-24c0007dde47');
     try {
-      await Future.delayed(Duration(milliseconds: 700)); // Pause pour l'animation
-      Navigator.of(context).pop(); // Fermer le dialogue
+      await Future.delayed(
+          Duration(milliseconds: 700)); // Pause pour l'animation
+      if (context.mounted && loadingDialogVisible) {
+        Navigator.of(context, rootNavigator: true).pop();
+        loadingDialogVisible = false;
+      }
 
-      await launchUrl(
+      final opened = await launchUrl(
         url,
-        mode: LaunchMode.inAppWebView,
-        webViewConfiguration: const WebViewConfiguration(
-          enableJavaScript: true,
-          enableDomStorage: true,
-        ),
+        // Sur Android, ce mode ouvre un Custom Tab avec une barre système
+        // et un bouton fermer/retour toujours visible. L'utilisateur revient
+        // donc dans Sendra sans devoir tuer puis relancer l'application.
+        mode: LaunchMode.inAppBrowserView,
       );
+      if (!opened) {
+        throw Exception('Ouverture refusée');
+      }
     } catch (e) {
-      Navigator.of(context).pop(); // Fermer le dialogue en cas d'erreur
+      if (context.mounted && loadingDialogVisible) {
+        Navigator.of(context, rootNavigator: true).pop();
+        loadingDialogVisible = false;
+      }
+      if (!context.mounted) return;
       // Afficher un message d'erreur plus élégant
       showDialog(
         context: context,
@@ -691,9 +707,7 @@ class DrawerScreen extends StatelessWidget {
       debugPrint('Headers de la requête: $headers');
 
       // Préparer le body de la requête
-      final requestBody = json.encode({
-        "telephone": phone
-      });
+      final requestBody = json.encode({"telephone": phone});
 
       debugPrint('Body de la requête: $requestBody');
 
@@ -751,7 +765,8 @@ class DrawerScreen extends StatelessWidget {
               ],
             ),
             content: Text(
-              responseData['message'] ?? "Votre compte a été supprimé avec succès.",
+              responseData['message'] ??
+                  "Votre compte a été supprimé avec succès.",
               style: TextStyle(
                 color: Colors.grey.shade800,
                 fontSize: 15,
@@ -776,7 +791,6 @@ class DrawerScreen extends StatelessWidget {
           ),
           barrierDismissible: false,
         );
-
       } else if (response.statusCode == 401) {
         // Non autorisé
         debugPrint('Erreur 401: Non autorisé');
@@ -795,7 +809,8 @@ class DrawerScreen extends StatelessWidget {
           _showErrorDialog(
             context,
             "Erreur de suppression",
-            errorData['message'] ?? "Une erreur est survenue lors de la suppression du compte.",
+            errorData['message'] ??
+                "Une erreur est survenue lors de la suppression du compte.",
           );
         } catch (e) {
           _showErrorDialog(
@@ -805,7 +820,6 @@ class DrawerScreen extends StatelessWidget {
           );
         }
       }
-
     } catch (e) {
       // Fermer le dialogue de chargement en cas d'erreur
       Get.back();

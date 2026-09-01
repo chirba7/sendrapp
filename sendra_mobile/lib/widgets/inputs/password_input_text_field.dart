@@ -33,11 +33,10 @@ class _PasswordInputTextFieldState extends State<PasswordInputTextField> {
       controller: widget.controller,
       keyboardType: widget.keyboardType,
       validator: (String? value) {
-        if (value!.isEmpty) {
-          return null;
-        } else {
+        if (value == null || value.isEmpty) {
           return Strings.pleaseFillOutTheField;
         }
+        return null;
       },
       decoration: InputDecoration(
         border: OutlineInputBorder(
