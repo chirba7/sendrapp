@@ -28,7 +28,18 @@ class StoreAgentRequest extends FormRequest
             // Correction WEB-C-1 : sans whitelist, un role_id arbitraire
             // (ex. hors des 4 rôles staff valides) pouvait être assigné.
             'role' => 'required|in:1,2,3,4',
-            'telephone' => 'required|numeric|regex:/^[0-9]{9}$/',
+            // Correction : le numéro est unique en base (contrainte SQL),
+            // mais rien ne le vérifiait avant l'enregistrement — un doublon
+            // provoquait une erreur 500 (SQLSTATE 23000) au lieu d'un
+            // message clair.
+            'telephone' => 'required|numeric|regex:/^[0-9]{9}$/|unique:users,telephone',
+        ];
+    }
+
+    public function messages(): array
+    {
+        return [
+            'telephone.unique' => 'Ce numéro de téléphone est déjà utilisé par un autre compte.',
         ];
     }
 }
