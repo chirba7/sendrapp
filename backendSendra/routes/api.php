@@ -64,19 +64,12 @@ Route::middleware('jwt.auth')->group(function () {
     Route::get('/voirSignalements', [CarPositionController::class, 'voirSignalements']);
     Route::post('/faireSignalement', [CarPositionController::class, 'store']);
 
-    // Ajustement (2026-08-27) : listerSignalements/listerSignalement sont un
-    // fil public (accueil + carto de l'app mobile, cf. home_screen.dart et
-    // cartography_screen.dart) — voulu accessible à tout citoyen connecté,
-    // pas seulement au personnel. Sorti du groupe role:1,2,3,4 ci-dessous
-    // suite à un test en environnement de staging qui a montré que ça
-    // cassait l'écran d'accueil pour le rôle citoyen (role_id=5).
-    Route::get('/listerSignalements', [CarPositionController::class, 'listerSignalements']);
-    Route::get('/listerSignalement/{carPosition}', [CarPositionController::class, 'listerSignalement']);
-
     // Correction API-C-3 : routes "métier" réservées au personnel
     // (Admin=1, Agent=2, Autorité commune=3, Autorité préfecture=4).
     // Auparavant accessibles à n'importe quel citoyen auto-inscrit (role_id=5).
     Route::middleware('role:1,2,3,4')->group(function () {
+        Route::get('/listerSignalements', [CarPositionController::class, 'listerSignalements']);
+        Route::get('/listerSignalement/{carPosition}', [CarPositionController::class, 'listerSignalement']);
         Route::delete('/supprimerSignalement/{carPosition}', [CarPositionController::class, 'destroy']);
 
         // Vehicule routes
