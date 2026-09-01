@@ -70,17 +70,14 @@ class _SignInScreenState extends State<SignInScreen> {
       _errorMessage = '';
     });
 
-    final phone =
-        _cleanPhoneNumber(_controller.emailOrUserNameController.text);
+    final phone = _cleanPhoneNumber(_controller.emailOrUserNameController.text);
     final password = _controller.passwordController.text;
 
     try {
-      final response = await http
-          .post(
-            Uri.parse('${Strings.apiURI}login'),
-            body: {'telephone': phone, 'password': password},
-          )
-          .timeout(const Duration(seconds: 25));
+      final response = await http.post(
+        Uri.parse('${Strings.apiURI}login'),
+        body: {'telephone': phone, 'password': password},
+      ).timeout(const Duration(seconds: 25));
 
       if (!mounted) return;
 
@@ -121,9 +118,11 @@ class _SignInScreenState extends State<SignInScreen> {
         'Connexion indisponible. Vérifiez votre accès à Internet.',
       );
     } on TimeoutException {
-      _showRequestError('La connexion prend trop de temps. Veuillez réessayer.');
+      _showRequestError(
+          'La connexion prend trop de temps. Veuillez réessayer.');
     } catch (_) {
-      _showRequestError('Une erreur inattendue est survenue. Veuillez réessayer.');
+      _showRequestError(
+          'Une erreur inattendue est survenue. Veuillez réessayer.');
     }
   }
 
@@ -222,11 +221,12 @@ class _SignInScreenState extends State<SignInScreen> {
                             _label('Numéro de téléphone'),
                             const SizedBox(height: 8),
                             TextFormField(
-                              controller:
-                                  _controller.emailOrUserNameController,
+                              controller: _controller.emailOrUserNameController,
                               keyboardType: TextInputType.phone,
                               textInputAction: TextInputAction.next,
-                              autofillHints: const [AutofillHints.telephoneNumber],
+                              autofillHints: const [
+                                AutofillHints.telephoneNumber
+                              ],
                               inputFormatters: [
                                 LengthLimitingTextInputFormatter(12),
                                 FilteringTextInputFormatter.allow(
@@ -278,9 +278,10 @@ class _SignInScreenState extends State<SignInScreen> {
                                   setState(() => _errorMessage = '');
                                 }
                               },
-                              validator: (value) => value == null || value.isEmpty
-                                  ? 'Veuillez saisir votre mot de passe.'
-                                  : null,
+                              validator: (value) =>
+                                  value == null || value.isEmpty
+                                      ? 'Veuillez saisir votre mot de passe.'
+                                      : null,
                               decoration: _fieldDecoration(
                                 hint: 'Votre mot de passe',
                                 icon: Icons.lock_outline_rounded,
@@ -349,6 +350,33 @@ class _SignInScreenState extends State<SignInScreen> {
                                         ),
                                       ),
                               ),
+                            ),
+                            const SizedBox(height: 14),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Flexible(
+                                  child: Text(
+                                    'Vous n’avez pas encore de compte ?',
+                                    style: TextStyle(
+                                      color: _muted,
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                ),
+                                TextButton(
+                                  onPressed: _isLoading
+                                      ? null
+                                      : () => Get.toNamed(Routes.signUpScreen),
+                                  child: const Text(
+                                    'Créer un compte',
+                                    style: TextStyle(
+                                      color: _forest,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
                             const Spacer(),
                             const SizedBox(height: 26),
