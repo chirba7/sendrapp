@@ -95,10 +95,19 @@ Route::middleware([
     Route::get('/dashboard/comptes/agents', [UserController::class, 'agents'])->name('agents');
     Route::get('/dashboard/comptes/autorites', [UserController::class, 'autorites'])->name('autorites');
     Route::get('/dashboard/comptes/utilisateurs', [UserController::class, 'utilisateurs'])->name('utilisateurs');
+    // Correction WEB-M-1 : route déclarée avant le wildcard {user} ci-dessous,
+    // sinon "citoyens" serait interprété comme un id de compte.
+    Route::get('/dashboard/comptes/citoyens', [UserController::class, 'citoyens'])->name('citoyens');
     Route::post('/ajouter', [UserController::class, 'store'])->name('ajouter.compte');
 
     Route::get('/dashboard/comptes/{user}', [UserController::class, 'show'])->name('modifier');
     Route::patch('/dashboard/comptes/{user}', [UserController::class, 'modifier'])->name('modifier.compte');
+    // Le champ "Mot De Passe" du formulaire Modifier n'a jamais été relié à
+    // rien côté backend (ni validé, ni lu) — un Admin qui le remplissait
+    // voyait "succès" sans que rien ne change. Route dédiée à la place,
+    // qui génère un mot de passe aléatoire et le transmet par e-mail
+    // (jamais saisi en clair par l'Admin).
+    Route::post('/dashboard/comptes/{user}/reset-password', [UserController::class, 'resetPassword'])->name('reset-password');
 
     // Correction WEB-H-2 : save_agents/save_admin/save_autorites pointaient
     // vers des méthodes UserController inexistantes (500 au moindre appel),
