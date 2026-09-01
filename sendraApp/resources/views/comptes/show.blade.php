@@ -24,6 +24,16 @@
                 </div>
             </div>
             @endif
+            {{-- Repli du reset de mot de passe si l'envoi d'e-mail échoue --}}
+            @if (session('warning'))
+            <div class="row alert-box danger-alert">
+                <div class="col-12 alert">
+                    <p class="text-medium">
+                        {{ session('warning') }}
+                    </p>
+                </div>
+            </div>
+            @endif
             @if(count($errors) >0)
             <div class="row alert-box danger-alert">
                 <div class="col-12 alert">

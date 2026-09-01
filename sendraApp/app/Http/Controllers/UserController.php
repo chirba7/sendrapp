@@ -9,6 +9,7 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 
@@ -143,9 +144,24 @@ class UserController extends Controller
         $user->is_enabled = false;
         $user->save();
 
-        Mail::to($user->email)->send(new AuthMail($user, $temporaryPassword));
-
-        return back()->with('success', 'Mot de passe réinitialisé — un nouveau mot de passe temporaire a été envoyé à ' . $user->email . '.');
+        // Le mot de passe est déjà changé à ce stade : un échec d'envoi
+        // (serveur SMTP injoignable, ex. constaté sur cet environnement)
+        // ne doit pas faire planter la requête en 500 alors que l'action
+        // a réussi — même logique que
+        // DommagesController::notifierAdministrateurs().
+        try {
+            Mail::to($user->email)->send(new AuthMail($user, $temporaryPassword));
+            return back()->with('success', 'Mot de passe réinitialisé — un nouveau mot de passe temporaire a été envoyé à ' . $user->email . '.');
+        } catch (\Throwable $exception) {
+            Log::error("Échec de l'envoi de l'e-mail de réinitialisation de mot de passe.", [
+                'userId' => $user->id,
+                'exception' => $exception->getMessage(),
+            ]);
+            // Repli : sans e-mail fonctionnel, l'Admin doit pouvoir
+            // communiquer le mot de passe autrement, sinon le compte reste
+            // bloqué sans que personne ne connaisse le nouveau mot de passe.
+            return back()->with('warning', "Mot de passe réinitialisé, mais l'e-mail n'a pas pu être envoyé (serveur mail injoignable). Mot de passe temporaire à transmettre manuellement : " . $temporaryPassword);
+        }
     }
 
     /**
