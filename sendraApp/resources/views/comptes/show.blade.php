@@ -89,18 +89,24 @@
                                             <div class="invalid-feedback">{{ $message }}</div>
                                             @enderror
                                         </div>
-                                        <div class="col-md-6">
-                                            <label class="form-label" for="inputPassword4">Mot De Passe</label>
-                                            <input type="password" class="form-control @error('motDePasse') is-invalid @enderror" id="inputPassword4" name="motDePasse">
-                                            @error('motDePasse')
-                                            <div class="invalid-feedback">{{ $message }}</div>
-                                            @enderror
-                                        </div>
-
                                     </div>
                                     <button type="submit mb-3" class="main-btn success-btn-light btn-hover">
                                         <i class="lni lni-checkmark"></i>
                                         Modifier</button>
+                                </form>
+
+                                {{-- Le champ "Mot De Passe" ci-dessus n'était relié à rien
+                                     (ni validé, ni lu par modifier()) : retiré. Un Admin ne
+                                     saisit plus de mot de passe en clair — il déclenche
+                                     l'envoi d'un mot de passe temporaire par e-mail. --}}
+                                <form action="{{ route('reset-password', [$user->id]) }}" method="post"
+                                      onsubmit="return confirm('Réinitialiser le mot de passe de {{ $user->first_name }} {{ $user->last_name }} ? L\'ancien mot de passe cessera de fonctionner immédiatement, un nouveau sera envoyé à {{ $user->email ?? 'son adresse e-mail' }}.');"
+                                      class="mt-3">
+                                    @csrf
+                                    <button type="submit" class="main-btn danger-btn-light btn-hover">
+                                        <i class="lni lni-key"></i>
+                                        Réinitialiser le mot de passe
+                                    </button>
                                 </form>
                             </div>
 

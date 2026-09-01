@@ -102,6 +102,12 @@ Route::middleware([
 
     Route::get('/dashboard/comptes/{user}', [UserController::class, 'show'])->name('modifier');
     Route::patch('/dashboard/comptes/{user}', [UserController::class, 'modifier'])->name('modifier.compte');
+    // Le champ "Mot De Passe" du formulaire Modifier n'a jamais été relié à
+    // rien côté backend (ni validé, ni lu) — un Admin qui le remplissait
+    // voyait "succès" sans que rien ne change. Route dédiée à la place,
+    // qui génère un mot de passe aléatoire et le transmet par e-mail
+    // (jamais saisi en clair par l'Admin).
+    Route::post('/dashboard/comptes/{user}/reset-password', [UserController::class, 'resetPassword'])->name('reset-password');
 
     // Correction WEB-H-2 : save_agents/save_admin/save_autorites pointaient
     // vers des méthodes UserController inexistantes (500 au moindre appel),

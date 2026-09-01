@@ -118,8 +118,36 @@ class UserController extends Controller
         $user->email = $request->email;
 
         $user->update();
-        return back()->with('success', 'Compte ajouter avec success');
+        // Correction : le message reprenait celui de la création de compte
+        // (copier-coller de store()) — trompeur sur une simple modification.
+        return back()->with('success', 'Compte modifié avec succès');
     }
+
+    /**
+     * Réinitialise le mot de passe d'un compte (Admin uniquement, déjà
+     * garanti par le middleware role:1 sur ce groupe de routes). Génère un
+     * mot de passe temporaire et le transmet par e-mail — jamais saisi en
+     * clair par l'Admin, pour éviter qu'un mot de passe ne transite dans la
+     * requête ou reste affiché à l'écran (même logique que store()).
+     */
+    public function resetPassword(User $user)
+    {
+        if (!$user->email) {
+            return back()->with('error', "Impossible de réinitialiser : ce compte n'a pas d'adresse e-mail renseignée.");
+        }
+
+        $temporaryPassword = Str::random(12);
+        $user->password = Hash::make($temporaryPassword);
+        // Force le changement de mot de passe à la prochaine connexion,
+        // comme pour un compte nouvellement créé (IsActiveMiddleware).
+        $user->is_enabled = false;
+        $user->save();
+
+        Mail::to($user->email)->send(new AuthMail($user, $temporaryPassword));
+
+        return back()->with('success', 'Mot de passe réinitialisé — un nouveau mot de passe temporaire a été envoyé à ' . $user->email . '.');
+    }
+
     /**
      * Display the specified resource.
      */

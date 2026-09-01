@@ -469,7 +469,7 @@
                                                             <tr>
                                                                 <td class="attributes_item">
                                                                     <span class="f-fallback">
-                                                                        <strong>Mot de passe :</strong> sendra2024@
+                                                                        <strong>Mot de passe :</strong> {{ $password }}
                                                                     </span>
                                                                 </td>
                                                             </tr>
