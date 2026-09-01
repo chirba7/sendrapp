@@ -439,6 +439,7 @@
                                     <td class="content-cell">
                                         <div class="f-fallback">
                                             <h1>Bienvenue, {{$nom}} !</h1>
+                                            @if($showWebLink)
                                             <p>Nous sommes ravis de vous avoir parmi nous. Pour tirer le meilleur parti de la plateform, Cliquez sur le bouton suivant :</p>
                                             <!-- Action -->
                                             <table class="body-action" align="center" width="100%" cellpadding="0" cellspacing="0" role="presentation">
@@ -454,6 +455,9 @@
                                                     </td>
                                                 </tr>
                                             </table>
+                                            @else
+                                            <p>Nous sommes ravis de vous avoir parmi nous. Connectez-vous depuis l'application mobile SENDRA avec les identifiants ci-dessous :</p>
+                                            @endif
                                             <p>Pour référence, voici vos informations de connexion :</p>
                                             <table class="attributes" width="100%" cellpadding="0" cellspacing="0" role="presentation">
                                                 <tr>
@@ -469,7 +473,7 @@
                                                             <tr>
                                                                 <td class="attributes_item">
                                                                     <span class="f-fallback">
-                                                                        <strong>Mot de passe :</strong> sendra2024@
+                                                                        <strong>Mot de passe :</strong> {{$password}}
                                                                     </span>
                                                                 </td>
                                                             </tr>
@@ -481,6 +485,7 @@
                                             <p>Merci,
                                                 <br>Mr Ba et l'équipe de SENDRA
                                             </p>
+                                            @if($showWebLink)
                                             <table class="body-sub" role="presentation">
                                                 <tr>
                                                     <td>
@@ -489,6 +494,7 @@
                                                     </td>
                                                 </tr>
                                             </table>
+                                            @endif
                                         </div>
                                     </td>
                                 </tr>

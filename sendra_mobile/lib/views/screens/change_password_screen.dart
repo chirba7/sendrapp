@@ -248,23 +248,38 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
       return;
     }
 
+    if (newPasswordController.text.length < 6) {
+      setState(() {
+        newPasswordError = 'Le mot de passe doit contenir au moins 6 caractères.';
+      });
+      return;
+    }
+
     final String oldPassword = oldPasswordController.text;
     final String newPassword = newPasswordController.text;
     final String confirmPassword = confirmPasswordController.text;
 
-    var response = await http.post(
-      Uri.parse(Strings.apiURL + 'change_password.php'),
-      body: {
-        'userId': userId!,
-        'oldPassword': oldPassword,
-        'newPassword': newPassword,
-        'confirmPassword': confirmPassword,
-      },
-    );
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('token') ?? '';
 
-    if (response.statusCode == 200) {
+    try {
+      final response = await http.put(
+        Uri.parse('${Strings.apiURI}change-password'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: json.encode({
+          'current_password': oldPassword,
+          'password': newPassword,
+          'password_confirmation': confirmPassword,
+        }),
+      );
+
       final Map<String, dynamic> data = json.decode(response.body);
-      if (data['success']) {
+
+      if (response.statusCode == 200 && data['success'] == true) {
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text("Le mot de passe a été modifié avec succès."),
           backgroundColor: Colors.green,
@@ -273,13 +288,15 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
         newPasswordController.clear();
         confirmPasswordController.clear();
       } else {
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(
+          content: Text(data['message']?.toString() ??
               "Erreur lors du changement de mot de passe. Veuillez réessayer."),
           backgroundColor: Colors.red,
         ));
       }
-    } else {
+    } catch (_) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text(
             "Erreur de communication avec le serveur. Veuillez réessayer."),

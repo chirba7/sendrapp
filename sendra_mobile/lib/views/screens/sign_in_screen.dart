@@ -480,51 +480,144 @@ class _SignInScreenState extends State<SignInScreen> {
   }
 
   Future<void> _forgotPasswordScreen(BuildContext context) async {
+    final phoneController = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+    bool isSending = false;
+    String? error;
+
     await showDialog<void>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        backgroundColor: Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        icon: const CircleAvatar(
-          radius: 28,
-          backgroundColor: Color(0xFFE5F4EB),
-          child: Icon(Icons.lock_reset_rounded, color: _green, size: 30),
-        ),
-        title: const Text(
-          'Mot de passe oublié',
-          textAlign: TextAlign.center,
-          style: TextStyle(color: _ink, fontWeight: FontWeight.w800),
-        ),
-        content: const Text(
-          'Nous allons vérifier votre numéro de téléphone avant de réinitialiser votre mot de passe.',
-          textAlign: TextAlign.center,
-          style: TextStyle(color: _muted, height: 1.4),
-        ),
-        actionsPadding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-        actions: [
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              onPressed: () {
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) {
+          Future<void> submit() async {
+            if (!formKey.currentState!.validate()) return;
+            final phone = _cleanPhoneNumber(phoneController.text);
+
+            setDialogState(() {
+              isSending = true;
+              error = null;
+            });
+
+            try {
+              final response = await http.post(
+                Uri.parse('${Strings.apiURI}send-verification-code'),
+                body: {'telephone': phone},
+              ).timeout(const Duration(seconds: 20));
+
+              final jsonResponse =
+                  jsonDecode(response.body) as Map<String, dynamic>;
+
+              if (response.statusCode == 200 &&
+                  jsonResponse['success'] == true) {
+                if (!dialogContext.mounted) return;
                 Navigator.of(dialogContext).pop();
-                Get.toNamed(Routes.otpVerificationScreen);
-              },
-              style: ElevatedButton.styleFrom(
-                elevation: 0,
-                backgroundColor: _green,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              child: const Text(
-                'Continuer',
-                style: TextStyle(fontWeight: FontWeight.w700),
+                Get.toNamed(Routes.otpVerificationScreen, arguments: phone);
+                return;
+              }
+
+              setDialogState(() {
+                error = jsonResponse['message']?.toString() ??
+                    'Impossible d\'envoyer le code de vérification.';
+                isSending = false;
+              });
+            } catch (_) {
+              setDialogState(() {
+                error = 'Connexion indisponible. Vérifiez votre accès à Internet.';
+                isSending = false;
+              });
+            }
+          }
+
+          return AlertDialog(
+            backgroundColor: Colors.white,
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            icon: const CircleAvatar(
+              radius: 28,
+              backgroundColor: Color(0xFFE5F4EB),
+              child: Icon(Icons.lock_reset_rounded, color: _green, size: 30),
+            ),
+            title: const Text(
+              'Mot de passe oublié',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: _ink, fontWeight: FontWeight.w800),
+            ),
+            content: Form(
+              key: formKey,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    'Saisissez votre numéro de téléphone pour recevoir un code de vérification.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: _muted, height: 1.4),
+                  ),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: phoneController,
+                    keyboardType: TextInputType.phone,
+                    inputFormatters: [
+                      LengthLimitingTextInputFormatter(12),
+                      FilteringTextInputFormatter.allow(RegExp(r'[0-9 ]')),
+                    ],
+                    validator: (value) {
+                      final cleaned = _cleanPhoneNumber(value?.trim() ?? '');
+                      if (cleaned.isEmpty) {
+                        return 'Veuillez saisir votre numéro de téléphone.';
+                      }
+                      if (!RegExp(r'^\d{9}$').hasMatch(cleaned)) {
+                        return 'Le numéro doit contenir exactement 9 chiffres.';
+                      }
+                      return null;
+                    },
+                    decoration: _fieldDecoration(
+                      hint: '77 123 45 67',
+                      icon: Icons.phone_outlined,
+                    ),
+                  ),
+                  if (error != null) ...[
+                    const SizedBox(height: 12),
+                    Text(
+                      error!,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(color: Color(0xFF9E1C13)),
+                    ),
+                  ],
+                ],
               ),
             ),
-          ),
-        ],
+            actionsPadding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+            actions: [
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: isSending ? null : submit,
+                  style: ElevatedButton.styleFrom(
+                    elevation: 0,
+                    backgroundColor: _green,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: isSending
+                      ? const SizedBox.square(
+                          dimension: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2.5,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Text(
+                          'Continuer',
+                          style: TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }

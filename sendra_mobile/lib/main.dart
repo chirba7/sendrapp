@@ -60,8 +60,7 @@ void main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
-  final initialRoute = await getInitialRoute();
-  runApp(MyApp(initialRoute: initialRoute));
+  runApp(const MyApp(initialRoute: Routes.splashScreen));
 }
 
 class MyApp extends StatelessWidget {

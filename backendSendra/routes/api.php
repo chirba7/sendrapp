@@ -44,6 +44,10 @@ Route::group([
         Route::post('/send-verification-code', [AuthControllerApi::class, 'sendVerificationCode']);
         Route::post('/check-phone', [AuthControllerApi::class, 'checkPhone']);
     });
+
+    // Mot de passe oublié : nécessite un code déjà vérifié via
+    // /verify-code pour ce numéro (voir resetPassword()).
+    Route::post('/reset-password', [AuthControllerApi::class, 'resetPassword']);
 });
 
 // Protected routes (Authentication required with JWT)
@@ -53,6 +57,7 @@ Route::middleware('jwt.auth')->group(function () {
     Route::post('/refresh', [AuthControllerApi::class, 'refresh']);
     Route::post('/me', [AuthControllerApi::class, 'me']);
     Route::post('/delete-user', [AuthControllerApi::class, 'deleteUser']);
+    Route::put('/change-password', [AuthControllerApi::class, 'changePassword']);
 
     // Signalement routes ouvertes à tout citoyen connecté (auto-scopées à
     // son propre compte côté contrôleur : store()/voirSignalements()).
