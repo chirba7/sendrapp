@@ -133,6 +133,9 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
   Container _titleWidget(BuildContext context) {
     return Container(
       margin: EdgeInsets.all(Dimensions.marginSize),
+      // Correction : les deux Text (libellé + numéro) sans Expanded
+      // débordaient de la Row de 59px sur les numéros/écrans un peu longs
+      // (ex: écran d'OTP pendant le flux mot de passe oublié).
       child: Row(
         mainAxisAlignment: MainAxisAlignment.start,
         children: [
@@ -142,10 +145,13 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
             style: CustomStyler.otpVerificationDescriptionStyle,
           ),
           addHorizontalSpace(6.w),
-          Text(
-            widget.phone,
-            textAlign: TextAlign.center,
-            style: CustomStyler.otpVerificationDescriptionStyle,
+          Expanded(
+            child: Text(
+              widget.phone,
+              textAlign: TextAlign.center,
+              overflow: TextOverflow.ellipsis,
+              style: CustomStyler.otpVerificationDescriptionStyle,
+            ),
           ),
         ],
       ),
