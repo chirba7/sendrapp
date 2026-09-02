@@ -30,6 +30,13 @@ class _DommagesScreenState extends State<DommagesScreen> {
   bool _drawingEnabled = false;
   bool _isSaving = false;
   Size _canvasSize = Size.zero;
+  // Correction : quand un signalement a déjà des dommages enregistrés,
+  // _loadImageFromApi() charge cette image existante (déjà un composite
+  // recadré, plus le gabarit à deux panneaux voiture+moto). Le sélecteur
+  // de type continuait pourtant à recadrer cette image comme si c'était le
+  // gabarit d'origine, produisant des morceaux de voiture absurdes en mode
+  // "Moto". _isExistingImage désactive ce recadrage sur une image existante.
+  bool _isExistingImage = false;
 
   @override
   void initState() {
@@ -95,6 +102,7 @@ class _DommagesScreenState extends State<DommagesScreen> {
       _image = image;
       _imageWidth = image.width.toDouble();
       _imageHeight = image.height.toDouble();
+      _isExistingImage = false;
     });
   }
 
@@ -129,6 +137,7 @@ class _DommagesScreenState extends State<DommagesScreen> {
             _image = image;
             _imageWidth = image.width.toDouble();
             _imageHeight = image.height.toDouble();
+            _isExistingImage = true;
           });
         } else {
           throw Exception('Aucune image trouvée pour ce signalement');
@@ -289,6 +298,12 @@ class _DommagesScreenState extends State<DommagesScreen> {
   Rect _sourceRectFor(ui.Image image) {
     final width = image.width.toDouble();
     final height = image.height.toDouble();
+    // Une image déjà enregistrée (composite chargé depuis l'API) est un
+    // panneau unique déjà finalisé, pas le gabarit à deux panneaux — pas de
+    // recadrage voiture/moto dessus, on l'affiche en entier.
+    if (_isExistingImage) {
+      return Rect.fromLTWH(0, 0, width, height);
+    }
     if (_vehicleKind == 'Moto') {
       return Rect.fromLTWH(width * .62, 0, width * .38, height);
     }
@@ -479,10 +494,18 @@ class _DommagesScreenState extends State<DommagesScreen> {
             width: double.infinity,
             child: Text(label, textAlign: TextAlign.center)),
         selected: selected,
-        onSelected: (_) => setState(() {
-          _vehicleKind = label;
-          _points.clear();
-        }),
+        onSelected: (_) async {
+          // Changer de type sur une image déjà enregistrée n'a pas de sens
+          // (ce n'est plus le gabarit à deux panneaux) — on repart du
+          // gabarit vierge pour une nouvelle annotation.
+          if (_isExistingImage) {
+            await _loadDefaultImage();
+          }
+          setState(() {
+            _vehicleKind = label;
+            _points.clear();
+          });
+        },
         selectedColor: const Color(0xFFE1F3E8),
         side: BorderSide(
             color: selected ? SendraTheme.green : SendraTheme.border),
