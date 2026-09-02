@@ -19,6 +19,36 @@ class VehicleForm extends StatefulWidget {
 }
 
 class _VehicleFormState extends State<VehicleForm> {
+  static const List<String> _vehicleBrands = [
+    'Toyota',
+    'Ford',
+    'Honda',
+    'Chevrolet',
+    'Nissan',
+    'BMW',
+    'Mercedes-Benz',
+    'Audi',
+    'Volkswagen',
+    'Hyundai',
+    'Kia',
+    'Mazda',
+    'Peugeot',
+    'Renault',
+  ];
+  static const List<String> _vehicleTypes = [
+    'Berline',
+    'VUS',
+    'Hayon',
+    'Camion',
+    'Electrique',
+  ];
+  static const List<String> _vehicleCategories = [
+    'BPP',
+    'VUS',
+    'VUL',
+    'VTM',
+    'CYCL',
+  ];
   static const Map<String, Color> _vehicleColors = {
     'Blanc': Color(0xFFF5F5F5),
     'Noir': Color(0xFF202124),
@@ -83,10 +113,13 @@ class _VehicleFormState extends State<VehicleForm> {
       print('  - Châssis non réparable: ${data['chassis_non_reparable']}');
       setState(() {
         _numeroController.text = _cleanValue(data['numero']);
-        _marqueController.text = _cleanValue(data['marque']);
-        _typeController.text = _cleanValue(data['type']);
+        _marqueController.text =
+            _canonicalChoice(_cleanValue(data['marque']), _vehicleBrands);
+        _typeController.text =
+            _canonicalChoice(_cleanValue(data['type']), _vehicleTypes);
         _modeleController.text = _cleanValue(data['model']);
-        _categorieController.text = _cleanValue(data['categorie']);
+        _categorieController.text = _canonicalChoice(
+            _cleanValue(data['categorie']), _vehicleCategories);
         final loadedColor = _cleanValue(data['couleur']);
         _couleurController.text = _vehicleColors.keys.firstWhere(
           (color) => color.toLowerCase() == loadedColor.toLowerCase(),
@@ -115,6 +148,14 @@ class _VehicleFormState extends State<VehicleForm> {
 
   String _cleanValue(dynamic value) =>
       value == null || value.toString() == 'null' ? '' : value.toString();
+
+  String _canonicalChoice(String value, List<String> choices) {
+    if (value.isEmpty) return '';
+    return choices.firstWhere(
+      (choice) => choice.toLowerCase() == value.toLowerCase(),
+      orElse: () => '',
+    );
+  }
 
   Future<void> _updateVehicle() async {
     if (_numeroController.text.isEmpty ||
@@ -227,11 +268,13 @@ class _VehicleFormState extends State<VehicleForm> {
               SizedBox(height: 20),
               _buildField(
                   'Numéro du véhicule', _numeroController, Icons.numbers),
-              _buildField('Marque', _marqueController, Icons.directions_car),
-              _buildField('Type', _typeController, Icons.category),
+              _buildDropdown('Marque', _marqueController, Icons.directions_car,
+                  _vehicleBrands),
+              _buildDropdown(
+                  'Type', _typeController, Icons.category, _vehicleTypes),
               _buildField('Modèle', _modeleController, Icons.model_training),
-              _buildField(
-                  'Catégorie du véhicule', _categorieController, Icons.label),
+              _buildDropdown('Catégorie du véhicule', _categorieController,
+                  Icons.label, _vehicleCategories),
               _buildColorPalette(),
               SizedBox(height: 20),
               Divider(),
@@ -319,6 +362,38 @@ class _VehicleFormState extends State<VehicleForm> {
     return Text(
       title,
       style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+    );
+  }
+
+  Widget _buildDropdown(
+    String label,
+    TextEditingController controller,
+    IconData icon,
+    List<String> options,
+  ) {
+    final selectedValue =
+        options.contains(controller.text) ? controller.text : null;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: DropdownButtonFormField<String>(
+        initialValue: selectedValue,
+        isExpanded: true,
+        decoration: InputDecoration(
+          labelText: label,
+          prefixIcon: Icon(icon),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+          filled: true,
+          fillColor: Colors.grey[100],
+        ),
+        hint: Text('Sélectionnez ${label.toLowerCase()}'),
+        items: options
+            .map((option) => DropdownMenuItem(
+                  value: option,
+                  child: Text(option),
+                ))
+            .toList(),
+        onChanged: (value) => setState(() => controller.text = value ?? ''),
+      ),
     );
   }
 

@@ -688,7 +688,7 @@
                                 </div>
                             </form>
                             <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.3.1/jspdf.umd.min.js"></script>
-                            <script src="{{ asset('assets/js/signature.js') }}"></script>
+                            <script src="{{ asset('assets/js/signature.js') }}?v={{ filemtime(public_path('assets/js/signature.js')) }}"></script>
                         </div>
                     </div>
                 </div>
