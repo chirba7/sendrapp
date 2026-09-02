@@ -660,6 +660,12 @@
                             <form id="signature-form" method="POST" action="{{ route('signature.store', [$carPosition->id]) }}">
                                 @csrf
                                 <img id="default-image" src="{{ asset('img/constation image.png') }}" style="display: none;">
+                                @if($carPosition->dommage_image)
+                                {{-- Correction : l'Admin ne voyait jamais les dommages déjà
+                                     constatés par l'agent — le canvas repartait toujours du
+                                     gabarit vierge, quel que soit l'état réel du signalement. --}}
+                                <img id="existing-damage-image" src="{{ asset('storage/dommages/'.$carPosition->dommage_image) }}" style="display: none;" crossorigin="anonymous">
+                                @endif
                                 <div class="sendra-damage-wrap">
                                     <h5 class="mb-3">Type de véhicule</h5>
                                     <div class="sendra-choice-grid mb-4">
@@ -672,7 +678,12 @@
                                             <label class="sendra-choice-card" for="damage-motorcycle">🏍️ Moto</label>
                                         </div>
                                     </div>
-                                    <p class="text-sm mb-2">Dessinez uniquement sur le véhicule pour indiquer les dommages.</p>
+                                    <p class="text-sm mb-2">
+                                        Dessinez uniquement sur le véhicule pour indiquer les dommages.
+                                        @if($carPosition->dommage_image)
+                                        <span class="text-muted">Dommages déjà constatés affichés ci-dessous — choisissez un type de véhicule pour repartir d'un gabarit vierge.</span>
+                                        @endif
+                                    </p>
                                     <canvas id="signature-canvas" width="760" height="360"></canvas>
                                 </div>
                                 <input type="hidden" name="signature" id="signature">

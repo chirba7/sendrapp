@@ -3,15 +3,27 @@ document.addEventListener('DOMContentLoaded', function () {
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     const defaultImage = document.getElementById('default-image');
+    const existingImage = document.getElementById('existing-damage-image');
     let vehicleType = document.querySelector('.damage-vehicle-choice:checked')?.value || 'car';
+    // Correction : l'Admin ne voyait jamais les dommages déjà constatés par
+    // l'agent — le canvas repartait toujours du gabarit vierge. Si une
+    // image existe déjà pour ce signalement, on l'affiche en entier (sans
+    // recadrage voiture/moto, ce n'est plus le gabarit à deux panneaux)
+    // jusqu'à ce qu'un type de véhicule soit explicitement choisi.
+    let showingExistingImage = !!existingImage;
 
     function drawDefaultImage() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         ctx.fillStyle = '#ffffff';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-        // L'image historique regroupe voiture (partie gauche) et moto
-        // (partie droite). On ne dessine que le véhicule choisi.
+        if (showingExistingImage) {
+            ctx.drawImage(existingImage, 0, 0, canvas.width, canvas.height);
+            return;
+        }
+
+        // L'image gabarit regroupe voiture (partie gauche) et moto (partie
+        // droite). On ne dessine que le véhicule choisi.
         if (vehicleType === 'motorcycle') {
             ctx.drawImage(defaultImage, 425, 0, 234, 154, 105, 25, 550, 310);
         } else {
@@ -19,11 +31,21 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
-    if (defaultImage.complete) drawDefaultImage();
-    else defaultImage.addEventListener('load', drawDefaultImage, { once: true });
+    if (showingExistingImage) {
+        if (existingImage.complete) drawDefaultImage();
+        else existingImage.addEventListener('load', drawDefaultImage, { once: true });
+    } else if (defaultImage.complete) {
+        drawDefaultImage();
+    } else {
+        defaultImage.addEventListener('load', drawDefaultImage, { once: true });
+    }
 
     document.querySelectorAll('.damage-vehicle-choice').forEach((choice) => {
         choice.addEventListener('change', (event) => {
+            // Choisir un type de véhicule sur une image existante n'a pas
+            // de sens (ce n'est plus le gabarit à deux panneaux) — on
+            // repart du gabarit vierge pour une nouvelle annotation.
+            showingExistingImage = false;
             vehicleType = event.target.value;
             drawDefaultImage();
         });
