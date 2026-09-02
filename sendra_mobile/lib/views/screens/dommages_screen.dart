@@ -44,7 +44,17 @@ class _DommagesScreenState extends State<DommagesScreen> {
     print('DommagesScreen initialized');
 
     fetchSignalementDetails(widget.signalementId);
-    _loadImageFromApi(widget.signalementId); // Charge l'image depuis l'API
+    // Correction perf : l'écran attendait deux appels réseau séquentiels
+    // (voirDommages puis le téléchargement de l'image) avant d'afficher
+    // quoi que ce soit — y compris dans le cas le plus fréquent où aucun
+    // dommage n'existe encore, où ça finissait par retomber sur le gabarit
+    // local de toute façon après avoir attendu pour rien. Le gabarit
+    // s'affiche maintenant tout de suite (chargement local, instantané) ;
+    // la vérification d'une éventuelle image déjà enregistrée se fait en
+    // arrière-plan et ne remplace l'affichage que si l'utilisateur n'a pas
+    // déjà commencé à dessiner dessus.
+    _loadDefaultImage();
+    _loadImageFromApi(widget.signalementId);
   }
 
   @override
@@ -120,7 +130,9 @@ class _DommagesScreenState extends State<DommagesScreen> {
     };
 
     try {
-      final response = await http.get(Uri.parse(url), headers: headers);
+      final response = await http
+          .get(Uri.parse(url), headers: headers)
+          .timeout(const Duration(seconds: 15));
 
       if (response.statusCode == 200) {
         final jsonResponse = jsonDecode(response.body);
@@ -133,29 +145,31 @@ class _DommagesScreenState extends State<DommagesScreen> {
           final imageBytes = await _fetchImageFromUrl(imageUrl);
           final image = await _decodeImage(imageBytes);
 
+          // Le gabarit local s'affiche déjà pendant ce chargement en
+          // arrière-plan — ne pas écraser un dessin déjà en cours.
+          if (!mounted || _points.isNotEmpty) return;
+
           setState(() {
             _image = image;
             _imageWidth = image.width.toDouble();
             _imageHeight = image.height.toDouble();
             _isExistingImage = true;
           });
-        } else {
-          throw Exception('Aucune image trouvée pour ce signalement');
         }
-      } else {
-        throw Exception('Impossible de récupérer l\'image depuis le backend');
+        // Pas de clé "dommages" : rien à faire, le gabarit local déjà
+        // affiché reste en place (cas normal, aucun dommage enregistré).
       }
     } catch (e) {
-      print('Erreur: $e');
-      // Charger l'image par défaut en cas d'erreur
-      print('Chargement de l\'image par défaut');
-      await _loadDefaultImage();
+      // Le gabarit local est déjà affiché depuis initState — un échec ici
+      // (réseau lent, timeout) n'empêche pas l'utilisateur d'annoter.
+      print('Erreur lors du chargement de l\'image existante: $e');
     }
   }
 
 // Fonction utilitaire pour récupérer l'image depuis une URL
   Future<Uint8List> _fetchImageFromUrl(String imageUrl) async {
-    final response = await http.get(Uri.parse(imageUrl));
+    final response =
+        await http.get(Uri.parse(imageUrl)).timeout(const Duration(seconds: 15));
     if (response.statusCode == 200) {
       return response.bodyBytes;
     } else {
