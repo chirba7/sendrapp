@@ -28,7 +28,9 @@ class StoreCarPositionRequest extends FormRequest
             'commune' => 'required|string',
             'latitude' => 'required|numeric',
             'longitude' => 'required|numeric',
-            'image' => 'required|string',
+            // Correction perf : aucune limite de taille sur le payload
+            // base64 entrant. ~15M caractères ≈ 11 Mo décodés.
+            'image' => 'required|string|max:15000000',
         ];
     }
     public function failedValidation(Validator $validator)

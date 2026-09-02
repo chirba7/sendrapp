@@ -489,11 +489,18 @@ class _DepositMoneyDetailsScreenState extends State<DepositMoneyDetailsScreen> {
         child: ListTile(
           contentPadding:
               EdgeInsets.symmetric(vertical: 12.0, horizontal: 16.0),
-          leading: Icon(
-            _getIconForTitle(
-                title), // Fonction pour obtenir l'icône en fonction du titre
-            size: 28.0, // Taille de l'icône augmentée
-            color: SendraTheme.green,
+          leading: Container(
+            width: 44,
+            height: 44,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: const Color(0xFFE8F5ED),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Text(
+              _emojiForTitle(title),
+              style: const TextStyle(fontSize: 23),
+            ),
           ),
           title: Text(
             title,
@@ -545,6 +552,17 @@ class _DepositMoneyDetailsScreenState extends State<DepositMoneyDetailsScreen> {
         ),
       ),
     );
+  }
+
+  String _emojiForTitle(String title) {
+    return switch (title) {
+      'Informations de base' => '📋',
+      'Véhicule' => '🚗',
+      'Infraction' => '⚠️',
+      'Dommages' => '🛠️',
+      'Enlèvement' => '🚛',
+      _ => '📌',
+    };
   }
 
 // Fonction pour obtenir l'icône correspondante en fonction du titre

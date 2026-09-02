@@ -1,5 +1,22 @@
 @extends('layouts.master')
 @section('session')
+<style>
+    .sendra-choice-grid { display:grid; grid-template-columns:repeat(2,minmax(130px,1fr)); gap:12px; max-width:520px; }
+    .sendra-choice-input { position:absolute; opacity:0; pointer-events:none; }
+    .sendra-choice-card { min-height:76px; border:2px solid #dce5df; border-radius:16px; display:flex; align-items:center; justify-content:center; gap:10px; cursor:pointer; font-weight:700; transition:.18s ease; }
+    .sendra-choice-input:checked + .sendra-choice-card { border-color:#198754; box-shadow:0 5px 14px rgba(25,135,84,.2); }
+    .sendra-day { background:#62b8ed; color:#fff; }
+    .sendra-night { background:#101722; color:#fff; position:relative; overflow:hidden; }
+    .sendra-night::before { content:'•  ·  •'; position:absolute; color:#fff; top:5px; right:15px; letter-spacing:5px; }
+    .sendra-color-grid { display:flex; flex-wrap:wrap; gap:9px; }
+    .sendra-color-card { width:62px; padding:8px 4px; border:2px solid #dce5df; border-radius:14px; text-align:center; cursor:pointer; background:#fff; }
+    .sendra-color-input { position:absolute; opacity:0; pointer-events:none; }
+    .sendra-color-input:checked + .sendra-color-card { border-color:#198754; background:#e8f5ed; }
+    .sendra-color-dot { width:30px; height:30px; margin:0 auto 5px; border-radius:50%; border:1px solid rgba(0,0,0,.25); display:block; }
+    .sendra-damage-wrap { max-width:900px; }
+    #signature-canvas { display:block; width:100%; max-width:760px; height:auto; border:1px solid #dce5df; border-radius:14px; touch-action:none; }
+    @media(max-width:767px) { .sendra-choice-grid{grid-template-columns:1fr 1fr}.sendra-choice-card{min-height:68px}.sendra-actions{gap:10px}.sendra-actions>div{text-align:left!important} }
+</style>
 <section class="tab-components">
     <div class="container-fluid">
         <div class="title-wrapper pt-30">
@@ -139,28 +156,20 @@
                                                     </tr>
                                                     <tr>
                                                         <td>
-                                                            <h6 class="text-sm text-medium">Météo</h6>
+                                                            <h6 class="text-sm text-medium">Moment du constat</h6>
                                                         </td>
                                                         <td>
-                                                            <div class="d-flex align-items-center">
-                                                                <div class="d-flex align-items-center align-content-center">
-                                                                    <div class="form-check">
-                                                                        <input class="form-check-input is-valid me-3" type="checkbox" name="meteo[]" value="nuit" {{ $carPosition->nuit ? 'checked' : '' }}>
-                                                                        <label class="form-label form-check-label" for="nuit">Nuit</label>
-                                                                    </div>
-                                                                    <div class="form-check">
-    <input 
-        class="form-check-input is-valid me-3" 
-        type="checkbox" 
-        name="meteo[]" 
-        id="pluie"
-        value="pluie" {{-- Correction WEB-H-4 : envoyait "1", jamais reconnu par in_array('pluie', ...) côté contrôleur --}}
-        {{ $carPosition->pluie ? 'checked' : '' }}>
-    <label class="form-label form-check-label" for="pluie">Pluie</label>
-</div>
+                                                            <div class="sendra-choice-grid">
+                                                                <div>
+                                                                    <input class="sendra-choice-input" type="radio" name="moment" id="moment-jour" value="jour" {{ old('moment', $carPosition->nuit ? 'nuit' : 'jour') === 'jour' ? 'checked' : '' }}>
+                                                                    <label class="sendra-choice-card sendra-day" for="moment-jour"><span style="font-size:28px">☀️</span> Jour</label>
+                                                                </div>
+                                                                <div>
+                                                                    <input class="sendra-choice-input" type="radio" name="moment" id="moment-nuit" value="nuit" {{ old('moment', $carPosition->nuit ? 'nuit' : 'jour') === 'nuit' ? 'checked' : '' }}>
+                                                                    <label class="sendra-choice-card sendra-night" for="moment-nuit"><span style="font-size:28px;color:#fff">☾</span> Nuit</label>
                                                                 </div>
                                                             </div>
-                                                            @error('meteo')
+                                                            @error('moment')
                                                             <div class="invalid-feedback">{{ $message }}</div>
                                                             @enderror
                                                         <td>
@@ -170,11 +179,11 @@
                                                             <div class="d-flex align-items-center">
                                                                 <div class="form-check me-3">
                                                                     <input class="form-check-input @error('lieu') is-invalid @enderror" type="radio" name="lieu" id="lieu1" value="PUBLIC" {{ old('lieu', $carPosition->lieu) == 'PUBLIC' ? 'checked' : '' }}>
-                                                                    <label class="form-label form-check-label" for="lieu1">PUBLIC</label>
+                                                                    <label class="form-label form-check-label" for="lieu1">🏛️ PUBLIC</label>
                                                                 </div>
                                                                 <div class="form-check">
                                                                     <input class="form-check-input @error('lieu') is-invalid @enderror" type="radio" name="lieu" id="lieu2" value="PRIVE" {{ old('lieu', $carPosition->lieu) == 'PRIVE' ? 'checked' : '' }}>
-                                                                    <label class="form-label form-check-label" for="lieu2">PRIVE</label>
+                                                                    <label class="form-label form-check-label" for="lieu2">🔒 PRIVÉ</label>
                                                                 </div>
                                                             </div>
                                                             @error('lieu')
@@ -311,20 +320,24 @@
                                                             <h6 class="text-sm text-medium">Couleur</h6>
                                                         </td>
                                                         <td>
-                                                            <select id="inputColor" class="form-control @error('couleur') is-invalid @enderror" name="couleur">
-                                                                <option value="">Sélectionnez une couleur</option>
-                                                                <option value="Noir" {{ $carPosition->couleur == 'Noir' ? 'selected' : '' }}>Noir</option>
-                                                                <option value="Blanc" {{ $carPosition->couleur == 'Blanc' ? 'selected' : '' }}>Blanc</option>
-                                                                <option value="Rouge" {{ $carPosition->couleur == 'Rouge' ? 'selected' : '' }}>Rouge</option>
-                                                                <option value="Bleu" {{ $carPosition->couleur == 'Bleu' ? 'selected' : '' }}>Bleu</option>
-                                                                <option value="Gris" {{ $carPosition->couleur == 'Gris' ? 'selected' : '' }}>Gris</option>
-                                                                <option value="Argent" {{ $carPosition->couleur == 'Argent' ? 'selected' : '' }}>Argent</option>
-                                                                <option value="Vert" {{ $carPosition->couleur == 'Vert' ? 'selected' : '' }}>Vert</option>
-                                                                <option value="Jaune" {{ $carPosition->couleur == 'Jaune' ? 'selected' : '' }}>Jaune</option>
-                                                                <option value="Orange" {{ $carPosition->couleur == 'Orange' ? 'selected' : '' }}>Orange</option>
-                                                                <option value="Marron" {{ $carPosition->couleur == 'Marron' ? 'selected' : '' }}>Marron</option>
-                                                                <option value="Violet" {{ $carPosition->couleur == 'Violet' ? 'selected' : '' }}>Violet</option>
-                                                            </select>
+                                                            @php
+                                                                $vehicleColors = [
+                                                                    'Blanc'=>'#f5f5f5','Noir'=>'#202124','Gris'=>'#8b9298','Argent'=>'#c5cbd0',
+                                                                    'Rouge'=>'#d93636','Bleu'=>'#2767c5','Vert'=>'#278652','Jaune'=>'#f2c230',
+                                                                    'Orange'=>'#e87924','Marron'=>'#795548','Violet'=>'#7e57c2'
+                                                                ];
+                                                            @endphp
+                                                            <div class="sendra-color-grid">
+                                                                @foreach($vehicleColors as $colorName => $colorHex)
+                                                                    <div>
+                                                                        <input class="sendra-color-input" type="radio" name="couleur" id="color-{{ Str::slug($colorName) }}" value="{{ $colorName }}" {{ old('couleur', $carPosition->couleur) === $colorName ? 'checked' : '' }}>
+                                                                        <label class="sendra-color-card" for="color-{{ Str::slug($colorName) }}">
+                                                                            <span class="sendra-color-dot" style="background:{{ $colorHex }}"></span>
+                                                                            <small>{{ $colorName }}</small>
+                                                                        </label>
+                                                                    </div>
+                                                                @endforeach
+                                                            </div>
                                                             @error('couleur')
                                                             <div class="invalid-feedback">{{ $message }}</div>
                                                             @enderror
@@ -338,15 +351,15 @@
                                                             <div class="d-flex align-items-center align-content-center">
                                                                 <div class="form-check me-3">
                                                                     <input class="form-check-input @error('entretien') is-invalid @enderror" type="radio" name="entretien" id="entretien1" value="BON" {{ old('entretien', $carPosition->entretien) == 'BON' ? 'checked' : '' }}>
-                                                                    <label class="form-label form-check-label" for="entretien1">BON</label>
+                                                                    <label class="form-label form-check-label" for="entretien1">✅ BON</label>
                                                                 </div>
                                                                 <div class="form-check me-3">
                                                                     <input class="form-check-input @error('entretien') is-invalid @enderror" type="radio" name="entretien" id="entretien2" value="MOYEN" {{ old('entretien', $carPosition->entretien) == 'MOYEN' ? 'checked' : '' }}>
-                                                                    <label class="form-label form-check-label" for="entretien2">MOYEN</label>
+                                                                    <label class="form-label form-check-label" for="entretien2">🟠 MOYEN</label>
                                                                 </div>
                                                                 <div class="form-check">
                                                                     <input class="form-check-input @error('entretien') is-invalid @enderror" type="radio" name="entretien" id="entretien3" value="DEGRADE" {{ old('entretien', $carPosition->entretien) == 'DEGRADE' ? 'checked' : '' }}>
-                                                                    <label class="form-label form-check-label" for="entretien3">DEGRADE</label>
+                                                                    <label class="form-label form-check-label" for="entretien3">🛠️ DÉGRADÉ</label>
                                                                 </div>
                                                             </div>
                                                             @error('entretien')
@@ -360,11 +373,11 @@
                                                             <div class="d-flex align-items-center align-content-center">
                                                                 <div class="form-check me-3">
                                                                     <input class="form-check-input @error('pays_etranger') is-invalid @enderror" type="radio" name="pays_etranger" id="pays_etranger1" value="OUI" {{ old('pays_etranger', $carPosition->pays_etranger) == 'OUI' ? 'checked' : '' }}>
-                                                                    <label class="form-label form-check-label" for="pays_etranger1">OUI</label>
+                                                                    <label class="form-label form-check-label" for="pays_etranger1">🌍 OUI</label>
                                                                 </div>
                                                                 <div class="form-check">
                                                                     <input class="form-check-input @error('pays_etranger') is-invalid @enderror" type="radio" name="pays_etranger" id="pays_etranger2" value="NON" {{ old('pays_etranger', $carPosition->pays_etranger) == 'NON' ? 'checked' : '' }}>
-                                                                    <label class="form-label form-check-label" for="pays_etranger2">NON</label>
+                                                                    <label class="form-label form-check-label" for="pays_etranger2">🇸🇳 NON</label>
                                                                 </div>
                                                             </div>
                                                             @error('pays_etranger')
@@ -647,10 +660,35 @@
                             <form id="signature-form" method="POST" action="{{ route('signature.store', [$carPosition->id]) }}">
                                 @csrf
                                 <img id="default-image" src="{{ asset('img/constation image.png') }}" style="display: none;">
-                                <canvas id="signature-canvas" width="650" height="400"></canvas>
+                                @if($carPosition->dommage_image)
+                                {{-- Correction : l'Admin ne voyait jamais les dommages déjà
+                                     constatés par l'agent — le canvas repartait toujours du
+                                     gabarit vierge, quel que soit l'état réel du signalement. --}}
+                                <img id="existing-damage-image" src="{{ asset('storage/dommages/'.$carPosition->dommage_image) }}" style="display: none;" crossorigin="anonymous">
+                                @endif
+                                <div class="sendra-damage-wrap">
+                                    <h5 class="mb-3">Type de véhicule</h5>
+                                    <div class="sendra-choice-grid mb-4">
+                                        <div>
+                                            <input class="sendra-choice-input damage-vehicle-choice" type="radio" name="damage_vehicle_type" id="damage-car" value="car" checked>
+                                            <label class="sendra-choice-card" for="damage-car">🚗 Voiture</label>
+                                        </div>
+                                        <div>
+                                            <input class="sendra-choice-input damage-vehicle-choice" type="radio" name="damage_vehicle_type" id="damage-motorcycle" value="motorcycle">
+                                            <label class="sendra-choice-card" for="damage-motorcycle">🏍️ Moto</label>
+                                        </div>
+                                    </div>
+                                    <p class="text-sm mb-2">
+                                        Dessinez uniquement sur le véhicule pour indiquer les dommages.
+                                        @if($carPosition->dommage_image)
+                                        <span class="text-muted">Dommages déjà constatés affichés ci-dessous — choisissez un type de véhicule pour repartir d'un gabarit vierge.</span>
+                                        @endif
+                                    </p>
+                                    <canvas id="signature-canvas" width="760" height="360"></canvas>
+                                </div>
                                 <input type="hidden" name="signature" id="signature">
                                 <hr>
-                                <div class=" row justify-content-center align-items-center g-2" id="signature-controls">
+                                <div class="row justify-content-center align-items-center g-2 sendra-actions" id="signature-controls">
                                     <div class="col-md-6">
                                         <button type="button" id="clear-signature" class="main-btn danger-btn-light btn-hover"> <i class="lni lni-reload"></i> Effacer</button>
                                     </div>
@@ -661,7 +699,7 @@
                                 </div>
                             </form>
                             <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.3.1/jspdf.umd.min.js"></script>
-                            <script src="{{ asset('assets/js/signature.js') }}"></script>
+                            <script src="{{ asset('assets/js/signature.js') }}?v={{ filemtime(public_path('assets/js/signature.js')) }}"></script>
                         </div>
                     </div>
                 </div>

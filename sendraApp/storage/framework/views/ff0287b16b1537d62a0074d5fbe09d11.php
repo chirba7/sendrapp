@@ -42,8 +42,9 @@
                         <div class="row">
                             <div class="col-12">
                                 <div class="input-style-1">
-                                    <label>Email</label>
-                                    <input type="email" name="email" :value="old('email')" class="form-control" placeholder="Enter your email">
+                                    <label>Téléphone</label>
+                                    
+                                    <input type="text" inputmode="tel" name="email" :value="old('email')" class="form-control" placeholder="Numéro de téléphone">
                                     <?php $__errorArgs = ['email'];
 $__bag = $errors->getBag($__errorArgs[1] ?? 'default');
 if ($__bag->has($__errorArgs[0])) :
