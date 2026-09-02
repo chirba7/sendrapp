@@ -42,14 +42,34 @@ document.addEventListener('DOMContentLoaded', function () {
 
     document.querySelectorAll('.damage-vehicle-choice').forEach((choice) => {
         choice.addEventListener('change', (event) => {
-            // Choisir un type de véhicule sur une image existante n'a pas
-            // de sens (ce n'est plus le gabarit à deux panneaux) — on
-            // repart du gabarit vierge pour une nouvelle annotation.
-            showingExistingImage = false;
+            // Choisir un type de véhicule ne doit plus, à lui seul,
+            // effacer les dommages déjà constatés par l'agent — seuls les
+            // boutons dédiés ci-dessous changent la vue affichée. Si on
+            // est déjà sur le gabarit vierge, on redessine avec le
+            // nouveau type choisi.
             vehicleType = event.target.value;
-            drawDefaultImage();
+            if (!showingExistingImage) {
+                drawDefaultImage();
+            }
         });
     });
+
+    const blankTemplateButton = document.getElementById('blank-template');
+    if (blankTemplateButton) {
+        blankTemplateButton.addEventListener('click', () => {
+            showingExistingImage = false;
+            drawDefaultImage();
+        });
+    }
+
+    const restoreAgentVersionButton = document.getElementById('restore-agent-version');
+    if (restoreAgentVersionButton) {
+        restoreAgentVersionButton.addEventListener('click', () => {
+            if (!existingImage) return;
+            showingExistingImage = true;
+            drawDefaultImage();
+        });
+    }
 
     let isDrawing = false;
     let lastX = 0;

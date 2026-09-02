@@ -664,7 +664,7 @@
                                 {{-- Correction : l'Admin ne voyait jamais les dommages déjà
                                      constatés par l'agent — le canvas repartait toujours du
                                      gabarit vierge, quel que soit l'état réel du signalement. --}}
-                                <img id="existing-damage-image" src="{{ asset('storage/dommages/'.$carPosition->dommage_image) }}" style="display: none;" crossorigin="anonymous">
+                                <img id="existing-damage-image" src="{{ config('services.backend.storage_url').'/dommages/'.$carPosition->dommage_image }}" style="display: none;" crossorigin="anonymous">
                                 @endif
                                 <div class="sendra-damage-wrap">
                                     <h5 class="mb-3">Type de véhicule</h5>
@@ -681,10 +681,16 @@
                                     <p class="text-sm mb-2">
                                         Dessinez uniquement sur le véhicule pour indiquer les dommages.
                                         @if($carPosition->dommage_image)
-                                        <span class="text-muted">Dommages déjà constatés affichés ci-dessous — choisissez un type de véhicule pour repartir d'un gabarit vierge.</span>
+                                        <span class="text-muted">Dommages déjà constatés affichés ci-dessous.</span>
                                         @endif
                                     </p>
                                     <canvas id="signature-canvas" width="760" height="360"></canvas>
+                                    @if($carPosition->dommage_image)
+                                    <div class="mt-2 d-flex gap-2 flex-wrap">
+                                        <button type="button" id="blank-template" class="main-btn btn-hover"><i class="lni lni-reload"></i> Nouveau gabarit vierge</button>
+                                        <button type="button" id="restore-agent-version" class="main-btn btn-hover"><i class="lni lni-undo"></i> Revenir à la version de l'agent</button>
+                                    </div>
+                                    @endif
                                 </div>
                                 <input type="hidden" name="signature" id="signature">
                                 <hr>
