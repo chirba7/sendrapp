@@ -6,6 +6,7 @@ use App\Http\Requests\StoreCarPositionRequest;
 use App\Http\Resources\SignalementRessource;
 use App\Models\CarPhoto;
 use App\Models\CarPosition;
+use App\Support\ImageOptimizer;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -29,8 +30,17 @@ class CarPositionController extends Controller
             return response()->json(['message' => 'Le fichier fourni n\'est pas une image valide'], 422);
         }
 
+        // Correction perf : les photos envoyées telles quelles par un
+        // appareil photo (souvent 3000px+ de large) gonflaient inutilement
+        // le stockage et les réponses de listerSignalements/voirSignalements
+        // (image_url pointe sur l'original). Redimensionnée à 1600px max
+        // avant écriture disque (JPEG si le build GD le supporte, sinon PNG).
+        $optimized = ImageOptimizer::resize($imageBinary);
+        $imageBinary = $optimized['binary'];
+        $extension = $optimized['extension'];
+
         try {
-            $carPhoto = DB::transaction(function () use ($request, $imageBinary) {
+            $carPhoto = DB::transaction(function () use ($request, $imageBinary, $extension) {
                 $carPosition = new CarPosition();
                 $carPosition->latitude = $request->latitude;
                 $carPosition->longitude = $request->longitude;
@@ -39,7 +49,7 @@ class CarPositionController extends Controller
                 $carPosition->user_id = Auth::user()->id;
                 $carPosition->save();
 
-                $filename = uniqid('car_photo') . '.png';
+                $filename = uniqid('car_photo') . '.' . $extension;
                 Storage::disk('public')->put('signalement/photo/' . $filename, $imageBinary);
 
                 $carPhoto = new CarPhoto();
@@ -69,9 +79,17 @@ class CarPositionController extends Controller
 
     public function voirSignalements()
     {
+        // Correction perf : aucune limite — l'historique complet d'un
+        // citoyen part en une seule réponse, qui grossit sans borne avec le
+        // temps. Un citoyen n'a normalement besoin de voir que ses
+        // signalements les plus récents ; 200 laisse une large marge sans
+        // changer le format de réponse (pas de pagination ici, pour rester
+        // compatible avec l'app mobile qui traite ce endpoint comme un
+        // tableau brut, contrairement à listerSignalements).
         $signalement = CarPosition::where([['user_id', Auth::user()->id], ['is_deleted', false]])
             ->with('photo')
             ->orderBy('created_at', 'desc')
+            ->limit(200)
             ->get();
         // return response()->json($signalement);
         return response()->json(SignalementRessource::collection($signalement));
@@ -83,8 +101,14 @@ class CarPositionController extends Controller
         $dateActuelle = Carbon::now();
         $dateLimite = $dateActuelle->subDays(10)->toDateString();
 
+        // Correction perf : whereDate('created_at', ...) enveloppe la
+        // colonne dans une fonction SQL (DATE(created_at) >= ?), ce qui
+        // empêche MySQL d'utiliser un index sur created_at (scan complet
+        // au lieu d'un accès par plage). $dateLimite est une date à minuit,
+        // donc une comparaison directe >= est strictement équivalente et
+        // reste "sargable".
         $signalement = CarPosition::where('is_deleted', false)
-            ->whereDate('created_at', '>=', $dateLimite)
+            ->where('created_at', '>=', $dateLimite)
             ->with('photo')
             ->orderBy('created_at', 'desc')
             ->paginate(10);
@@ -97,12 +121,18 @@ class CarPositionController extends Controller
     {
         // Correction API-M-3 : count(->get()) charge toute la collection en
         // mémoire juste pour la compter — ->count() fait l'agrégation en SQL.
+        // Correction perf : 4 requêtes count() séparées → 1 seule requête
+        // groupée pour la répartition par état, plus le total.
+        $parEtat = CarPosition::selectRaw('etat, count(*) as total')
+            ->groupBy('etat')
+            ->pluck('total', 'etat');
+
         return response()->json(
             [
                 'signalements' => CarPosition::count(),
-                'signales' => CarPosition::where('etat', 'SIGNALE')->count(),
-                'enleves' => CarPosition::where('etat', 'ENLEVE')->count(),
-                'encours' => CarPosition::where('etat', 'EN COURS')->count()
+                'signales' => $parEtat->get('SIGNALE', 0),
+                'enleves' => $parEtat->get('ENLEVE', 0),
+                'encours' => $parEtat->get('EN COURS', 0),
             ]
         );
     }

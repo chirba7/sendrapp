@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\CarPosition;
 use App\Models\User;
+use App\Support\ImageOptimizer;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
@@ -13,8 +14,12 @@ class DommagesController extends Controller
 {
     public function enregistrerDommages(Request $request, CarPosition $carPosition)
     {
+        // Correction perf : aucune limite de taille sur le payload base64
+        // entrant (vecteur de gonflement du stockage / requêtes lentes).
+        // ~15M caractères ≈ 11 Mo décodés, largement suffisant pour une
+        // signature/composite dessiné(e) sur une image de constatation.
         $request->validate([
-            'signature' => 'required|string',
+            'signature' => 'required|string|max:15000000',
         ]);
 
 
@@ -26,8 +31,15 @@ class DommagesController extends Controller
         // Décodage de l'image base64
         $imageBinary = base64_decode($data);
 
+        // Redimensionnement défensif : le canvas mobile/web est déjà borné
+        // en taille, mais on cappe quand même pour éviter qu'une image
+        // anormalement grande ne parte telle quelle sur le disque (JPEG si
+        // le build GD le supporte, sinon PNG).
+        $optimized = ImageOptimizer::resize($imageBinary, 1600, 88);
+        $imageBinary = $optimized['binary'];
+
         // Génération d'un nom de fichier unique pour l'image
-        $filename = uniqid('dommages') . '.png';
+        $filename = uniqid('dommages') . '.' . $optimized['extension'];
 
         // Sauvegarde de l'image dans le stockage Laravel (dossier public/storage/dommages)
         Storage::disk('public')->put('dommages/' . $filename, $imageBinary);
@@ -112,24 +124,28 @@ class DommagesController extends Controller
     }
 
      // Méthode pour voir les détails d'un signalement
-     public function voirDommages($vehicleId)
+     public function voirDommages(Request $request, $vehicleId)
      {
-      
+
          // Rechercher le signalement associé à l'ID du véhicule
          $carPosition = CarPosition::where('id', $vehicleId)->first();
-     
+
          if (!$carPosition) {
              // Retourner une erreur si le signalement n'est pas trouvé
              return response()->json([
                  'message' => 'Aucun signalement trouvé pour ce véhicule.',
              ], 404);
          }
-         // Correction API-M-4 : URL de production codée en dur.
-         $dommage_url = config('app.url') . '/storage/dommages/';
+         // Correction : config('app.url') vaut 'localhost' côté serveur,
+         // injoignable depuis un téléphone — même bug déjà corrigé pour les
+         // photos de signalement dans SignalementRessource. On utilise
+         // l'hôte réellement appelé par le client (ex. l'IP LAN du backend
+         // Docker, ou le domaine public en prod).
+         $dommage_url = $request->getSchemeAndHttpHost() . '/storage/dommages/';
          // Vérifier si le champ dommages existe et le retourner
          $dommages = $carPosition->dommage_image; // Assurez-vous que le champ s'appelle bien 'dommage_image'
          $dommages = $dommage_url.$dommages;
-     
+
          return response()->json([
              'message' => 'Détails des dommages récupérés avec succès.',
              'dommages' => $dommages,
