@@ -150,14 +150,15 @@ class CarPositionController extends Controller
             'adresse_precise' => 'required|string|max:255',
             'motif_infraction' => 'required|string|max:255',
             'lieu' => 'required|in:PUBLIC,PRIVE',
+            'moment' => 'required|in:jour,nuit',
         ]);
 
 
         $carPosition->adresse_precise = $request->input('adresse_precise');
         $carPosition->motif_infraction = $request->input('motif_infraction');
         $carPosition->lieu = $request->input('lieu');
-        $carPosition->nuit = $request->has('meteo') && in_array('nuit', $request->input('meteo', []));
-        $carPosition->pluie = $request->has('meteo') && in_array('pluie', $request->input('meteo', []));
+        $carPosition->nuit = $request->input('moment') === 'nuit';
+        $carPosition->pluie = false;
 
         $carPosition->update();
 

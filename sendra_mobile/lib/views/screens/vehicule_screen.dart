@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:walletium/views/screens/vehicle_details_screen.dart';
 import 'package:walletium/views/screens/vehicle_list_screen.dart';
 import '../../utils/strings.dart';
+import '../../utils/sendra_theme.dart';
 import 'infraction_screen.dart';
 
 class VehicleForm extends StatefulWidget {
@@ -16,7 +17,20 @@ class VehicleForm extends StatefulWidget {
   @override
   _VehicleFormState createState() => _VehicleFormState();
 }
+
 class _VehicleFormState extends State<VehicleForm> {
+  static const Map<String, Color> _vehicleColors = {
+    'Blanc': Color(0xFFF5F5F5),
+    'Noir': Color(0xFF202124),
+    'Gris': Color(0xFF8B9298),
+    'Argent': Color(0xFFC5CBD0),
+    'Rouge': Color(0xFFD93636),
+    'Bleu': Color(0xFF2767C5),
+    'Vert': Color(0xFF278652),
+    'Jaune': Color(0xFFF2C230),
+    'Orange': Color(0xFFE87924),
+    'Marron': Color(0xFF795548),
+  };
   final TextEditingController _numeroController = TextEditingController();
   final TextEditingController _marqueController = TextEditingController();
   final TextEditingController _typeController = TextEditingController();
@@ -57,27 +71,36 @@ class _VehicleFormState extends State<VehicleForm> {
       final data = json.decode(response.body);
       print('Données du véhicule: $data');
       print('Détails:');
-      print('  - Défaut de contrôle technique: ${data['defaut_controle_technique']}');
+      print(
+          '  - Défaut de contrôle technique: ${data['defaut_controle_technique']}');
       print('  - Pneumatiques manquantes: ${data['pneumatiques_manquantes']}');
       print('  - Véhicule immergé: ${data['vehicule_immerge']}');
-      print('  - Défauts techniques irréversibles: ${data['defauts_techniques_irreversibles']}');
-      print('  - Véhicule non identifiable: ${data['vehicule_non_identifiable']}');
+      print(
+          '  - Défauts techniques irréversibles: ${data['defauts_techniques_irreversibles']}');
+      print(
+          '  - Véhicule non identifiable: ${data['vehicule_non_identifiable']}');
       print('  - Véhicule brûlé: ${data['vehicule_brule']}');
       print('  - Châssis non réparable: ${data['chassis_non_reparable']}');
       setState(() {
-        _numeroController.text = data['numero'].toString();
-        _marqueController.text = data['marque'].toString();
-        _typeController.text = data['type'].toString();
-        _modeleController.text = data['model'].toString();
-        _categorieController.text = data['categorie'].toString();
-        _couleurController.text = data['couleur'].toString();
-        _entretien = data['entretien'].toString();
-        _paysEtranger = data['pays_etranger'].toString();
+        _numeroController.text = _cleanValue(data['numero']);
+        _marqueController.text = _cleanValue(data['marque']);
+        _typeController.text = _cleanValue(data['type']);
+        _modeleController.text = _cleanValue(data['model']);
+        _categorieController.text = _cleanValue(data['categorie']);
+        final loadedColor = _cleanValue(data['couleur']);
+        _couleurController.text = _vehicleColors.keys.firstWhere(
+          (color) => color.toLowerCase() == loadedColor.toLowerCase(),
+          orElse: () => '',
+        );
+        _entretien = _cleanValue(data['entretien']).toUpperCase();
+        _paysEtranger = _cleanValue(data['pays_etranger']).toUpperCase();
         _details = {
-          'Défaut de contrôle technique': (data['defaut_controle_technique'] == 1),
+          'Défaut de contrôle technique':
+              (data['defaut_controle_technique'] == 1),
           'Pneumatiques manquantes': (data['pneumatiques_manquantes'] == 1),
           'Véhicule immergé': (data['vehicule_immerge'] == 1),
-          'Défauts techniques irréversibles': (data['defauts_techniques_irreversibles'] == 1),
+          'Défauts techniques irréversibles':
+              (data['defauts_techniques_irreversibles'] == 1),
           'Véhicule non identifiable': (data['vehicule_non_identifiable'] == 1),
           'Véhicule brûlé': (data['vehicule_brule'] == 1),
           'Châssis non réparable': (data['chassis_non_reparable'] == 1),
@@ -90,6 +113,9 @@ class _VehicleFormState extends State<VehicleForm> {
     }
   }
 
+  String _cleanValue(dynamic value) =>
+      value == null || value.toString() == 'null' ? '' : value.toString();
+
   Future<void> _updateVehicle() async {
     if (_numeroController.text.isEmpty ||
         _marqueController.text.isEmpty ||
@@ -100,7 +126,8 @@ class _VehicleFormState extends State<VehicleForm> {
         _entretien == null ||
         _paysEtranger == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Veuillez remplir tous les champs obligatoires')),
+        SnackBar(
+            content: Text('Veuillez remplir tous les champs obligatoires')),
       );
       return;
     }
@@ -110,13 +137,18 @@ class _VehicleFormState extends State<VehicleForm> {
     final token = prefs.getString('token');
 
     Map<String, dynamic> updatedDetails = {
-      'defaut_controle_technique': _details['Défaut de contrôle technique'] == true ? 1 : 0,
-      'pneumatiques_manquantes': _details['Pneumatiques manquantes'] == true ? 1 : 0,
+      'defaut_controle_technique':
+          _details['Défaut de contrôle technique'] == true ? 1 : 0,
+      'pneumatiques_manquantes':
+          _details['Pneumatiques manquantes'] == true ? 1 : 0,
       'vehicule_immerge': _details['Véhicule immergé'] == true ? 1 : 0,
-      'defauts_techniques_irreversibles': _details['Défauts techniques irréversibles'] == true ? 1 : 0,
-      'vehicule_non_identifiable': _details['Véhicule non identifiable'] == true ? 1 : 0,
+      'defauts_techniques_irreversibles':
+          _details['Défauts techniques irréversibles'] == true ? 1 : 0,
+      'vehicule_non_identifiable':
+          _details['Véhicule non identifiable'] == true ? 1 : 0,
       'vehicule_brule': _details['Véhicule brûlé'] == true ? 1 : 0,
-      'chassis_non_reparable': _details['Châssis non réparable'] == true ? 1 : 0,
+      'chassis_non_reparable':
+          _details['Châssis non réparable'] == true ? 1 : 0,
     };
 
     final response = await http.put(
@@ -140,7 +172,8 @@ class _VehicleFormState extends State<VehicleForm> {
 
     if (response.statusCode == 200) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Véhicule mis à jour avec succès'),
+        SnackBar(
+          content: Text('Véhicule mis à jour avec succès'),
           duration: Duration(seconds: 1),
         ),
       );
@@ -149,11 +182,11 @@ class _VehicleFormState extends State<VehicleForm> {
       Future.delayed(Duration(seconds: 1), () {
         Navigator.of(context).push(
           MaterialPageRoute(
-            builder: (context) => InfractionForm(signalementId: widget.signalementId),
+            builder: (context) =>
+                InfractionForm(signalementId: widget.signalementId),
           ),
         );
       });
-
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Échec de la mise à jour du véhicule')),
@@ -161,17 +194,11 @@ class _VehicleFormState extends State<VehicleForm> {
     }
   }
 
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(
-          'Modifier les détails',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-        ),
-        backgroundColor: Colors.green[700],
-        iconTheme: IconThemeData(color: Colors.white),
+        title: const Text('Véhicule'),
         actions: [
           IconButton(
             icon: Icon(Icons.list),
@@ -186,7 +213,8 @@ class _VehicleFormState extends State<VehicleForm> {
       ),
       body: Padding(
         padding: const EdgeInsets.all(20.0),
-        child: Scrollbar( // Ajouter l'indicateur de défilement
+        child: Scrollbar(
+          // Ajouter l'indicateur de défilement
           thumbVisibility: true, // Rendre l'indicateur toujours visible
           thickness: 4.0, // Réduit l'épaisseur de l'indicateur
           radius: Radius.circular(5), // Arrondir les coins
@@ -197,17 +225,23 @@ class _VehicleFormState extends State<VehicleForm> {
                 style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
               ),
               SizedBox(height: 20),
-              _buildField('Numéro du véhicule', _numeroController, Icons.numbers),
+              _buildField(
+                  'Numéro du véhicule', _numeroController, Icons.numbers),
               _buildField('Marque', _marqueController, Icons.directions_car),
               _buildField('Type', _typeController, Icons.category),
               _buildField('Modèle', _modeleController, Icons.model_training),
-              _buildField('Catégorie du véhicule', _categorieController, Icons.label),
-              _buildField('Couleur', _couleurController, Icons.color_lens),
+              _buildField(
+                  'Catégorie du véhicule', _categorieController, Icons.label),
+              _buildColorPalette(),
               SizedBox(height: 20),
               Divider(),
               SizedBox(height: 10),
               _buildSectionTitle('État général'),
-              _buildRadioGroup(['BON', 'MOYEN', 'DEGRADE'], _entretien, (value) {
+              _buildChoiceGroup(const {
+                'BON': '✅  Bon',
+                'MOYEN': '🟠  Moyen',
+                'DEGRADE': '🛠️  Dégradé'
+              }, _entretien, (value) {
                 setState(() {
                   _entretien = value;
                 });
@@ -216,7 +250,9 @@ class _VehicleFormState extends State<VehicleForm> {
               Divider(),
               SizedBox(height: 10),
               _buildSectionTitle('Pays étranger'),
-              _buildRadioGroup(['OUI', 'NON'], _paysEtranger, (value) {
+              _buildChoiceGroup(
+                  const {'NON': '🇸🇳  Non', 'OUI': '🌍  Oui'}, _paysEtranger,
+                  (value) {
                 setState(() {
                   _paysEtranger = value;
                 });
@@ -253,7 +289,6 @@ class _VehicleFormState extends State<VehicleForm> {
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                 ),
               ),
-
             ],
           ),
         ),
@@ -261,8 +296,8 @@ class _VehicleFormState extends State<VehicleForm> {
     );
   }
 
-
-  Widget _buildField(String label, TextEditingController controller, IconData icon) {
+  Widget _buildField(
+      String label, TextEditingController controller, IconData icon) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0),
       child: TextField(
@@ -287,7 +322,100 @@ class _VehicleFormState extends State<VehicleForm> {
     );
   }
 
-  Widget _buildRadioGroup(List<String> options, String? groupValue, ValueChanged<String?> onChanged) {
+  Widget _buildColorPalette() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Couleur',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: _vehicleColors.entries.map((entry) {
+              final selected = _couleurController.text == entry.key;
+              return Semantics(
+                label: 'Couleur ${entry.key}',
+                selected: selected,
+                child: InkWell(
+                  onTap: () =>
+                      setState(() => _couleurController.text = entry.key),
+                  borderRadius: BorderRadius.circular(14),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 180),
+                    width: 58,
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    decoration: BoxDecoration(
+                      color: selected ? const Color(0xFFE1F3E8) : Colors.white,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color:
+                            selected ? SendraTheme.green : SendraTheme.border,
+                        width: selected ? 2 : 1,
+                      ),
+                    ),
+                    child: Column(
+                      children: [
+                        Container(
+                          width: 28,
+                          height: 28,
+                          decoration: BoxDecoration(
+                            color: entry.value,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.black26),
+                          ),
+                          child: selected
+                              ? Icon(Icons.check,
+                                  size: 18,
+                                  color: entry.key == 'Noir'
+                                      ? Colors.white
+                                      : Colors.black87)
+                              : null,
+                        ),
+                        const SizedBox(height: 5),
+                        Text(entry.key, style: const TextStyle(fontSize: 10)),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildChoiceGroup(
+    Map<String, String> options,
+    String? groupValue,
+    ValueChanged<String?> onChanged,
+  ) {
+    return Wrap(
+      spacing: 10,
+      runSpacing: 10,
+      children: options.entries.map((entry) {
+        final selected = groupValue == entry.key;
+        return ChoiceChip(
+          label: Text(entry.value),
+          selected: selected,
+          onSelected: (_) => onChanged(entry.key),
+          selectedColor: const Color(0xFFE1F3E8),
+          side: BorderSide(
+              color: selected ? SendraTheme.green : SendraTheme.border),
+          labelStyle: TextStyle(
+            color: selected ? SendraTheme.forest : SendraTheme.ink,
+            fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _buildRadioGroup(List<String> options, String? groupValue,
+      ValueChanged<String?> onChanged) {
     return Column(
       children: options.map((option) {
         return RadioListTile<String>(
