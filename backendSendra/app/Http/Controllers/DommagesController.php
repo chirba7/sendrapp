@@ -40,13 +40,24 @@ class DommagesController extends Controller
         // dommages représente une demande (ou une nouvelle version) à
         // examiner. Se baser sur la seule présence d'une ancienne image
         // empêchait toute notification lors d'une correction ultérieure.
-        $notificationEnvoyee = false;
-        if (!$carPosition->is_approve) {
-            $notificationEnvoyee = $this->notifierAdministrateurs($carPosition);
+        //
+        // Correction : l'envoi (Mail::send, SMTP Brevo) se faisait de façon
+        // synchrone dans la requête — le temps de connexion/handshake SMTP
+        // pouvait dépasser le timeout HTTP de l'app mobile, qui affichait
+        // alors à tort "Impossible de joindre le serveur" alors que les
+        // dommages étaient bien enregistrés. dispatch()->afterResponse()
+        // renvoie la réponse au client immédiatement ; l'e-mail part juste
+        // après, sans bloquer la requête (fonctionne sans worker de file
+        // d'attente dédié, contrairement à ->queue()).
+        $demandeApprobation = !$carPosition->is_approve;
+        if ($demandeApprobation) {
+            dispatch(function () use ($carPosition) {
+                $this->notifierAdministrateurs($carPosition);
+            })->afterResponse();
         }
 
         return response()->json([
-            'message' => $notificationEnvoyee
+            'message' => $demandeApprobation
                 ? 'Les dommages ont été enregistrés. Une demande d’approbation a été envoyée à l’administration.'
                 : 'Les dommages ont été enregistrés avec succès.',
             'dommage_image' => $filename,

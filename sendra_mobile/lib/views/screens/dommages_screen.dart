@@ -231,7 +231,21 @@ class _DommagesScreenState extends State<DommagesScreen> {
 
     http.Response response;
     try {
-      response = await http.put(Uri.parse(url), headers: headers, body: body);
+      response = await http
+          .put(Uri.parse(url), headers: headers, body: body)
+          .timeout(const Duration(seconds: 30));
+    } on TimeoutException {
+      if (mounted) {
+        setState(() => _isSaving = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Le serveur met du temps à répondre. Vérifiez votre connexion puis réessayez ; les dommages ont peut-être déjà été enregistrés.',
+            ),
+          ),
+        );
+      }
+      return;
     } catch (_) {
       if (mounted) {
         setState(() => _isSaving = false);
