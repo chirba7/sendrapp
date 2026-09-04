@@ -22,6 +22,11 @@ class CarPositionController extends Controller
      */
     public function index()
     {
+        // Correction perf : aucun ORDER BY n'était précisé — MySQL renvoyait
+        // les lignes dans un ordre non garanti (en pratique l'ordre naturel
+        // du PK, donc du plus ancien au plus récent). Tri explicite sur
+        // created_at (indexé, voir migration add_perf_indexes) pour un
+        // résultat déterministe et conserver le comportement observé.
         $signalements = CarPosition::where(
             [
                 ['is_deleted', false],
@@ -29,6 +34,7 @@ class CarPositionController extends Controller
             ]
         )
             ->with('photo')
+            ->orderBy('created_at')
             ->paginate(5);
 
         return view('carPosition.signales', compact('signalements'));
@@ -43,6 +49,7 @@ class CarPositionController extends Controller
             ]
         )
             ->with('photo')
+            ->orderBy('created_at')
             ->paginate(5);
         return view('carPosition.enleves', compact('signalements'));
     }
@@ -55,6 +62,7 @@ class CarPositionController extends Controller
             ]
         )
             ->with('photo')
+            ->orderBy('created_at')
             ->paginate(5);
         return view('carPosition.encours', compact('signalements'));
     }
@@ -231,10 +239,14 @@ class CarPositionController extends Controller
     }
     public function infos()
     {
-        $signalements = count(CarPosition::all());
-        $signales = count(CarPosition::where('etat', 'SIGNALE')->get());
-        $enleves = count(CarPosition::where('etat', 'ENLEVE')->get());
-        $encours = count(CarPosition::where('etat', 'EN COURS')->get());
+        // Correction perf (même anti-pattern qu'API-M-3 dans l'API mobile) :
+        // count(->get()) hydrate toute la table en modèles Eloquent rien que
+        // pour la compter en PHP. ->count() fait l'agrégation en SQL, sans
+        // rapatrier ni instancier la moindre ligne.
+        $signalements = CarPosition::count();
+        $signales = CarPosition::where('etat', 'SIGNALE')->count();
+        $enleves = CarPosition::where('etat', 'ENLEVE')->count();
+        $encours = CarPosition::where('etat', 'EN COURS')->count();
         $signalement = CarPosition::where('is_deleted', false)
             ->with('photo')
             ->orderBy('created_at', 'desc')

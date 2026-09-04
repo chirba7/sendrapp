@@ -255,4 +255,5 @@ return [
         'value'                    => 'valeur',
         'year'                     => 'année',
     ],
+
 ];

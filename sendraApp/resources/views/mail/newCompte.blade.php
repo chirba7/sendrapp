@@ -473,7 +473,7 @@
                                                             <tr>
                                                                 <td class="attributes_item">
                                                                     <span class="f-fallback">
-                                                                        <strong>Mot de passe :</strong> {{$password}}
+                                                                        <strong>Mot de passe :</strong> {{ $password }}
                                                                     </span>
                                                                 </td>
                                                             </tr>
