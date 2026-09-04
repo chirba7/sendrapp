@@ -1,12 +1,60 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:walletium/views/screens/vehicle_details_screen.dart';
 import 'package:walletium/views/screens/vehicle_list_screen.dart';
 import '../../utils/strings.dart';
 import '../../utils/sendra_theme.dart';
+import '../../utils/vehicle_brands.dart';
 import 'infraction_screen.dart';
+
+/// Formate la saisie de plaque en AA-0000-AA au fil de la frappe
+/// (majuscules forcées, tirets automatiques). La validation stricte du
+/// format se fait séparément, à la soumission.
+class _PlateInputFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    final raw = newValue.text.toUpperCase();
+    final letters1 = <String>[];
+    final digits = <String>[];
+    final letters2 = <String>[];
+
+    for (final char in raw.split('')) {
+      if (RegExp(r'[A-Z]').hasMatch(char)) {
+        if (digits.isEmpty && letters1.length < 2) {
+          letters1.add(char);
+        } else if (digits.length == 4 && letters2.length < 2) {
+          letters2.add(char);
+        }
+      } else if (RegExp(r'[0-9]').hasMatch(char)) {
+        if (letters1.length == 2 && digits.length < 4) {
+          digits.add(char);
+        }
+      }
+    }
+
+    final buffer = StringBuffer(letters1.join());
+    if (letters1.length == 2) {
+      buffer.write('-');
+      buffer.write(digits.join());
+    }
+    if (digits.length == 4) {
+      buffer.write('-');
+      buffer.write(letters2.join());
+    }
+
+    final text = buffer.toString();
+    return TextEditingValue(
+      text: text,
+      selection: TextSelection.collapsed(offset: text.length),
+    );
+  }
+}
 
 class VehicleForm extends StatefulWidget {
   final int signalementId; // Identifiant du véhicule à mettre à jour
@@ -19,31 +67,16 @@ class VehicleForm extends StatefulWidget {
 }
 
 class _VehicleFormState extends State<VehicleForm> {
-  static const List<String> _vehicleBrands = [
-    'Toyota',
-    'Ford',
-    'Honda',
-    'Chevrolet',
-    'Nissan',
-    'BMW',
-    'Mercedes-Benz',
-    'Audi',
-    'Volkswagen',
-    'Hyundai',
-    'Kia',
-    'Mazda',
-    'Peugeot',
-    'Renault',
-  ];
   static const List<String> _vehicleTypes = [
     'Berline',
     'VUS',
+    'SUV',
     'Hayon',
     'Camion',
     'Electrique',
   ];
   static const List<String> _vehicleCategories = [
-    'BPP',
+    'VPP',
     'VUS',
     'VUL',
     'VTM',
@@ -67,6 +100,16 @@ class _VehicleFormState extends State<VehicleForm> {
   final TextEditingController _modeleController = TextEditingController();
   final TextEditingController _categorieController = TextEditingController();
   final TextEditingController _couleurController = TextEditingController();
+
+  // Sélecteur en tête d'écran : filtre la liste de marques suggérées
+  // (voiture/moto) — n'est pas envoyé au serveur, juste une aide de saisie.
+  String _vehicleKind = 'Voiture';
+  // Ne remonte qu'une fois, après le chargement initial des données, pour
+  // forcer un seul remontage du champ Autocomplete (afficher la marque déjà
+  // enregistrée) sans perturber la frappe de l'utilisateur ensuite.
+  int _brandFieldVersion = 0;
+  List<String> get _brandOptions =>
+      _vehicleKind == 'Moto' ? VehicleBrands.moto : VehicleBrands.voiture;
 
   String? _entretien;
   String? _paysEtranger;
@@ -112,9 +155,12 @@ class _VehicleFormState extends State<VehicleForm> {
       print('  - Véhicule brûlé: ${data['vehicule_brule']}');
       print('  - Châssis non réparable: ${data['chassis_non_reparable']}');
       setState(() {
-        _numeroController.text = _cleanValue(data['numero']);
-        _marqueController.text =
-            _canonicalChoice(_cleanValue(data['marque']), _vehicleBrands);
+        _numeroController.text = _cleanValue(data['numero']).toUpperCase();
+        // Marque : saisie libre (suggestions seulement) depuis cette
+        // correction — on charge la valeur enregistrée telle quelle, sans
+        // la restreindre à une liste fermée.
+        _marqueController.text = _cleanValue(data['marque']);
+        _brandFieldVersion++;
         _typeController.text =
             _canonicalChoice(_cleanValue(data['type']), _vehicleTypes);
         _modeleController.text = _cleanValue(data['model']);
@@ -169,6 +215,17 @@ class _VehicleFormState extends State<VehicleForm> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
             content: Text('Veuillez remplir tous les champs obligatoires')),
+      );
+      return;
+    }
+
+    if (!RegExp(r'^[A-Z]{2}-\d{4}-[A-Z]{2}$')
+        .hasMatch(_numeroController.text)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+              'Le numéro du véhicule doit être au format AB-0000-KO.'),
+        ),
       );
       return;
     }
@@ -261,15 +318,19 @@ class _VehicleFormState extends State<VehicleForm> {
           radius: Radius.circular(5), // Arrondir les coins
           child: ListView(
             children: [
+              _buildSectionTitle('Type de véhicule'),
+              const SizedBox(height: 10),
+              _buildVehicleKindSelector(),
+              SizedBox(height: 20),
+              Divider(),
+              SizedBox(height: 10),
               Text(
                 'Caractéristiques du Véhicule',
                 style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
               ),
               SizedBox(height: 20),
-              _buildField(
-                  'Numéro du véhicule', _numeroController, Icons.numbers),
-              _buildDropdown('Marque', _marqueController, Icons.directions_car,
-                  _vehicleBrands),
+              _buildPlateField(),
+              _buildBrandField(),
               _buildDropdown(
                   'Type', _typeController, Icons.category, _vehicleTypes),
               _buildField('Modèle', _modeleController, Icons.model_training),
@@ -335,6 +396,123 @@ class _VehicleFormState extends State<VehicleForm> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildVehicleKindSelector() {
+    return Row(
+      children: [
+        Expanded(
+          child: _kindChoice('Voiture', Icons.directions_car_rounded),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: _kindChoice('Moto', Icons.two_wheeler_rounded),
+        ),
+      ],
+    );
+  }
+
+  Widget _kindChoice(String label, IconData icon) {
+    final selected = _vehicleKind == label;
+    return ChoiceChip(
+      showCheckmark: false,
+      avatar: Icon(icon, color: selected ? SendraTheme.forest : Colors.grey),
+      label: SizedBox(
+        width: double.infinity,
+        child: Text(label, textAlign: TextAlign.center),
+      ),
+      selected: selected,
+      onSelected: (_) => setState(() {
+        // Change seulement la liste de marques suggérées — n'efface pas une
+        // marque déjà saisie, y compris hors-liste.
+        _vehicleKind = label;
+      }),
+      selectedColor: const Color(0xFFE1F3E8),
+      side: BorderSide(
+          color: selected ? SendraTheme.green : SendraTheme.border),
+    );
+  }
+
+  Widget _buildPlateField() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: TextField(
+        controller: _numeroController,
+        textCapitalization: TextCapitalization.characters,
+        inputFormatters: [_PlateInputFormatter()],
+        decoration: InputDecoration(
+          labelText: 'Numéro du véhicule',
+          hintText: 'AB-0000-KO',
+          prefixIcon: const Icon(Icons.numbers),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+          filled: true,
+          fillColor: Colors.grey[100],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBrandField() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Autocomplete<String>(
+        key: ValueKey('marque-$_brandFieldVersion'),
+        initialValue: TextEditingValue(text: _marqueController.text),
+        optionsBuilder: (TextEditingValue value) {
+          if (value.text.isEmpty) return _brandOptions;
+          return _brandOptions.where(
+            (brand) =>
+                brand.toLowerCase().contains(value.text.toLowerCase()),
+          );
+        },
+        onSelected: (selection) => _marqueController.text = selection,
+        fieldViewBuilder: (context, controller, focusNode, onSubmitted) {
+          controller.addListener(() {
+            _marqueController.text = controller.text;
+          });
+          return TextField(
+            controller: controller,
+            focusNode: focusNode,
+            decoration: InputDecoration(
+              labelText: 'Marque',
+              hintText: 'Choisissez dans la liste ou saisissez librement',
+              prefixIcon: const Icon(Icons.directions_car),
+              border:
+                  OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+              filled: true,
+              fillColor: Colors.grey[100],
+            ),
+          );
+        },
+        optionsViewBuilder: (context, onSelected, options) {
+          return Align(
+            alignment: Alignment.topLeft,
+            child: Material(
+              elevation: 4,
+              borderRadius: BorderRadius.circular(10),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxHeight: 260),
+                child: ListView.builder(
+                  padding: EdgeInsets.zero,
+                  shrinkWrap: true,
+                  itemCount: options.length,
+                  itemBuilder: (context, index) {
+                    final option = options.elementAt(index);
+                    return ListTile(
+                      dense: true,
+                      title: Text(option),
+                      onTap: () => onSelected(option),
+                    );
+                  },
+                ),
+              ),
+            ),
+          );
+        },
       ),
     );
   }

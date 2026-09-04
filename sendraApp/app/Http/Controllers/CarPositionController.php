@@ -129,7 +129,7 @@ class CarPositionController extends Controller
      */
     public function vehicule(UpdateCarPositionRequest $request, CarPosition $carPosition)
     {
-        $carPosition->numero_vehicule = $request->numero_vehicule;
+        $carPosition->numero_vehicule = strtoupper($request->numero_vehicule);
         $carPosition->motif_infraction = $request->motif_infraction;
         $carPosition->marque = $request->marque;
         $carPosition->model = $request->model;
@@ -158,7 +158,7 @@ class CarPositionController extends Controller
             'adresse_precise' => 'required|string|max:255',
             'motif_infraction' => 'required|string|max:255',
             'lieu' => 'required|in:PUBLIC,PRIVE',
-            'moment' => 'required|in:jour,nuit',
+            'moment' => 'required|in:jour,nuit,pluie',
         ]);
 
 
@@ -166,7 +166,7 @@ class CarPositionController extends Controller
         $carPosition->motif_infraction = $request->input('motif_infraction');
         $carPosition->lieu = $request->input('lieu');
         $carPosition->nuit = $request->input('moment') === 'nuit';
-        $carPosition->pluie = false;
+        $carPosition->pluie = $request->input('moment') === 'pluie';
 
         $carPosition->update();
 

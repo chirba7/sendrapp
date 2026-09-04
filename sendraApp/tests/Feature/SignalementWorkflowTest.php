@@ -39,6 +39,7 @@ class SignalementWorkflowTest extends TestCase
             'adresse_precise' => 'Avenue Cheikh Anta Diop',
             'motif_infraction' => 'Stationnement prolongé',
             'lieu' => 'PUBLIC',
+            'moment' => 'jour',
         ])->assertSessionHasNoErrors();
 
         // Enlèvement refusé tant que non approuvé (même garde-fou que l'API).

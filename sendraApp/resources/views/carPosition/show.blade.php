@@ -8,6 +8,7 @@
     .sendra-day { background:#62b8ed; color:#fff; }
     .sendra-night { background:#101722; color:#fff; position:relative; overflow:hidden; }
     .sendra-night::before { content:'•  ·  •'; position:absolute; color:#fff; top:5px; right:15px; letter-spacing:5px; }
+    .sendra-rain { background:#4a6572; color:#fff; }
     .sendra-color-grid { display:flex; flex-wrap:wrap; gap:9px; }
     .sendra-color-card { width:62px; padding:8px 4px; border:2px solid #dce5df; border-radius:14px; text-align:center; cursor:pointer; background:#fff; }
     .sendra-color-input { position:absolute; opacity:0; pointer-events:none; }
@@ -159,14 +160,22 @@
                                                             <h6 class="text-sm text-medium">Moment du constat</h6>
                                                         </td>
                                                         <td>
-                                                            <div class="sendra-choice-grid">
+                                                            @php
+                                                                $momentDefault = $carPosition->pluie ? 'pluie' : ($carPosition->nuit ? 'nuit' : 'jour');
+                                                                $momentValue = old('moment', $momentDefault);
+                                                            @endphp
+                                                            <div class="sendra-choice-grid" style="grid-template-columns:repeat(3,minmax(100px,1fr))">
                                                                 <div>
-                                                                    <input class="sendra-choice-input" type="radio" name="moment" id="moment-jour" value="jour" {{ old('moment', $carPosition->nuit ? 'nuit' : 'jour') === 'jour' ? 'checked' : '' }}>
+                                                                    <input class="sendra-choice-input" type="radio" name="moment" id="moment-jour" value="jour" {{ $momentValue === 'jour' ? 'checked' : '' }}>
                                                                     <label class="sendra-choice-card sendra-day" for="moment-jour"><span style="font-size:28px">☀️</span> Jour</label>
                                                                 </div>
                                                                 <div>
-                                                                    <input class="sendra-choice-input" type="radio" name="moment" id="moment-nuit" value="nuit" {{ old('moment', $carPosition->nuit ? 'nuit' : 'jour') === 'nuit' ? 'checked' : '' }}>
+                                                                    <input class="sendra-choice-input" type="radio" name="moment" id="moment-nuit" value="nuit" {{ $momentValue === 'nuit' ? 'checked' : '' }}>
                                                                     <label class="sendra-choice-card sendra-night" for="moment-nuit"><span style="font-size:28px;color:#fff">☾</span> Nuit</label>
+                                                                </div>
+                                                                <div>
+                                                                    <input class="sendra-choice-input" type="radio" name="moment" id="moment-pluie" value="pluie" {{ $momentValue === 'pluie' ? 'checked' : '' }}>
+                                                                    <label class="sendra-choice-card sendra-rain" for="moment-pluie"><span style="font-size:28px">🌧️</span> Pluie</label>
                                                                 </div>
                                                             </div>
                                                             @error('moment')
@@ -230,6 +239,23 @@
                                     </div>
                                 </div>
                                 <div class="card-body">
+                                    @php
+                                        $vehicleBrands = config('vehicle_brands');
+                                    @endphp
+                                    <div class="mb-4">
+                                        <h6 class="text-sm text-medium mb-2">Type de véhicule</h6>
+                                        <div class="sendra-choice-grid" style="max-width:340px">
+                                            <div>
+                                                <input class="sendra-choice-input vehicle-kind-choice" type="radio" name="vehicule_kind_ui" id="kind-voiture" value="voiture" checked>
+                                                <label class="sendra-choice-card" for="kind-voiture">🚗 Voiture</label>
+                                            </div>
+                                            <div>
+                                                <input class="sendra-choice-input vehicle-kind-choice" type="radio" name="vehicule_kind_ui" id="kind-moto" value="moto">
+                                                <label class="sendra-choice-card" for="kind-moto">🏍️ Moto</label>
+                                            </div>
+                                        </div>
+                                        <p class="text-sm text-muted mt-2 mb-0">Filtre seulement les marques suggérées ci-dessous — pas enregistré séparément.</p>
+                                    </div>
                                     <form action="{{route('vehicule', [$carPosition->id])}}" method="post">
                                         @method('patch')
                                         @csrf
@@ -241,7 +267,7 @@
                                                             <h6 class="text-sm text-medium">Numéro du véhicule</h6>
                                                         </td>
                                                         <td>
-                                                            <input type="text" class="form-control @error('numero_vehicule') is-invalid @enderror" id="numero_vehicule" value="{{ old('numero_vehicule', strtoupper($carPosition->numero_vehicule)) }}" name="numero_vehicule">
+                                                            <input type="text" class="form-control @error('numero_vehicule') is-invalid @enderror" id="numero_vehicule" placeholder="AB-0000-KO" pattern="[A-Z]{2}-\d{4}-[A-Z]{2}" value="{{ old('numero_vehicule', strtoupper($carPosition->numero_vehicule)) }}" name="numero_vehicule" style="text-transform:uppercase">
                                                             @error('numero_vehicule')
                                                             <div class="invalid-feedback">{{ $message }}</div>
                                                             @enderror
@@ -250,23 +276,8 @@
                                                             <h6 class="text-sm text-medium">Marque</h6>
                                                         </td>
                                                         <td>
-                                                            <select id="marque" class="form-control @error('marque') is-invalid @enderror" name="marque">
-                                                                <option value="" {{ $carPosition->marque == '' ? 'selected' : '' }}>Sélectionnez une marque</option>
-                                                                <option value="Toyota" {{ $carPosition->marque == 'Toyota' ? 'selected' : '' }}>Toyota</option>
-                                                                <option value="Ford" {{ $carPosition->marque == 'Ford' ? 'selected' : '' }}>Ford</option>
-                                                                <option value="Honda" {{ $carPosition->marque == 'Honda' ? 'selected' : '' }}>Honda</option>
-                                                                <option value="Chevrolet" {{ $carPosition->marque == 'Chevrolet' ? 'selected' : '' }}>Chevrolet</option>
-                                                                <option value="Nissan" {{ $carPosition->marque == 'Nissan' ? 'selected' : '' }}>Nissan</option>
-                                                                <option value="BMW" {{ $carPosition->marque == 'BMW' ? 'selected' : '' }}>BMW</option>
-                                                                <option value="Mercedes-Benz" {{ $carPosition->marque == 'Mercedes-Benz' ? 'selected' : '' }}>Mercedes-Benz</option>
-                                                                <option value="Audi" {{ $carPosition->marque == 'Audi' ? 'selected' : '' }}>Audi</option>
-                                                                <option value="Volkswagen" {{ $carPosition->marque == 'Volkswagen' ? 'selected' : '' }}>Volkswagen</option>
-                                                                <option value="Hyundai" {{ $carPosition->marque == 'Hyundai' ? 'selected' : '' }}>Hyundai</option>
-                                                                <option value="Kia" {{ $carPosition->marque == 'Kia' ? 'selected' : '' }}>Kia</option>
-                                                                <option value="Mazda" {{ $carPosition->marque == 'Mazda' ? 'selected' : '' }}>Mazda</option>
-                                                                <option value="Peugeot" {{ $carPosition->marque == 'Peugeot' ? 'selected' : '' }}>Peugeot</option>
-                                                                <option value="Renault" {{ $carPosition->marque == 'Renault' ? 'selected' : '' }}>Renault</option>
-                                                            </select>
+                                                            <input type="text" class="form-control @error('marque') is-invalid @enderror" id="marque" list="marque-options" value="{{ old('marque', $carPosition->marque) }}" name="marque" placeholder="Choisissez ou saisissez une marque">
+                                                            <datalist id="marque-options"></datalist>
                                                             @error('marque')
                                                             <div class="invalid-feedback">{{ $message }}</div>
                                                             @enderror
@@ -281,6 +292,7 @@
                                                                 <option value="" {{ $carPosition->type_car == '' ? 'selected' : '' }}>Sélectionnez le type</option>
                                                                 <option value="Berline" {{ $carPosition->type_car == 'Berline' ? 'selected' : '' }}>Berline</option>
                                                                 <option value="VUS" {{ $carPosition->type_car == 'VUS' ? 'selected' : '' }}>VUS</option>
+                                                                <option value="SUV" {{ $carPosition->type_car == 'SUV' ? 'selected' : '' }}>SUV</option>
                                                                 <option value="Hayon" {{ $carPosition->type_car == 'Hayon' ? 'selected' : '' }}>Hayon</option>
                                                                 <option value="Camion" {{ $carPosition->type_car == 'Camion' ? 'selected' : '' }}>Camion</option>
                                                                 <option value="Electrique" {{ $carPosition->type_car == 'Electrique' ? 'selected' : '' }}>Electrique</option>
@@ -306,7 +318,7 @@
                                                         <td>
                                                             <select id="categorie" class="form-control @error('categorie') is-invalid @enderror" name="categorie">
                                                                 <option value="">Choisissez une catégorie</option>
-                                                                <option value="BPP" {{ $carPosition->categorie == 'BPP' ? 'selected' : '' }}>BPP</option>
+                                                                <option value="VPP" {{ $carPosition->categorie == 'VPP' ? 'selected' : '' }}>VPP</option>
                                                                 <option value="VUS" {{ $carPosition->categorie == 'VUS' ? 'selected' : '' }}>VUS</option>
                                                                 <option value="VUL" {{ $carPosition->categorie == 'VUL' ? 'selected' : '' }}>VUL</option>
                                                                 <option value="VTM" {{ $carPosition->categorie == 'VTM' ? 'selected' : '' }}>VTM</option>
@@ -496,6 +508,46 @@
                                             </table>
                                         </div>
                                     </form>
+                                    <script>
+                                        (function () {
+                                            const brands = @json($vehicleBrands);
+                                            const marqueInput = document.getElementById('marque');
+                                            const marqueList = document.getElementById('marque-options');
+                                            const numeroInput = document.getElementById('numero_vehicule');
+
+                                            function fillBrandOptions(kind) {
+                                                if (!marqueList) return;
+                                                marqueList.innerHTML = '';
+                                                (brands[kind] || []).forEach((brand) => {
+                                                    const option = document.createElement('option');
+                                                    option.value = brand;
+                                                    marqueList.appendChild(option);
+                                                });
+                                            }
+
+                                            document.querySelectorAll('.vehicle-kind-choice').forEach((choice) => {
+                                                choice.addEventListener('change', (event) => fillBrandOptions(event.target.value));
+                                            });
+                                            fillBrandOptions('voiture');
+
+                                            // Plaque : AA-0000-AA — majuscules et tirets automatiques,
+                                            // pas de blocage strict de caractère par caractère (l'utilisateur
+                                            // peut coller/corriger librement), la validation stricte se fait
+                                            // à la soumission (attribut pattern + contrôle serveur).
+                                            if (numeroInput) {
+                                                numeroInput.addEventListener('input', () => {
+                                                    const raw = numeroInput.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+                                                    const letters1 = raw.slice(0, 2).replace(/[^A-Z]/g, '');
+                                                    const digits = raw.slice(2, 6).replace(/[^0-9]/g, '');
+                                                    const letters2 = raw.slice(6, 8).replace(/[^A-Z]/g, '');
+                                                    let formatted = letters1;
+                                                    if (letters1.length === 2) formatted += '-' + digits;
+                                                    if (digits.length === 4) formatted += '-' + letters2;
+                                                    numeroInput.value = formatted;
+                                                });
+                                            }
+                                        })();
+                                    </script>
 
                                 </div>
                             </div>

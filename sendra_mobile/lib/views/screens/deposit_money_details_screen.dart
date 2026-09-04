@@ -279,6 +279,15 @@ class _DepositMoneyDetailsScreenState extends State<DepositMoneyDetailsScreen> {
   }
 
   Widget _buildContent(Map<String, dynamic> signalementData) {
+    final isApproved = signalementData['is_approve'] == true;
+    final isResolved = signalementData['etat']?.toString() == 'ENLEVE';
+    // Une fois approuvé (et tant que ce n'est pas résolu), la constatation
+    // (infos/véhicule/infraction/dommages) n'est plus l'action prioritaire —
+    // elle est repliée dans un seul bouton dépliable, et l'enlèvement (la
+    // vraie prochaine étape) est mis en relief. Un signalement résolu
+    // retrouve l'affichage à plat des 5 items, comme avant approbation.
+    final grouped = _isStaff && isApproved && !isResolved;
+
     return RefreshIndicator(
       onRefresh: fetchSignalementData,
       child: SingleChildScrollView(
@@ -288,23 +297,153 @@ class _DepositMoneyDetailsScreenState extends State<DepositMoneyDetailsScreen> {
           children: [
             _workflowHeader(signalementData),
             _localisationButton(),
-            _menuItem('Informations de base', signalementData),
+            if (!grouped) _menuItem('Informations de base', signalementData),
             // Le workflow métier (véhicule, infraction, dommages, enlèvement)
             // est réservé au staff côté API (role:1,2,3,4) — masqué pour un
             // citoyen, qui n'a qu'une vue de suivi de son signalement.
             if (_isStaff) ...[
-              _menuItem('Véhicule', signalementData),
-              _menuItem('Infraction', signalementData),
-              _menuItem('Dommages', signalementData),
-              if (signalementData['dommages_saisis'] == true &&
-                  signalementData['is_approve'] != true)
-                _approvalStatus(signalementData['etat']?.toString()),
-              if (signalementData['is_approve'] == true)
+              if (!isApproved) ...[
+                _menuItem('Véhicule', signalementData),
+                _menuItem('Infraction', signalementData),
+                _menuItem('Dommages', signalementData),
+                if (signalementData['dommages_saisis'] == true)
+                  _approvalStatus(signalementData['etat']?.toString()),
+              ] else if (grouped) ...[
+                _constatationGroup(signalementData),
+                _enlevementHighlight(signalementData),
+              ] else ...[
+                _menuItem('Véhicule', signalementData),
+                _menuItem('Infraction', signalementData),
+                _menuItem('Dommages', signalementData),
                 _menuItem('Enlèvement', signalementData),
+              ],
             ] else
               _citizenStatusCard(signalementData['etat']?.toString()),
             const SizedBox(height: 16),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _constatationGroup(Map<String, dynamic> signalementData) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      child: Card(
+        elevation: 0,
+        clipBehavior: Clip.antiAlias,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: const BorderSide(color: SendraTheme.border),
+        ),
+        color: Colors.white,
+        child: Theme(
+          data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+          child: ExpansionTile(
+            tilePadding: const EdgeInsets.symmetric(horizontal: 16),
+            leading: Container(
+              width: 44,
+              height: 44,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: const Color(0xFFE8F5ED),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Text('📋', style: TextStyle(fontSize: 23)),
+            ),
+            title: const Text(
+              'Constatation',
+              style: TextStyle(fontWeight: FontWeight.w600, fontSize: 18),
+            ),
+            subtitle: const Text(
+              'Informations, véhicule, infraction, dommages',
+              style: TextStyle(color: SendraTheme.muted, fontSize: 12.5),
+            ),
+            childrenPadding: const EdgeInsets.only(bottom: 6),
+            children: [
+              _menuItem('Informations de base', signalementData),
+              _menuItem('Véhicule', signalementData),
+              _menuItem('Infraction', signalementData),
+              _menuItem('Dommages', signalementData),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _enlevementHighlight(Map<String, dynamic> signalementData) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(18),
+          onTap: () {
+            final signalementId = signalementData['signalementId'];
+            Navigator.of(context).push(MaterialPageRoute(
+              builder: (context) =>
+                  RemovalForm(signalementId: signalementId),
+            ));
+          },
+          child: Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [SendraTheme.green, SendraTheme.forest],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(18),
+              boxShadow: [
+                BoxShadow(
+                  color: SendraTheme.green.withValues(alpha: .3),
+                  blurRadius: 16,
+                  offset: const Offset(0, 6),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 50,
+                  height: 50,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: .18),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: const Text('🚛', style: TextStyle(fontSize: 25)),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Enlèvement',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 18,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        'Signalement approuvé — prochaine étape',
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: .85),
+                          fontSize: 12.5,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const Icon(Icons.arrow_forward_ios,
+                    color: Colors.white, size: 18),
+              ],
+            ),
+          ),
         ),
       ),
     );

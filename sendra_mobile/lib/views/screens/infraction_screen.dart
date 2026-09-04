@@ -54,7 +54,9 @@ class _InfractionFormState extends State<InfractionForm> {
         _adresseController.text = data['adresse_precise'] ?? '';
         _motifController.text = data['motif_infraction'] ?? '';
         _lieu = data['lieu'] ?? '';
-        _meteo = data['nuit'] == 1 ? 'Nuit' : 'Jour';
+        _meteo = data['pluie'] == 1
+            ? 'Pluie'
+            : (data['nuit'] == 1 ? 'Nuit' : 'Jour');
       });
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -73,7 +75,7 @@ class _InfractionFormState extends State<InfractionForm> {
       // Le backend conserve ses deux booléens historiques. « Jour » signifie
       // simplement nuit=false et pluie=false.
       bool nuit = _meteo == 'Nuit';
-      bool pluie = false;
+      bool pluie = _meteo == 'Pluie';
 
       final response = await http.put(
         Uri.parse(url),
@@ -305,6 +307,18 @@ class _InfractionFormState extends State<InfractionForm> {
             value: 'Nuit',
             backgroundColor: const Color(0xFF101722),
             icon: const _NightSkyIcon(),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: _timeChoice(
+            value: 'Pluie',
+            backgroundColor: const Color(0xFF4A6572),
+            icon: const Icon(
+              Icons.water_drop_rounded,
+              color: Color(0xFF9AD4E8),
+              size: 28,
+            ),
           ),
         ),
       ],
