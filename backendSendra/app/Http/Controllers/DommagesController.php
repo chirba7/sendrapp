@@ -79,6 +79,14 @@ class DommagesController extends Controller
 
     private function notifierAdministrateurs(CarPosition $carPosition): bool
     {
+        // Correction : cette méthode ne loguait que les échecs — impossible
+        // de distinguer "le mail est parti sans erreur" de "le callback
+        // dispatch()->afterResponse() n'a jamais été exécuté". Un log
+        // d'entrée + un log de succès explicite lèvent le doute.
+        Log::info('Notification d’approbation : traitement démarré.', [
+            'signalement_id' => $carPosition->id,
+        ]);
+
         $emails = User::query()
             ->where('role_id', 1)
             ->whereNotNull('email')
@@ -111,6 +119,10 @@ class DommagesController extends Controller
                         ->subject("Sendra — demande d’approbation n° {$carPosition->id}");
                 }
             );
+            Log::info('Notification d’approbation envoyée avec succès.', [
+                'signalement_id' => $carPosition->id,
+                'destinataires' => $emails->all(),
+            ]);
             return true;
         } catch (\Throwable $exception) {
             // La saisie des dommages reste enregistrée même si le serveur
