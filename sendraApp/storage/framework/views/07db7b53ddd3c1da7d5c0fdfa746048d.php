@@ -1,4 +1,22 @@
 <?php $__env->startSection('session'); ?>
+<style>
+    .sendra-choice-grid { display:grid; grid-template-columns:repeat(2,minmax(130px,1fr)); gap:12px; max-width:520px; }
+    .sendra-choice-input { position:absolute; opacity:0; pointer-events:none; }
+    .sendra-choice-card { min-height:76px; border:2px solid #dce5df; border-radius:16px; display:flex; align-items:center; justify-content:center; gap:10px; cursor:pointer; font-weight:700; transition:.18s ease; }
+    .sendra-choice-input:checked + .sendra-choice-card { border-color:#198754; box-shadow:0 5px 14px rgba(25,135,84,.2); }
+    .sendra-day { background:#62b8ed; color:#fff; }
+    .sendra-night { background:#101722; color:#fff; position:relative; overflow:hidden; }
+    .sendra-night::before { content:'•  ·  •'; position:absolute; color:#fff; top:5px; right:15px; letter-spacing:5px; }
+    .sendra-rain { background:#4a6572; color:#fff; }
+    .sendra-color-grid { display:flex; flex-wrap:wrap; gap:9px; }
+    .sendra-color-card { width:62px; padding:8px 4px; border:2px solid #dce5df; border-radius:14px; text-align:center; cursor:pointer; background:#fff; }
+    .sendra-color-input { position:absolute; opacity:0; pointer-events:none; }
+    .sendra-color-input:checked + .sendra-color-card { border-color:#198754; background:#e8f5ed; }
+    .sendra-color-dot { width:30px; height:30px; margin:0 auto 5px; border-radius:50%; border:1px solid rgba(0,0,0,.25); display:block; }
+    .sendra-damage-wrap { max-width:900px; }
+    #signature-canvas { display:block; width:100%; max-width:760px; height:auto; border:1px solid #dce5df; border-radius:14px; touch-action:none; }
+    @media(max-width:767px) { .sendra-choice-grid{grid-template-columns:1fr 1fr}.sendra-choice-card{min-height:68px}.sendra-actions{gap:10px}.sendra-actions>div{text-align:left!important} }
+</style>
 <section class="tab-components">
     <div class="container-fluid">
         <div class="title-wrapper pt-30">
@@ -166,28 +184,28 @@ unset($__errorArgs, $__bag); ?>
                                                     </tr>
                                                     <tr>
                                                         <td>
-                                                            <h6 class="text-sm text-medium">Météo</h6>
+                                                            <h6 class="text-sm text-medium">Moment du constat</h6>
                                                         </td>
                                                         <td>
-                                                            <div class="d-flex align-items-center">
-                                                                <div class="d-flex align-items-center align-content-center">
-                                                                    <div class="form-check">
-                                                                        <input class="form-check-input is-valid me-3" type="checkbox" name="meteo[]" value="nuit" <?php echo e($carPosition->nuit ? 'checked' : ''); ?>>
-                                                                        <label class="form-label form-check-label" for="nuit">Nuit</label>
-                                                                    </div>
-                                                                    <div class="form-check">
-    <input 
-        class="form-check-input is-valid me-3" 
-        type="checkbox" 
-        name="meteo[]" 
-        id="pluie"
-        value="pluie" 
-        <?php echo e($carPosition->pluie ? 'checked' : ''); ?>>
-    <label class="form-label form-check-label" for="pluie">Pluie</label>
-</div>
+                                                            <?php
+                                                                $momentDefault = $carPosition->pluie ? 'pluie' : ($carPosition->nuit ? 'nuit' : 'jour');
+                                                                $momentValue = old('moment', $momentDefault);
+                                                            ?>
+                                                            <div class="sendra-choice-grid" style="grid-template-columns:repeat(3,minmax(100px,1fr))">
+                                                                <div>
+                                                                    <input class="sendra-choice-input" type="radio" name="moment" id="moment-jour" value="jour" <?php echo e($momentValue === 'jour' ? 'checked' : ''); ?>>
+                                                                    <label class="sendra-choice-card sendra-day" for="moment-jour"><span style="font-size:28px">☀️</span> Jour</label>
+                                                                </div>
+                                                                <div>
+                                                                    <input class="sendra-choice-input" type="radio" name="moment" id="moment-nuit" value="nuit" <?php echo e($momentValue === 'nuit' ? 'checked' : ''); ?>>
+                                                                    <label class="sendra-choice-card sendra-night" for="moment-nuit"><span style="font-size:28px;color:#fff">☾</span> Nuit</label>
+                                                                </div>
+                                                                <div>
+                                                                    <input class="sendra-choice-input" type="radio" name="moment" id="moment-pluie" value="pluie" <?php echo e($momentValue === 'pluie' ? 'checked' : ''); ?>>
+                                                                    <label class="sendra-choice-card sendra-rain" for="moment-pluie"><span style="font-size:28px">🌧️</span> Pluie</label>
                                                                 </div>
                                                             </div>
-                                                            <?php $__errorArgs = ['meteo'];
+                                                            <?php $__errorArgs = ['moment'];
 $__bag = $errors->getBag($__errorArgs[1] ?? 'default');
 if ($__bag->has($__errorArgs[0])) :
 if (isset($message)) { $__messageOriginal = $message; }
@@ -211,7 +229,7 @@ $message = $__bag->first($__errorArgs[0]); ?> is-invalid <?php unset($message);
 if (isset($__messageOriginal)) { $message = $__messageOriginal; }
 endif;
 unset($__errorArgs, $__bag); ?>" type="radio" name="lieu" id="lieu1" value="PUBLIC" <?php echo e(old('lieu', $carPosition->lieu) == 'PUBLIC' ? 'checked' : ''); ?>>
-                                                                    <label class="form-label form-check-label" for="lieu1">PUBLIC</label>
+                                                                    <label class="form-label form-check-label" for="lieu1">🏛️ PUBLIC</label>
                                                                 </div>
                                                                 <div class="form-check">
                                                                     <input class="form-check-input <?php $__errorArgs = ['lieu'];
@@ -222,7 +240,7 @@ $message = $__bag->first($__errorArgs[0]); ?> is-invalid <?php unset($message);
 if (isset($__messageOriginal)) { $message = $__messageOriginal; }
 endif;
 unset($__errorArgs, $__bag); ?>" type="radio" name="lieu" id="lieu2" value="PRIVE" <?php echo e(old('lieu', $carPosition->lieu) == 'PRIVE' ? 'checked' : ''); ?>>
-                                                                    <label class="form-label form-check-label" for="lieu2">PRIVE</label>
+                                                                    <label class="form-label form-check-label" for="lieu2">🔒 PRIVÉ</label>
                                                                 </div>
                                                             </div>
                                                             <?php $__errorArgs = ['lieu'];
@@ -276,6 +294,23 @@ unset($__errorArgs, $__bag); ?>
                                     </div>
                                 </div>
                                 <div class="card-body">
+                                    <?php
+                                        $vehicleBrands = config('vehicle_brands');
+                                    ?>
+                                    <div class="mb-4">
+                                        <h6 class="text-sm text-medium mb-2">Type de véhicule</h6>
+                                        <div class="sendra-choice-grid" style="max-width:340px">
+                                            <div>
+                                                <input class="sendra-choice-input vehicle-kind-choice" type="radio" name="vehicule_kind_ui" id="kind-voiture" value="voiture" checked>
+                                                <label class="sendra-choice-card" for="kind-voiture">🚗 Voiture</label>
+                                            </div>
+                                            <div>
+                                                <input class="sendra-choice-input vehicle-kind-choice" type="radio" name="vehicule_kind_ui" id="kind-moto" value="moto">
+                                                <label class="sendra-choice-card" for="kind-moto">🏍️ Moto</label>
+                                            </div>
+                                        </div>
+                                        <p class="text-sm text-muted mt-2 mb-0">Filtre seulement les marques suggérées ci-dessous — pas enregistré séparément.</p>
+                                    </div>
                                     <form action="<?php echo e(route('vehicule', [$carPosition->id])); ?>" method="post">
                                         <?php echo method_field('patch'); ?>
                                         <?php echo csrf_field(); ?>
@@ -294,7 +329,7 @@ if (isset($message)) { $__messageOriginal = $message; }
 $message = $__bag->first($__errorArgs[0]); ?> is-invalid <?php unset($message);
 if (isset($__messageOriginal)) { $message = $__messageOriginal; }
 endif;
-unset($__errorArgs, $__bag); ?>" id="numero_vehicule" value="<?php echo e(old('numero_vehicule', strtoupper($carPosition->numero_vehicule))); ?>" name="numero_vehicule">
+unset($__errorArgs, $__bag); ?>" id="numero_vehicule" placeholder="AB-0000-KO" pattern="[A-Z]{2}-\d{4}-[A-Z]{2}" value="<?php echo e(old('numero_vehicule', strtoupper($carPosition->numero_vehicule))); ?>" name="numero_vehicule" style="text-transform:uppercase">
                                                             <?php $__errorArgs = ['numero_vehicule'];
 $__bag = $errors->getBag($__errorArgs[1] ?? 'default');
 if ($__bag->has($__errorArgs[0])) :
@@ -310,30 +345,15 @@ unset($__errorArgs, $__bag); ?>
                                                             <h6 class="text-sm text-medium">Marque</h6>
                                                         </td>
                                                         <td>
-                                                            <select id="marque" class="form-control <?php $__errorArgs = ['marque'];
+                                                            <input type="text" class="form-control <?php $__errorArgs = ['marque'];
 $__bag = $errors->getBag($__errorArgs[1] ?? 'default');
 if ($__bag->has($__errorArgs[0])) :
 if (isset($message)) { $__messageOriginal = $message; }
 $message = $__bag->first($__errorArgs[0]); ?> is-invalid <?php unset($message);
 if (isset($__messageOriginal)) { $message = $__messageOriginal; }
 endif;
-unset($__errorArgs, $__bag); ?>" name="marque">
-                                                                <option value="" <?php echo e($carPosition->marque == '' ? 'selected' : ''); ?>>Sélectionnez une marque</option>
-                                                                <option value="Toyota" <?php echo e($carPosition->marque == 'Toyota' ? 'selected' : ''); ?>>Toyota</option>
-                                                                <option value="Ford" <?php echo e($carPosition->marque == 'Ford' ? 'selected' : ''); ?>>Ford</option>
-                                                                <option value="Honda" <?php echo e($carPosition->marque == 'Honda' ? 'selected' : ''); ?>>Honda</option>
-                                                                <option value="Chevrolet" <?php echo e($carPosition->marque == 'Chevrolet' ? 'selected' : ''); ?>>Chevrolet</option>
-                                                                <option value="Nissan" <?php echo e($carPosition->marque == 'Nissan' ? 'selected' : ''); ?>>Nissan</option>
-                                                                <option value="BMW" <?php echo e($carPosition->marque == 'BMW' ? 'selected' : ''); ?>>BMW</option>
-                                                                <option value="Mercedes-Benz" <?php echo e($carPosition->marque == 'Mercedes-Benz' ? 'selected' : ''); ?>>Mercedes-Benz</option>
-                                                                <option value="Audi" <?php echo e($carPosition->marque == 'Audi' ? 'selected' : ''); ?>>Audi</option>
-                                                                <option value="Volkswagen" <?php echo e($carPosition->marque == 'Volkswagen' ? 'selected' : ''); ?>>Volkswagen</option>
-                                                                <option value="Hyundai" <?php echo e($carPosition->marque == 'Hyundai' ? 'selected' : ''); ?>>Hyundai</option>
-                                                                <option value="Kia" <?php echo e($carPosition->marque == 'Kia' ? 'selected' : ''); ?>>Kia</option>
-                                                                <option value="Mazda" <?php echo e($carPosition->marque == 'Mazda' ? 'selected' : ''); ?>>Mazda</option>
-                                                                <option value="Peugeot" <?php echo e($carPosition->marque == 'Peugeot' ? 'selected' : ''); ?>>Peugeot</option>
-                                                                <option value="Renault" <?php echo e($carPosition->marque == 'Renault' ? 'selected' : ''); ?>>Renault</option>
-                                                            </select>
+unset($__errorArgs, $__bag); ?>" id="marque" list="marque-options" value="<?php echo e(old('marque', $carPosition->marque)); ?>" name="marque" placeholder="Choisissez ou saisissez une marque">
+                                                            <datalist id="marque-options"></datalist>
                                                             <?php $__errorArgs = ['marque'];
 $__bag = $errors->getBag($__errorArgs[1] ?? 'default');
 if ($__bag->has($__errorArgs[0])) :
@@ -362,6 +382,7 @@ unset($__errorArgs, $__bag); ?>" name="type">
                                                                 <option value="" <?php echo e($carPosition->type_car == '' ? 'selected' : ''); ?>>Sélectionnez le type</option>
                                                                 <option value="Berline" <?php echo e($carPosition->type_car == 'Berline' ? 'selected' : ''); ?>>Berline</option>
                                                                 <option value="VUS" <?php echo e($carPosition->type_car == 'VUS' ? 'selected' : ''); ?>>VUS</option>
+                                                                <option value="SUV" <?php echo e($carPosition->type_car == 'SUV' ? 'selected' : ''); ?>>SUV</option>
                                                                 <option value="Hayon" <?php echo e($carPosition->type_car == 'Hayon' ? 'selected' : ''); ?>>Hayon</option>
                                                                 <option value="Camion" <?php echo e($carPosition->type_car == 'Camion' ? 'selected' : ''); ?>>Camion</option>
                                                                 <option value="Electrique" <?php echo e($carPosition->type_car == 'Electrique' ? 'selected' : ''); ?>>Electrique</option>
@@ -415,7 +436,7 @@ if (isset($__messageOriginal)) { $message = $__messageOriginal; }
 endif;
 unset($__errorArgs, $__bag); ?>" name="categorie">
                                                                 <option value="">Choisissez une catégorie</option>
-                                                                <option value="BPP" <?php echo e($carPosition->categorie == 'BPP' ? 'selected' : ''); ?>>BPP</option>
+                                                                <option value="VPP" <?php echo e($carPosition->categorie == 'VPP' ? 'selected' : ''); ?>>VPP</option>
                                                                 <option value="VUS" <?php echo e($carPosition->categorie == 'VUS' ? 'selected' : ''); ?>>VUS</option>
                                                                 <option value="VUL" <?php echo e($carPosition->categorie == 'VUL' ? 'selected' : ''); ?>>VUL</option>
                                                                 <option value="VTM" <?php echo e($carPosition->categorie == 'VTM' ? 'selected' : ''); ?>>VTM</option>
@@ -436,27 +457,24 @@ unset($__errorArgs, $__bag); ?>
                                                             <h6 class="text-sm text-medium">Couleur</h6>
                                                         </td>
                                                         <td>
-                                                            <select id="inputColor" class="form-control <?php $__errorArgs = ['couleur'];
-$__bag = $errors->getBag($__errorArgs[1] ?? 'default');
-if ($__bag->has($__errorArgs[0])) :
-if (isset($message)) { $__messageOriginal = $message; }
-$message = $__bag->first($__errorArgs[0]); ?> is-invalid <?php unset($message);
-if (isset($__messageOriginal)) { $message = $__messageOriginal; }
-endif;
-unset($__errorArgs, $__bag); ?>" name="couleur">
-                                                                <option value="">Sélectionnez une couleur</option>
-                                                                <option value="Noir" <?php echo e($carPosition->couleur == 'Noir' ? 'selected' : ''); ?>>Noir</option>
-                                                                <option value="Blanc" <?php echo e($carPosition->couleur == 'Blanc' ? 'selected' : ''); ?>>Blanc</option>
-                                                                <option value="Rouge" <?php echo e($carPosition->couleur == 'Rouge' ? 'selected' : ''); ?>>Rouge</option>
-                                                                <option value="Bleu" <?php echo e($carPosition->couleur == 'Bleu' ? 'selected' : ''); ?>>Bleu</option>
-                                                                <option value="Gris" <?php echo e($carPosition->couleur == 'Gris' ? 'selected' : ''); ?>>Gris</option>
-                                                                <option value="Argent" <?php echo e($carPosition->couleur == 'Argent' ? 'selected' : ''); ?>>Argent</option>
-                                                                <option value="Vert" <?php echo e($carPosition->couleur == 'Vert' ? 'selected' : ''); ?>>Vert</option>
-                                                                <option value="Jaune" <?php echo e($carPosition->couleur == 'Jaune' ? 'selected' : ''); ?>>Jaune</option>
-                                                                <option value="Orange" <?php echo e($carPosition->couleur == 'Orange' ? 'selected' : ''); ?>>Orange</option>
-                                                                <option value="Marron" <?php echo e($carPosition->couleur == 'Marron' ? 'selected' : ''); ?>>Marron</option>
-                                                                <option value="Violet" <?php echo e($carPosition->couleur == 'Violet' ? 'selected' : ''); ?>>Violet</option>
-                                                            </select>
+                                                            <?php
+                                                                $vehicleColors = [
+                                                                    'Blanc'=>'#f5f5f5','Noir'=>'#202124','Gris'=>'#8b9298','Argent'=>'#c5cbd0',
+                                                                    'Rouge'=>'#d93636','Bleu'=>'#2767c5','Vert'=>'#278652','Jaune'=>'#f2c230',
+                                                                    'Orange'=>'#e87924','Marron'=>'#795548','Violet'=>'#7e57c2'
+                                                                ];
+                                                            ?>
+                                                            <div class="sendra-color-grid">
+                                                                <?php $__currentLoopData = $vehicleColors; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $colorName => $colorHex): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                                                                    <div>
+                                                                        <input class="sendra-color-input" type="radio" name="couleur" id="color-<?php echo e(Str::slug($colorName)); ?>" value="<?php echo e($colorName); ?>" <?php echo e(old('couleur', $carPosition->couleur) === $colorName ? 'checked' : ''); ?>>
+                                                                        <label class="sendra-color-card" for="color-<?php echo e(Str::slug($colorName)); ?>">
+                                                                            <span class="sendra-color-dot" style="background:<?php echo e($colorHex); ?>"></span>
+                                                                            <small><?php echo e($colorName); ?></small>
+                                                                        </label>
+                                                                    </div>
+                                                                <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                                                            </div>
                                                             <?php $__errorArgs = ['couleur'];
 $__bag = $errors->getBag($__errorArgs[1] ?? 'default');
 if ($__bag->has($__errorArgs[0])) :
@@ -484,7 +502,7 @@ $message = $__bag->first($__errorArgs[0]); ?> is-invalid <?php unset($message);
 if (isset($__messageOriginal)) { $message = $__messageOriginal; }
 endif;
 unset($__errorArgs, $__bag); ?>" type="radio" name="entretien" id="entretien1" value="BON" <?php echo e(old('entretien', $carPosition->entretien) == 'BON' ? 'checked' : ''); ?>>
-                                                                    <label class="form-label form-check-label" for="entretien1">BON</label>
+                                                                    <label class="form-label form-check-label" for="entretien1">✅ BON</label>
                                                                 </div>
                                                                 <div class="form-check me-3">
                                                                     <input class="form-check-input <?php $__errorArgs = ['entretien'];
@@ -495,7 +513,7 @@ $message = $__bag->first($__errorArgs[0]); ?> is-invalid <?php unset($message);
 if (isset($__messageOriginal)) { $message = $__messageOriginal; }
 endif;
 unset($__errorArgs, $__bag); ?>" type="radio" name="entretien" id="entretien2" value="MOYEN" <?php echo e(old('entretien', $carPosition->entretien) == 'MOYEN' ? 'checked' : ''); ?>>
-                                                                    <label class="form-label form-check-label" for="entretien2">MOYEN</label>
+                                                                    <label class="form-label form-check-label" for="entretien2">🟠 MOYEN</label>
                                                                 </div>
                                                                 <div class="form-check">
                                                                     <input class="form-check-input <?php $__errorArgs = ['entretien'];
@@ -506,7 +524,7 @@ $message = $__bag->first($__errorArgs[0]); ?> is-invalid <?php unset($message);
 if (isset($__messageOriginal)) { $message = $__messageOriginal; }
 endif;
 unset($__errorArgs, $__bag); ?>" type="radio" name="entretien" id="entretien3" value="DEGRADE" <?php echo e(old('entretien', $carPosition->entretien) == 'DEGRADE' ? 'checked' : ''); ?>>
-                                                                    <label class="form-label form-check-label" for="entretien3">DEGRADE</label>
+                                                                    <label class="form-label form-check-label" for="entretien3">🛠️ DÉGRADÉ</label>
                                                                 </div>
                                                             </div>
                                                             <?php $__errorArgs = ['entretien'];
@@ -534,7 +552,7 @@ $message = $__bag->first($__errorArgs[0]); ?> is-invalid <?php unset($message);
 if (isset($__messageOriginal)) { $message = $__messageOriginal; }
 endif;
 unset($__errorArgs, $__bag); ?>" type="radio" name="pays_etranger" id="pays_etranger1" value="OUI" <?php echo e(old('pays_etranger', $carPosition->pays_etranger) == 'OUI' ? 'checked' : ''); ?>>
-                                                                    <label class="form-label form-check-label" for="pays_etranger1">OUI</label>
+                                                                    <label class="form-label form-check-label" for="pays_etranger1">🌍 OUI</label>
                                                                 </div>
                                                                 <div class="form-check">
                                                                     <input class="form-check-input <?php $__errorArgs = ['pays_etranger'];
@@ -545,7 +563,7 @@ $message = $__bag->first($__errorArgs[0]); ?> is-invalid <?php unset($message);
 if (isset($__messageOriginal)) { $message = $__messageOriginal; }
 endif;
 unset($__errorArgs, $__bag); ?>" type="radio" name="pays_etranger" id="pays_etranger2" value="NON" <?php echo e(old('pays_etranger', $carPosition->pays_etranger) == 'NON' ? 'checked' : ''); ?>>
-                                                                    <label class="form-label form-check-label" for="pays_etranger2">NON</label>
+                                                                    <label class="form-label form-check-label" for="pays_etranger2">🇸🇳 NON</label>
                                                                 </div>
                                                             </div>
                                                             <?php $__errorArgs = ['pays_etranger'];
@@ -769,6 +787,46 @@ unset($__errorArgs, $__bag); ?>
                                             </table>
                                         </div>
                                     </form>
+                                    <script>
+                                        (function () {
+                                            const brands = <?php echo json_encode($vehicleBrands, 15, 512) ?>;
+                                            const marqueInput = document.getElementById('marque');
+                                            const marqueList = document.getElementById('marque-options');
+                                            const numeroInput = document.getElementById('numero_vehicule');
+
+                                            function fillBrandOptions(kind) {
+                                                if (!marqueList) return;
+                                                marqueList.innerHTML = '';
+                                                (brands[kind] || []).forEach((brand) => {
+                                                    const option = document.createElement('option');
+                                                    option.value = brand;
+                                                    marqueList.appendChild(option);
+                                                });
+                                            }
+
+                                            document.querySelectorAll('.vehicle-kind-choice').forEach((choice) => {
+                                                choice.addEventListener('change', (event) => fillBrandOptions(event.target.value));
+                                            });
+                                            fillBrandOptions('voiture');
+
+                                            // Plaque : AA-0000-AA — majuscules et tirets automatiques,
+                                            // pas de blocage strict de caractère par caractère (l'utilisateur
+                                            // peut coller/corriger librement), la validation stricte se fait
+                                            // à la soumission (attribut pattern + contrôle serveur).
+                                            if (numeroInput) {
+                                                numeroInput.addEventListener('input', () => {
+                                                    const raw = numeroInput.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+                                                    const letters1 = raw.slice(0, 2).replace(/[^A-Z]/g, '');
+                                                    const digits = raw.slice(2, 6).replace(/[^0-9]/g, '');
+                                                    const letters2 = raw.slice(6, 8).replace(/[^A-Z]/g, '');
+                                                    let formatted = letters1;
+                                                    if (letters1.length === 2) formatted += '-' + digits;
+                                                    if (digits.length === 4) formatted += '-' + letters2;
+                                                    numeroInput.value = formatted;
+                                                });
+                                            }
+                                        })();
+                                    </script>
 
                                 </div>
                             </div>
@@ -1010,10 +1068,39 @@ unset($__errorArgs, $__bag); ?>
                             <form id="signature-form" method="POST" action="<?php echo e(route('signature.store', [$carPosition->id])); ?>">
                                 <?php echo csrf_field(); ?>
                                 <img id="default-image" src="<?php echo e(asset('img/constation image.png')); ?>" style="display: none;">
-                                <canvas id="signature-canvas" width="650" height="400"></canvas>
+                                <?php if($carPosition->dommage_image): ?>
+                                
+                                <img id="existing-damage-image" src="<?php echo e(config('services.backend.storage_url').'/dommages/'.$carPosition->dommage_image); ?>" style="display: none;" crossorigin="anonymous">
+                                <?php endif; ?>
+                                <div class="sendra-damage-wrap">
+                                    <h5 class="mb-3">Type de véhicule</h5>
+                                    <div class="sendra-choice-grid mb-4">
+                                        <div>
+                                            <input class="sendra-choice-input damage-vehicle-choice" type="radio" name="damage_vehicle_type" id="damage-car" value="car" checked>
+                                            <label class="sendra-choice-card" for="damage-car">🚗 Voiture</label>
+                                        </div>
+                                        <div>
+                                            <input class="sendra-choice-input damage-vehicle-choice" type="radio" name="damage_vehicle_type" id="damage-motorcycle" value="motorcycle">
+                                            <label class="sendra-choice-card" for="damage-motorcycle">🏍️ Moto</label>
+                                        </div>
+                                    </div>
+                                    <p class="text-sm mb-2">
+                                        Dessinez uniquement sur le véhicule pour indiquer les dommages.
+                                        <?php if($carPosition->dommage_image): ?>
+                                        <span class="text-muted">Dommages déjà constatés affichés ci-dessous.</span>
+                                        <?php endif; ?>
+                                    </p>
+                                    <canvas id="signature-canvas" width="760" height="360"></canvas>
+                                    <?php if($carPosition->dommage_image): ?>
+                                    <div class="mt-2 d-flex gap-2 flex-wrap">
+                                        <button type="button" id="blank-template" class="main-btn btn-hover"><i class="lni lni-reload"></i> Nouveau gabarit vierge</button>
+                                        <button type="button" id="restore-agent-version" class="main-btn btn-hover"><i class="lni lni-undo"></i> Revenir à la version de l'agent</button>
+                                    </div>
+                                    <?php endif; ?>
+                                </div>
                                 <input type="hidden" name="signature" id="signature">
                                 <hr>
-                                <div class=" row justify-content-center align-items-center g-2" id="signature-controls">
+                                <div class="row justify-content-center align-items-center g-2 sendra-actions" id="signature-controls">
                                     <div class="col-md-6">
                                         <button type="button" id="clear-signature" class="main-btn danger-btn-light btn-hover"> <i class="lni lni-reload"></i> Effacer</button>
                                     </div>
@@ -1024,7 +1111,7 @@ unset($__errorArgs, $__bag); ?>
                                 </div>
                             </form>
                             <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.3.1/jspdf.umd.min.js"></script>
-                            <script src="<?php echo e(asset('assets/js/signature.js')); ?>"></script>
+                            <script src="<?php echo e(asset('assets/js/signature.js')); ?>?v=<?php echo e(filemtime(public_path('assets/js/signature.js'))); ?>"></script>
                         </div>
                     </div>
                 </div>

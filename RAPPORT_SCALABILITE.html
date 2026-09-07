@@ -1,0 +1,629 @@
+<title>Sendra à l'échelle</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+  :root {
+    --ground: #F2F3EE;
+    --surface: #FFFFFF;
+    --surface-alt: #E7EDE7;
+    --ink: #1B2420;
+    --ink-soft: #4B564F;
+    --ink-faint: #7C877E;
+    --accent: #1F6F4A;
+    --accent-strong: #164F35;
+    --accent-soft: #DCE9E1;
+    --line: #D7DAD1;
+    --warn: #B5471B;
+    --warn-soft: #F3E4DB;
+    --defer: #8A6B1E;
+    --defer-soft: #F1E6C9;
+    --good: #1F6F4A;
+    --good-soft: #DCE9E1;
+    --code-bg: #12160F;
+    --code-ink: #DCE9E1;
+    --shadow: 0 1px 2px rgba(27,36,32,.06), 0 8px 24px rgba(27,36,32,.05);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #11150F;
+      --surface: #171C15;
+      --surface-alt: #1F2A20;
+      --ink: #EAEFE7;
+      --ink-soft: #A6B3A5;
+      --ink-faint: #78877A;
+      --accent: #58CC98;
+      --accent-strong: #86E0B7;
+      --accent-soft: #1E3327;
+      --line: #2A342A;
+      --warn: #E38657;
+      --warn-soft: #3A2A1E;
+      --defer: #D8BE64;
+      --defer-soft: #362C16;
+      --good: #58CC98;
+      --good-soft: #1E3327;
+      --code-bg: #0B0E09;
+      --code-ink: #D6E5D8;
+      --shadow: 0 1px 2px rgba(0,0,0,.35), 0 8px 24px rgba(0,0,0,.35);
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --ground: #11150F;
+    --surface: #171C15;
+    --surface-alt: #1F2A20;
+    --ink: #EAEFE7;
+    --ink-soft: #A6B3A5;
+    --ink-faint: #78877A;
+    --accent: #58CC98;
+    --accent-strong: #86E0B7;
+    --accent-soft: #1E3327;
+    --line: #2A342A;
+    --warn: #E38657;
+    --warn-soft: #3A2A1E;
+    --defer: #D8BE64;
+    --defer-soft: #362C16;
+    --good: #58CC98;
+    --good-soft: #1E3327;
+    --code-bg: #0B0E09;
+    --code-ink: #D6E5D8;
+    --shadow: 0 1px 2px rgba(0,0,0,.35), 0 8px 24px rgba(0,0,0,.35);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font-family: "IBM Plex Sans", system-ui, sans-serif;
+    font-size: 17px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  ::selection { background: var(--accent-soft); color: var(--accent-strong); }
+
+  a { color: var(--accent-strong); }
+
+  .page {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 56px 28px 120px;
+  }
+
+  .prose {
+    max-width: 700px;
+  }
+
+  header.hero {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    padding-bottom: 44px;
+    border-bottom: 1px solid var(--line);
+    margin-bottom: 48px;
+  }
+
+  .eyebrow {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 12.5px;
+    letter-spacing: .09em;
+    text-transform: uppercase;
+    color: var(--accent-strong);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .eyebrow .dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--accent);
+    flex: none;
+  }
+
+  h1 {
+    font-family: "Fraunces", Georgia, serif;
+    font-optical-sizing: auto;
+    font-weight: 600;
+    font-size: clamp(34px, 5vw, 50px);
+    line-height: 1.08;
+    margin: 0;
+    text-wrap: balance;
+    letter-spacing: -0.01em;
+  }
+
+  .dek {
+    max-width: 640px;
+    color: var(--ink-soft);
+    font-size: 18px;
+    line-height: 1.6;
+    text-wrap: pretty;
+  }
+
+  .verdict-strip {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 6px;
+  }
+
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 12.5px;
+    font-weight: 500;
+    padding: 6px 12px;
+    border-radius: 999px;
+    border: 1px solid var(--line);
+    background: var(--surface);
+    color: var(--ink-soft);
+  }
+  .chip b { color: var(--ink); font-weight: 600; }
+
+  section { margin-bottom: 64px; }
+
+  .section-head {
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+    margin-bottom: 22px;
+  }
+
+  .section-num {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 13px;
+    color: var(--ink-faint);
+    flex: none;
+  }
+
+  h2 {
+    font-family: "Fraunces", Georgia, serif;
+    font-weight: 600;
+    font-size: 27px;
+    margin: 0;
+    text-wrap: balance;
+  }
+
+  h3 {
+    font-family: "Fraunces", Georgia, serif;
+    font-weight: 600;
+    font-size: 19px;
+    margin: 0 0 10px;
+  }
+
+  p { margin: 0 0 16px; }
+  .prose p:last-child { margin-bottom: 0; }
+
+  code, .mono {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: .92em;
+  }
+
+  .path {
+    display: inline-block;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 13.5px;
+    background: var(--surface-alt);
+    color: var(--accent-strong);
+    padding: 2px 7px;
+    border-radius: 5px;
+  }
+
+  /* Finding cards */
+  .findings {
+    display: grid;
+    gap: 14px;
+  }
+
+  .finding {
+    display: grid;
+    grid-template-columns: 30px 1fr;
+    gap: 16px;
+    padding: 18px 20px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    box-shadow: var(--shadow);
+  }
+
+  .finding .mark {
+    width: 30px; height: 30px;
+    border-radius: 8px;
+    background: var(--warn-soft);
+    color: var(--warn);
+    display: flex; align-items: center; justify-content: center;
+    font-family: "IBM Plex Mono", monospace;
+    font-weight: 600;
+    font-size: 13px;
+    flex: none;
+  }
+
+  .finding h4 {
+    font-family: "IBM Plex Sans", sans-serif;
+    font-weight: 600;
+    font-size: 15.5px;
+    margin: 0 0 5px;
+    color: var(--ink);
+  }
+
+  .finding p {
+    margin: 0;
+    font-size: 14.5px;
+    color: var(--ink-soft);
+  }
+
+  /* Diagram frame */
+  .diagram-frame {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 28px;
+    box-shadow: var(--shadow);
+    overflow-x: auto;
+  }
+  .diagram-frame .cap {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 12px;
+    color: var(--ink-faint);
+    text-transform: uppercase;
+    letter-spacing: .07em;
+    margin-bottom: 14px;
+  }
+  pre.mermaid { margin: 0; min-width: 560px; }
+
+  /* Verdict table */
+  .table-wrap {
+    overflow-x: auto;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    box-shadow: var(--shadow);
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    background: var(--surface);
+    min-width: 720px;
+  }
+  thead th {
+    text-align: left;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 11.5px;
+    text-transform: uppercase;
+    letter-spacing: .07em;
+    color: var(--ink-faint);
+    font-weight: 500;
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--line);
+  }
+  tbody td {
+    padding: 16px 18px;
+    border-bottom: 1px solid var(--line);
+    vertical-align: top;
+    font-size: 14.5px;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  td.proposal { font-weight: 600; width: 26%; }
+  td.why { color: var(--ink-soft); }
+
+  .verdict-pill {
+    display: inline-flex;
+    align-items: center;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 6px;
+    white-space: nowrap;
+  }
+  .v-adopt { background: var(--good-soft); color: var(--good); }
+  .v-defer { background: var(--defer-soft); color: var(--defer); }
+  .v-skip  { background: var(--warn-soft); color: var(--warn); }
+
+  /* Roadmap */
+  .roadmap {
+    display: grid;
+    gap: 0;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    overflow: hidden;
+    box-shadow: var(--shadow);
+    background: var(--surface);
+  }
+  .phase {
+    display: grid;
+    grid-template-columns: 130px 1fr;
+    gap: 22px;
+    padding: 24px 24px;
+  }
+  .phase + .phase { border-top: 1px solid var(--line); }
+  .phase-label {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 12px;
+    color: var(--ink-faint);
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    padding-top: 3px;
+  }
+  .phase-label .trigger {
+    display: block;
+    margin-top: 8px;
+    color: var(--ink-faint);
+    font-size: 11px;
+    line-height: 1.5;
+    text-transform: none;
+    letter-spacing: normal;
+  }
+  .phase h3 { margin-bottom: 12px; }
+  .phase ul {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: grid;
+    gap: 9px;
+  }
+  .phase li {
+    display: grid;
+    grid-template-columns: 16px 1fr;
+    gap: 10px;
+    font-size: 14.5px;
+    color: var(--ink-soft);
+  }
+  .phase li::before {
+    content: "";
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--accent);
+    margin-top: 8px;
+  }
+  .phase li b { color: var(--ink); font-weight: 600; }
+
+  footer.closing {
+    margin-top: 72px;
+    padding-top: 28px;
+    border-top: 1px solid var(--line);
+    color: var(--ink-soft);
+    font-size: 15px;
+  }
+  footer.closing p { max-width: 640px; }
+
+  @media (max-width: 640px) {
+    .page { padding: 36px 18px 90px; }
+    .phase { grid-template-columns: 1fr; }
+    .phase-label { padding-top: 0; }
+  }
+</style>
+
+<div class="page">
+
+  <header class="hero">
+    <div class="eyebrow"><span class="dot"></span>Note technique — architecture &amp; scalabilité</div>
+    <h1>Sendra à l'échelle</h1>
+    <p class="dek">Avant de dessiner une cible, un diagnostic honnête&nbsp;: qu'est-ce qui casserait réellement si Sendra couvrait plus de villes et plus d'utilisateurs — et qu'est-ce qui n'a rien à voir avec ça.</p>
+    <div class="verdict-strip">
+      <span class="chip">Monolithes Laravel actuels — <b>à garder</b></span>
+      <span class="chip">Microservices / réécriture Django·FastAPI — <b>à écarter</b></span>
+      <span class="chip">Stockage objet, file d'attente, CI/CD — <b>à faire maintenant</b></span>
+    </div>
+  </header>
+
+  <section id="findings">
+    <div class="section-head">
+      <span class="section-num">01</span>
+      <h2>Ce qui casserait en premier</h2>
+    </div>
+    <div class="prose" style="margin-bottom:28px;">
+      <p>Cinq points concrets, tous constatés cette semaine en corrigeant des bugs réels sur l'environnement de préproduction — pas des hypothèses.</p>
+    </div>
+
+    <div class="findings">
+      <div class="finding">
+        <div class="mark">01</div>
+        <div>
+          <h4>Le stockage est un disque, pas un service</h4>
+          <p>Les photos et images de dommages vivent sur le disque local du serveur <span class="path">backendSendra</span>. Le back-office web (autre domaine, autre serveur) doit y accéder par-dessus une frontière réseau — c'est exactement ce qui vient de casser en préproduction (image bloquée par la politique CORS du navigateur). Ça ne se résout pas en ajoutant des serveurs&nbsp;: sans stockage partagé, chaque nouvelle instance a ses propres fichiers, invisibles des autres.</p>
+        </div>
+      </div>
+      <div class="finding">
+        <div class="mark">02</div>
+        <div>
+          <h4>Pas de file d'attente réelle</h4>
+          <p><span class="path">QUEUE_CONNECTION=sync</span> — chaque envoi d'e-mail (approbation, mot de passe temporaire) bloque la requête HTTP qui l'a déclenché. Contourné cette semaine avec <span class="path">dispatch()-&gt;afterResponse()</span>, un palliatif qui tient tant qu'un seul serveur applicatif existe. Dès qu'il y en a deux, ce mécanisme ne suffit plus.</p>
+        </div>
+      </div>
+      <div class="finding">
+        <div class="mark">03</div>
+        <div>
+          <h4>Deux monolithes, une logique métier dupliquée</h4>
+          <p><span class="path">backendSendra</span> (API mobile) et <span class="path">sendraApp</span> (back-office) réimplémentent chacun le même parcours signalement → véhicule → infraction → dommages → approbation, avec leurs propres modèles Eloquent sur la même base. Chaque correctif métier doit être porté deux fois — déjà vrai aujourd'hui, ça s'aggrave avec plus de villes et plus de règles locales.</p>
+        </div>
+      </div>
+      <div class="finding">
+        <div class="mark">04</div>
+        <div>
+          <h4>Déploiement manuel, coordonné à la main</h4>
+          <p>Mettre le code en préproduction, cette semaine, a voulu dire&nbsp;: se connecter en SSH, lancer <span class="path">git pull</span>, vérifier <span class="path">git status</span> pour ne rien écraser, vider les caches à la main. Aucune étape automatisée, aucun test qui bloque un déploiement cassé avant qu'il n'arrive en ligne.</p>
+        </div>
+      </div>
+      <div class="finding">
+        <div class="mark">05</div>
+        <div>
+          <h4>Le traitement d'image tourne dans la requête</h4>
+          <p>Le redimensionnement des photos (ajouté cette semaine pour limiter le poids des réponses) s'exécute de façon synchrone, pendant que l'utilisateur attend sa réponse HTTP. Correct pour le volume actuel — deviendrait un point de contention si le nombre de signalements par minute augmentait significativement.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="current">
+    <div class="section-head">
+      <span class="section-num">02</span>
+      <h2>Architecture actuelle</h2>
+    </div>
+    <div class="diagram-frame">
+      <div class="cap">État constaté — préproduction</div>
+      <pre class="mermaid">
+flowchart TD
+    M["App mobile Flutter"]
+    W["Navigateur — back-office"]
+    API["backendSendra — API JWT<br/>Laravel monolithe"]
+    BO["sendraApp — back-office<br/>Laravel monolithe, session Sanctum"]
+    DB[("MySQL — instance unique<br/>partagée par les deux apps")]
+    FS[("Disque local backendSendra<br/>storage/dommages, storage/photo")]
+    SMTP["Brevo — SMTP"]
+
+    M --> API
+    W --> BO
+    API --> DB
+    BO --> DB
+    API --> FS
+    BO -.->|"référence cross-origin ⚠"| FS
+    API -.->|"Mail::send synchrone ⚠"| SMTP
+    BO -.->|"git pull manuel en SSH ⚠"| BO
+      </pre>
+    </div>
+  </section>
+
+  <section id="verdicts">
+    <div class="section-head">
+      <span class="section-num">03</span>
+      <h2>Sur microservices, Django/FastAPI, PostgreSQL, OpenSearch</h2>
+    </div>
+    <div class="prose" style="margin-bottom:24px;">
+      <p>Aucun des points ci-dessus n'est un plafond de langage ou de framework. Voici, proposition par proposition, ce qui tient et ce qui ne tient pas à la lumière de ce qui a réellement été observé.</p>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Proposition</th><th>Verdict</th><th>Pourquoi</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="proposal">Découpage en microservices</td>
+            <td><span class="verdict-pill v-skip">Écarter</span></td>
+            <td class="why">Une équipe restreinte gère aujourd'hui deux applications. Les points de rupture réels (stockage local, pas de file d'attente, déploiement manuel) ne disparaissent pas en multipliant les services — ils se reproduisent à chaque service, avec en plus un réseau interne à sécuriser et surveiller.</td>
+          </tr>
+          <tr>
+            <td class="proposal">Réécriture Django, FastAPI, ou hybride</td>
+            <td><span class="verdict-pill v-skip">Écarter</span></td>
+            <td class="why">Rien de constaté cette semaine n'est dû à PHP ou Laravel — les cinq points ci-dessus se retrouveraient à l'identique dans n'importe quel framework. Une réécriture porte tout le risque (des mois sans nouvelle fonctionnalité, un système métier à reproduire à l'identique) pour aucun des bénéfices recherchés.</td>
+          </tr>
+          <tr>
+            <td class="proposal">PostgreSQL + extensions (PostGIS…)</td>
+            <td><span class="verdict-pill v-defer">Reporter</span></td>
+            <td class="why">Légitime uniquement si la cartographie devient un vrai besoin géospatial — recherche par rayon, clustering de points denses. C'est une question fonctionnelle à trancher d'abord, pas une raison de migrer la base existante par anticipation.</td>
+          </tr>
+          <tr>
+            <td class="proposal">OpenSearch</td>
+            <td><span class="verdict-pill v-skip">Écarter pour l'instant</span></td>
+            <td class="why">Aucun besoin de recherche plein texte complexe identifié. Un index MySQL bien posé couvre largement le volume actuel — le correctif <span class="path">whereDate</span> non-sargable appliqué cette semaine en est un exemple concret et suffisant.</td>
+          </tr>
+          <tr>
+            <td class="proposal">Stockage objet (S3-compatible) + CDN</td>
+            <td><span class="verdict-pill v-adopt">Faire maintenant</span></td>
+            <td class="why">Cause directe du bug CORS de cette semaine. Un bucket partagé, référencé par une seule URL de CDN, élimine le problème à la racine — et devient indispensable dès qu'un deuxième serveur applicatif entre en jeu.</td>
+          </tr>
+          <tr>
+            <td class="proposal">File d'attente (Redis + worker dédié)</td>
+            <td><span class="verdict-pill v-adopt">Faire maintenant</span></td>
+            <td class="why">Le palliatif <span class="path">afterResponse()</span> posé cette semaine fonctionne à un seul serveur. La vraie solution — un worker persistant — est peu coûteuse à mettre en place et retire un vrai risque de lenteur perçue.</td>
+          </tr>
+          <tr>
+            <td class="proposal">CI/CD (build, tests, déploiement)</td>
+            <td><span class="verdict-pill v-adopt">Faire maintenant</span></td>
+            <td class="why">Le risque opérationnel le plus concret constaté cette semaine : un déploiement cassé n'est aujourd'hui détecté qu'après coup, à la main. C'est indépendant du volume — vrai dès maintenant, pas seulement à l'échelle.</td>
+          </tr>
+          <tr>
+            <td class="proposal">Réplique de lecture MySQL</td>
+            <td><span class="verdict-pill v-defer">Reporter</span></td>
+            <td class="why">Utile si le volume de lecture (tableaux de bord, cartographie multi-villes) devient un goulot mesuré. Rien observé cette semaine ne l'indique encore — à instrumenter avant d'investir dedans.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="target">
+    <div class="section-head">
+      <span class="section-num">04</span>
+      <h2>Architecture cible — même stack, bases posées</h2>
+    </div>
+    <div class="prose" style="margin-bottom:24px;">
+      <p>Toujours deux applications Laravel, toujours MySQL — mais le stockage, l'envoi asynchrone et le déploiement cessent de dépendre d'un seul serveur.</p>
+    </div>
+    <div class="diagram-frame">
+      <div class="cap">Cible à dimension réelle</div>
+      <pre class="mermaid">
+flowchart TD
+    M["App mobile Flutter"]
+    W["Navigateur — back-office"]
+    API["backendSendra — API JWT"]
+    BO["sendraApp — back-office"]
+    DB[("MySQL — primaire")]
+    DBR[("Réplique lecture<br/>si volume mesuré")]
+    Q["Worker de file d'attente<br/>Redis"]
+    OBJ[("Stockage objet + CDN<br/>partagé par les deux apps")]
+    SMTP["Brevo — SMTP"]
+    CI["CI/CD — tests puis déploiement"]
+
+    M --> API
+    W --> BO
+    API --> DB
+    BO --> DB
+    DB -.-> DBR
+    API --> Q
+    Q --> SMTP
+    API --> OBJ
+    BO --> OBJ
+    CI ==> API
+    CI ==> BO
+      </pre>
+    </div>
+  </section>
+
+  <section id="roadmap">
+    <div class="section-head">
+      <span class="section-num">05</span>
+      <h2>Feuille de route, dans l'ordre</h2>
+    </div>
+    <div class="roadmap">
+      <div class="phase">
+        <div class="phase-label">Phase 1<span class="trigger">Justifié dès maintenant, indépendamment du volume</span></div>
+        <div>
+          <h3>Corriger ce qui est déjà cassé</h3>
+          <ul>
+            <li><b>Stockage objet + CDN</b> pour les photos et images de dommages, partagé par les deux apps — supprime le bug CORS à la racine.</li>
+            <li><b>Worker de file d'attente</b> (Redis) pour les e-mails et traitements différables — retire le palliatif <span class="path">afterResponse()</span>.</li>
+            <li><b>Pipeline CI/CD minimal</b> — tests automatiques avant tout déploiement, déploiement scripté plutôt qu'un <span class="path">git pull</span> manuel.</li>
+          </ul>
+        </div>
+      </div>
+      <div class="phase">
+        <div class="phase-label">Phase 2<span class="trigger">Déclenché par une croissance mesurée — nombre de villes, de signalements/jour</span></div>
+        <div>
+          <h3>Absorber le volume réel</h3>
+          <ul>
+            <li><b>Instrumentation</b> (temps de réponse, requêtes lentes) avant tout investissement — mesurer plutôt que supposer où ça tire.</li>
+            <li><b>Réplique de lecture MySQL</b> si les tableaux de bord/la cartographie ralentissent réellement.</li>
+            <li><b>Traitement d'image en tâche asynchrone</b> plutôt que dans la requête, une fois le worker de file d'attente en place.</li>
+          </ul>
+        </div>
+      </div>
+      <div class="phase">
+        <div class="phase-label">Phase 3<span class="trigger">Seulement si un besoin fonctionnel précis apparaît</span></div>
+        <div>
+          <h3>Réévaluer, pas anticiper</h3>
+          <ul>
+            <li><b>PostGIS</b> si la cartographie exige des requêtes géospatiales que MySQL ne couvre plus.</li>
+            <li><b>Extraction d'un service</b> (jamais tous) — uniquement si une équipe dédiée doit faire évoluer une partie du système à un rythme différent du reste.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer class="closing">
+    <p>Le risque, aujourd'hui, n'est pas que Laravel ne tienne pas la charge — c'est qu'un fichier vive sur un seul disque, qu'un e-mail bloque une requête, et qu'un déploiement se joue à la main. Ce sont des heures de travail, pas des mois, et ils tiennent la route bien au-delà de la taille actuelle de Sendra.</p>
+  </footer>
+
+</div>

@@ -1,0 +1,601 @@
+<title>Sendra, service par service</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+  :root {
+    --ground: #F2F3EE; --surface: #FFFFFF; --surface-alt: #E7EDE7;
+    --ink: #1B2420; --ink-soft: #4B564F; --ink-faint: #7C877E;
+    --accent: #1F6F4A; --accent-strong: #164F35; --accent-soft: #DCE9E1;
+    --line: #D7DAD1;
+    --warn: #B5471B; --warn-soft: #F3E4DB;
+    --defer: #8A6B1E; --defer-soft: #F1E6C9;
+    --good: #1F6F4A; --good-soft: #DCE9E1;
+    --blue: #2A5F8F; --blue-soft: #E2EBF3;
+    --shadow: 0 1px 2px rgba(27,36,32,.06), 0 8px 24px rgba(27,36,32,.05);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #11150F; --surface: #171C15; --surface-alt: #1F2A20;
+      --ink: #EAEFE7; --ink-soft: #A6B3A5; --ink-faint: #78877A;
+      --accent: #58CC98; --accent-strong: #86E0B7; --accent-soft: #1E3327;
+      --line: #2A342A;
+      --warn: #E38657; --warn-soft: #3A2A1E;
+      --defer: #D8BE64; --defer-soft: #362C16;
+      --good: #58CC98; --good-soft: #1E3327;
+      --blue: #7FB2E0; --blue-soft: #1C2C3A;
+      --shadow: 0 1px 2px rgba(0,0,0,.35), 0 8px 24px rgba(0,0,0,.35);
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground: #11150F; --surface: #171C15; --surface-alt: #1F2A20;
+    --ink: #EAEFE7; --ink-soft: #A6B3A5; --ink-faint: #78877A;
+    --accent: #58CC98; --accent-strong: #86E0B7; --accent-soft: #1E3327;
+    --line: #2A342A;
+    --warn: #E38657; --warn-soft: #3A2A1E;
+    --defer: #D8BE64; --defer-soft: #362C16;
+    --good: #58CC98; --good-soft: #1E3327;
+    --blue: #7FB2E0; --blue-soft: #1C2C3A;
+    --shadow: 0 1px 2px rgba(0,0,0,.35), 0 8px 24px rgba(0,0,0,.35);
+  }
+  * { box-sizing: border-box; }
+  body { background: var(--ground); color: var(--ink); font-family: "IBM Plex Sans", system-ui, sans-serif; font-size: 17px; line-height: 1.65; -webkit-font-smoothing: antialiased; }
+  ::selection { background: var(--accent-soft); color: var(--accent-strong); }
+  a { color: var(--accent-strong); }
+  .page { max-width: 1140px; margin: 0 auto; padding: 56px 28px 120px; }
+  .prose { max-width: 720px; }
+  header.hero { display: flex; flex-direction: column; gap: 18px; padding-bottom: 44px; border-bottom: 1px solid var(--line); margin-bottom: 48px; }
+  .eyebrow { font-family: "IBM Plex Mono", monospace; font-size: 12.5px; letter-spacing: .09em; text-transform: uppercase; color: var(--accent-strong); display: flex; align-items: center; gap: 10px; }
+  .eyebrow .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); flex: none; }
+  h1 { font-family: "Fraunces", Georgia, serif; font-optical-sizing: auto; font-weight: 600; font-size: clamp(34px, 5vw, 50px); line-height: 1.08; margin: 0; text-wrap: balance; letter-spacing: -0.01em; }
+  .dek { max-width: 660px; color: var(--ink-soft); font-size: 18px; line-height: 1.6; text-wrap: pretty; }
+  .verdict-strip { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 6px; }
+  .decision-banner { display: flex; flex-direction: column; gap: 6px; background: var(--accent-soft); border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--line)); border-radius: 12px; padding: 16px 20px; margin-top: 8px; max-width: 660px; }
+  .decision-banner-tag { font-family: "IBM Plex Mono", monospace; font-size: 11.5px; text-transform: uppercase; letter-spacing: .07em; color: var(--accent-strong); font-weight: 600; }
+  .decision-banner p { margin: 0; font-size: 14.5px; color: var(--ink); }
+  .chip { display: inline-flex; align-items: center; gap: 7px; font-family: "IBM Plex Mono", monospace; font-size: 12.5px; font-weight: 500; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); color: var(--ink-soft); }
+  .chip b { color: var(--ink); font-weight: 600; }
+  section { margin-bottom: 68px; }
+  .section-head { display: flex; align-items: baseline; gap: 14px; margin-bottom: 22px; }
+  .section-num { font-family: "IBM Plex Mono", monospace; font-size: 13px; color: var(--ink-faint); flex: none; }
+  h2 { font-family: "Fraunces", Georgia, serif; font-weight: 600; font-size: 27px; margin: 0; text-wrap: balance; }
+  h3 { font-family: "Fraunces", Georgia, serif; font-weight: 600; font-size: 19px; margin: 0 0 10px; }
+  p { margin: 0 0 16px; }
+  .prose p:last-child { margin-bottom: 0; }
+  code, .mono { font-family: "IBM Plex Mono", monospace; font-size: .92em; }
+  .path { display: inline-block; font-family: "IBM Plex Mono", monospace; font-size: 13.5px; background: var(--surface-alt); color: var(--accent-strong); padding: 2px 7px; border-radius: 5px; }
+  .kw { font-family: "IBM Plex Mono", monospace; font-size: .93em; color: var(--blue); background: var(--blue-soft); padding: 1px 6px; border-radius: 4px; }
+
+  .diagram-frame { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 28px; box-shadow: var(--shadow); overflow-x: auto; margin-bottom: 14px; }
+  .diagram-frame .cap { font-family: "IBM Plex Mono", monospace; font-size: 12px; color: var(--ink-faint); text-transform: uppercase; letter-spacing: .07em; margin-bottom: 14px; }
+  pre.mermaid { margin: 0; min-width: 560px; }
+  .diagram-note { font-size: 14px; color: var(--ink-soft); max-width: 720px; margin: 0 0 40px; }
+
+  .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow); margin-bottom: 14px; }
+  table { width: 100%; border-collapse: collapse; background: var(--surface); min-width: 900px; }
+  thead th { text-align: left; font-family: "IBM Plex Mono", monospace; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-faint); font-weight: 500; padding: 13px 16px; border-bottom: 1px solid var(--line); }
+  thead th.colA { color: var(--warn); } thead th.colB { color: var(--blue); } thead th.colC { color: var(--good); }
+  tbody td { padding: 14px 16px; border-bottom: 1px solid var(--line); vertical-align: top; font-size: 13.8px; color: var(--ink-soft); }
+  tbody tr:last-child td { border-bottom: none; }
+  td.crit { font-weight: 600; color: var(--ink); width: 17%; font-size: 14px; }
+  tbody tr:hover td { background: var(--surface-alt); }
+
+  .verdict-pill { display: inline-flex; align-items: center; font-family: "IBM Plex Mono", monospace; font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 6px; white-space: nowrap; margin-top: 4px; }
+  .v-adopt { background: var(--good-soft); color: var(--good); }
+  .v-defer { background: var(--defer-soft); color: var(--defer); }
+  .v-skip  { background: var(--warn-soft); color: var(--warn); }
+
+  .scenario-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 44px; }
+  .scenario-card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 22px; box-shadow: var(--shadow); display: flex; flex-direction: column; gap: 12px; }
+  .scenario-card .tag { font-family: "IBM Plex Mono", monospace; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; }
+  .scenario-card.a .tag { color: var(--warn); } .scenario-card.b .tag { color: var(--blue); } .scenario-card.c .tag { color: var(--good); }
+  .scenario-card h3 { font-size: 18px; margin: 0; }
+  .scenario-card ul { margin: 0; padding-left: 18px; font-size: 13.6px; color: var(--ink-soft); display: grid; gap: 5px; }
+  .scenario-card .verdict-pill { align-self: flex-start; }
+
+  .roadmap { display: grid; gap: 0; border: 1px solid var(--line); border-radius: 14px; overflow: hidden; box-shadow: var(--shadow); background: var(--surface); }
+  .phase { display: grid; grid-template-columns: 150px 1fr; gap: 22px; padding: 24px; }
+  .phase + .phase { border-top: 1px solid var(--line); }
+  .phase-label { font-family: "IBM Plex Mono", monospace; font-size: 12px; color: var(--ink-faint); text-transform: uppercase; letter-spacing: .06em; padding-top: 3px; }
+  .phase-label .trigger { display: block; margin-top: 8px; color: var(--ink-faint); font-size: 11px; line-height: 1.5; text-transform: none; letter-spacing: normal; }
+  .phase h3 { margin-bottom: 10px; }
+  .phase ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 9px; }
+  .phase li { display: grid; grid-template-columns: 16px 1fr; gap: 10px; font-size: 14.5px; color: var(--ink-soft); }
+  .phase li::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); margin-top: 8px; }
+  .phase li b { color: var(--ink); font-weight: 600; }
+
+  footer.closing { margin-top: 72px; padding-top: 28px; border-top: 1px solid var(--line); color: var(--ink-soft); font-size: 15px; }
+  footer.closing p { max-width: 660px; }
+
+  @media (max-width: 800px) { .scenario-grid { grid-template-columns: 1fr; } }
+  @media (max-width: 640px) { .page { padding: 36px 18px 90px; } .phase { grid-template-columns: 1fr; } .phase-label { padding-top: 0; } }
+</style>
+
+<div class="page">
+
+  <header class="hero">
+    <div class="eyebrow"><span class="dot"></span>Étude comparative — architecture de la nouvelle plateforme</div>
+    <h1>Sendra, service par service</h1>
+    <p class="dek">Microservices FastAPI totalement découplés, monolithe Django modulaire, ou hybride — comparés point par point sur les quinze critères demandés, avec les douze schémas d'architecture.</p>
+    <div class="verdict-strip">
+      <span class="chip">A — Microservices FastAPI</span>
+      <span class="chip">B — Django modulaire</span>
+      <span class="chip">C — Hybride séquencé — <b>recommandé</b></span>
+    </div>
+    <div class="decision-banner">
+      <div class="decision-banner-tag">Décision du chef de projet</div>
+      <p>Le <b>Scénario A</b> est retenu et maintenu tel quel. Ce document reste en l'état comme référence des compromis assumés en choisissant le découplage complet — et se complète ci-dessous de la couche DevOps, du service de journalisation des activités, et des services additionnels à considérer.</p>
+    </div>
+  </header>
+
+  <section id="scenarios">
+    <div class="section-head"><span class="section-num">00</span><h2>Les trois scénarios, en bref</h2></div>
+    <div class="scenario-grid">
+      <div class="scenario-card a">
+        <span class="tag">Scénario A</span>
+        <h3>Microservices FastAPI</h3>
+        <ul>
+          <li>1 service = 1 responsabilité = 1 base PostgreSQL</li>
+          <li>Keycloak pour l'identité, Kafka pour les événements</li>
+          <li>MinIO, Novu, OpenSearch, Redis en composants partagés</li>
+          <li>Déploiement indépendant par service</li>
+        </ul>
+        <span class="verdict-pill v-skip">Prématuré à ce stade</span>
+      </div>
+      <div class="scenario-card b">
+        <span class="tag">Scénario B</span>
+        <h3>Django modulaire</h3>
+        <ul>
+          <li>Un monolithe, des domaines cloisonnés en apps Django</li>
+          <li>Une base PostgreSQL, Redis + Celery pour l'asynchrone</li>
+          <li>MinIO centralisé, OpenSearch en option</li>
+          <li>Un seul cycle de déploiement</li>
+        </ul>
+        <span class="verdict-pill v-defer">Solide, mais tout ou rien</span>
+      </div>
+      <div class="scenario-card c">
+        <span class="tag">Scénario C</span>
+        <h3>Hybride séquencé</h3>
+        <ul>
+          <li>Cœur métier en monolithe modulaire Django</li>
+          <li>Notifications et Recherche extraits dès le départ</li>
+          <li>Kafka et Keycloak activés seulement si un besoin réel apparaît</li>
+          <li>Chaque domaine reste extractible plus tard, sans réécriture</li>
+        </ul>
+        <span class="verdict-pill v-adopt">Recommandé</span>
+      </div>
+    </div>
+  </section>
+
+  <section id="d1">
+    <div class="section-head"><span class="section-num">01</span><h2>Architecture microservices FastAPI (Scénario A)</h2></div>
+    <div class="diagram-frame">
+      <div class="cap">Découpage par domaine, une base PostgreSQL par service</div>
+      <pre class="mermaid">
+flowchart TD
+    C["Clients Web / Mobile"] --> GW["API Gateway / Load Balancer"]
+    GW --> KC["Keycloak — identité, OAuth2/OIDC, JWT"]
+    GW --> S1["User Service"]
+    GW --> S2["Annonce Service"]
+    GW --> S3["Pièces Service"]
+    GW --> S4["Enlèvement Service"]
+    GW --> S5["Notification Service"]
+    GW --> S6["Search Service"]
+    GW --> S7["Paiements Service"]
+    GW --> S8["Admin / Statistiques Service"]
+
+    S1 --> D1[("PostgreSQL — Users")]
+    S2 --> D2[("PostgreSQL — Annonces")]
+    S3 --> D3[("PostgreSQL — Pièces")]
+    S4 --> D4[("PostgreSQL — Enlèvements")]
+    S5 --> D5[("PostgreSQL — Notifications")]
+    S6 --> OS[("OpenSearch")]
+    S7 --> D7[("PostgreSQL — Paiements")]
+
+    S1 -.-> KAF["Kafka — bus d'événements"]
+    S2 -.-> KAF
+    S3 -.-> KAF
+    S4 -.-> KAF
+    S7 -.-> KAF
+    KAF -.-> S5
+
+    S2 --> MIO[("MinIO — stockage objet")]
+    S3 --> MIO
+    S1 --> MIO
+
+    S5 --> NOVU["Novu — templates, orchestration"]
+    NOVU --> CH["Email / SMS / Push / WhatsApp"]
+
+    S1 -.-> RC["Redis — cache, verrous"]
+    S2 -.-> RC
+      </pre>
+    </div>
+    <p class="diagram-note">Huit services, huit bases, plus Keycloak/Kafka/MinIO/Novu/OpenSearch/Redis en composants d'infrastructure. Onze systèmes distincts à faire fonctionner ensemble, chacun avec sa propre disponibilité à garantir.</p>
+  </section>
+
+  <section id="d2">
+    <div class="section-head"><span class="section-num">02</span><h2>Flux d'authentification — Keycloak</h2></div>
+    <div class="diagram-frame">
+      <div class="cap">OAuth2 / OpenID Connect, vérification JWT côté service</div>
+      <pre class="mermaid">
+sequenceDiagram
+    participant Client
+    participant Gateway as API Gateway
+    participant KC as Keycloak
+    participant Svc as Microservice (ex. Annonce)
+
+    Client->>KC: identifiants (OIDC)
+    KC-->>Client: access_token (JWT) + refresh_token
+    Client->>Gateway: requête + Authorization Bearer
+    Gateway->>Svc: transfère la requête + token
+    Svc->>Svc: vérifie la signature JWT (clé publique Keycloak, en local)
+    Svc-->>Client: réponse
+
+    Note over Client,KC: refresh_token utilisé pour renouveler<br/>l'access_token sans ressaisir le mot de passe
+      </pre>
+    </div>
+    <p class="diagram-note">Chaque service vérifie le JWT localement (clé publique Keycloak mise en cache) — pas d'appel réseau à Keycloak à chaque requête. C'est le point fort réel de Keycloak : une fois en place, il ne devient pas un goulot d'étranglement.</p>
+  </section>
+
+  <section id="d3">
+    <div class="section-head"><span class="section-num">03</span><h2>Événements Kafka et service Notifications</h2></div>
+    <div class="diagram-frame">
+      <div class="cap">Service Annonce → Kafka → Service Notifications → Novu → canaux</div>
+      <pre class="mermaid">
+sequenceDiagram
+    participant Annonce as Service Annonce
+    participant Kafka
+    participant Notif as Service Notifications
+    participant Novu
+    participant Canal as Email / SMS / Push / WhatsApp
+
+    Annonce->>Annonce: annonce publiée en base
+    Annonce->>Kafka: produit ANNONCE_PUBLIEE
+    Kafka-->>Notif: consomme ANNONCE_PUBLIEE
+    Notif->>Novu: déclenche le scénario associé
+    Novu->>Canal: envoie sur le(s) canal(aux) configuré(s)
+    Note over Annonce,Kafka: le Service Annonce ne connaît pas<br/>l'existence des Notifications — découplage réel
+      </pre>
+    </div>
+    <p class="diagram-note">Le découplage fonctionne réellement ici : le service producteur (Annonce) ignore tout du destinataire de l'événement. C'est la partie la plus solide du Scénario A — et elle ne nécessite pas d'adopter le reste de l'architecture pour en profiter (voir Scénario C).</p>
+  </section>
+
+  <section id="d4">
+    <div class="section-head"><span class="section-num">04</span><h2>MinIO — stockage objet centralisé</h2></div>
+    <div class="diagram-frame">
+      <div class="cap">Chaque service écrit l'objet, ne garde que la référence en base</div>
+      <pre class="mermaid">
+flowchart LR
+    S2["Service Annonce"] -->|"upload photo"| MIO[("MinIO — bucket unique<br/>compatible S3")]
+    S3["Service Pièces"] -->|"upload photo/document"| MIO
+    S1["Service Users"] -->|"upload avatar"| MIO
+    MIO -->|"URL / clé objet"| D1[("PostgreSQL — Annonces<br/>stocke seulement la référence")]
+    D1 -.-> S2
+      </pre>
+    </div>
+    <p class="diagram-note">C'est le composant le plus consensuel de toute l'étude — utile dans <b>les trois</b> scénarios, y compris le monolithe Django. C'est aussi la correction directe du bug CORS constaté cette semaine sur Sendra actuel (fichiers sur le disque d'un seul serveur, référencés depuis un autre domaine).</p>
+  </section>
+
+  <section id="d5">
+    <div class="section-head"><span class="section-num">05</span><h2>OpenSearch — synchronisation</h2></div>
+    <div class="diagram-frame">
+      <div class="cap">Index en lecture seule, jamais source de vérité</div>
+      <pre class="mermaid">
+flowchart TD
+    D2[("PostgreSQL — Annonces<br/>source de vérité")] -->|"événement ANNONCE_PUBLIEE / MODIFIEE"| IDX["Indexeur"]
+    IDX --> OS[("OpenSearch")]
+    Client["Client — recherche"] -->|"requête plein texte, filtres"| OS
+    OS -.->|"jamais d'écriture directe"| D2
+      </pre>
+    </div>
+    <p class="diagram-note">OpenSearch reste une projection dérivée, jamais la base d'écriture — un décalage de quelques secondes entre publication et recherche est acceptable, ce qui simplifie beaucoup la synchronisation par rapport à une cohérence stricte.</p>
+  </section>
+
+  <section id="d6">
+    <div class="section-head"><span class="section-num">06</span><h2>Architecture Django alternative (Scénario B)</h2></div>
+    <div class="diagram-frame">
+      <div class="cap">Un monolithe, des domaines cloisonnés en apps internes</div>
+      <pre class="mermaid">
+flowchart TD
+    C["Clients Web / Mobile"] --> LB["Load Balancer"]
+    LB --> DJ1["Instance Django #1"]
+    LB --> DJ2["Instance Django #2"]
+
+    subgraph APP["Une seule application — apps Django cloisonnées"]
+      A1["users"]
+      A2["annonces"]
+      A3["pieces"]
+      A4["enlevements"]
+      A5["administration"]
+      A6["statistiques"]
+      A7["notifications (interne)"]
+    end
+
+    DJ1 --> APP
+    DJ2 --> APP
+    APP --> DB[("PostgreSQL — une base,<br/>schémas/permissions par domaine")]
+    APP --> MIO[("MinIO")]
+    APP --> CEL["Celery"]
+    CEL --> RC[("Redis — broker + cache")]
+    APP -.->|"si besoin réel"| OS[("OpenSearch")]
+      </pre>
+    </div>
+    <p class="diagram-note">Les domaines restent cloisonnés au niveau du code (apps Django, permissions, éventuellement des schémas PostgreSQL séparés) sans payer le coût réseau et transactionnel de la séparation physique en services.</p>
+  </section>
+
+  <section id="d7">
+    <div class="section-head"><span class="section-num">07</span><h2>Architecture hybride recommandée (Scénario C)</h2></div>
+    <div class="diagram-frame">
+      <div class="cap">Le cœur métier reste uni ; seuls les domaines qui en tirent un vrai bénéfice sont extraits</div>
+      <pre class="mermaid">
+flowchart TD
+    C["Clients Web / Mobile"] --> LB["Load Balancer"]
+    LB --> DJ["Django modulaire<br/>users · annonces · pieces · enlevements · paiements · admin · stats"]
+    DJ --> DB[("PostgreSQL — cœur métier")]
+    DJ --> MIO[("MinIO — stockage centralisé")]
+    DJ --> RC[("Redis — cache + Celery")]
+
+    DJ -->|"événement (Redis Streams,<br/>upgradable vers Kafka)"| BUS["Bus d'événements léger"]
+    BUS --> NS["Service Notifications<br/>— extrait dès le départ"]
+    NS --> DN[("PostgreSQL — Notifications")]
+    NS --> NOVU["Novu"]
+    NOVU --> CH["Email / SMS / Push / WhatsApp"]
+
+    DB -->|"sync événementielle"| SS["Service Recherche<br/>— extrait dès le départ"]
+    SS --> OS[("OpenSearch")]
+
+    DJ -.->|"évolution future,<br/>si SSO multi-partenaires requis"| KC["Keycloak"]
+    BUS -.->|"évolution future,<br/>si volume/durabilité l'exige"| KAF["Kafka"]
+      </pre>
+    </div>
+    <p class="diagram-note">Notifications et Recherche sont extraits <em>dès maintenant</em> — ce sont des projections dérivées, jamais source de vérité transactionnelle, donc sûres à découpler sans complexité de transaction distribuée. Paiements/Pièces/Enlèvements restent ensemble tant qu'ils partagent une même transaction métier (publier une pièce → l'enlever → la payer est un seul parcours cohérent).</p>
+  </section>
+
+  <section id="d8">
+    <div class="section-head"><span class="section-num">08</span><h2>Déploiement scalable, DevOps et observabilité</h2></div>
+    <div class="diagram-frame">
+      <div class="cap">Valable pour les trois scénarios — c'est la partie qui manque aujourd'hui à Sendra, quel que soit le choix retenu</div>
+      <pre class="mermaid">
+flowchart LR
+    DEV["Dépôt Git"] --> CI["CI — tests automatiques"]
+    CI -->|"échec"| BLOCK["Déploiement bloqué"]
+    CI -->|"succès"| BUILD["Build — image conteneur"]
+    BUILD --> REG["Registre d'images"]
+    REG --> CD["CD — déploiement"]
+    CD --> APP1["Instance applicative #1"]
+    CD --> APP2["Instance applicative #2"]
+    APP1 --> MON["Métriques + logs + traces"]
+    APP2 --> MON
+    MON --> DASH["Tableaux de bord + alertes"]
+      </pre>
+    </div>
+    <p class="diagram-note">Le pipeline CI/CD et l'observabilité (métriques, logs, traces) sont indépendants du choix d'architecture — et c'est précisément ce qui manque à Sendra aujourd'hui (déploiement manuel en SSH, aucun test bloquant). À construire en premier, quel que soit le scénario retenu ensuite.</p>
+  </section>
+
+  <section id="comparison">
+    <div class="section-head"><span class="section-num">09</span><h2>Comparatif, critère par critère</h2></div>
+    <div class="prose" style="margin-bottom:24px;">
+      <p>Les quinze critères demandés, pour les trois scénarios.</p>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Critère</th><th class="colA">A — Microservices FastAPI</th><th class="colB">B — Django modulaire</th><th class="colC">C — Hybride séquencé</th></tr>
+        </thead>
+        <tbody>
+          <tr><td class="crit">Scalabilité</td><td>Chaque service scale indépendamment — un vrai atout, mais seulement utile si un service précis a un profil de charge très différent des autres.</td><td>Scale horizontalement en dupliquant l'instance complète — suffisant jusqu'à plusieurs centaines de milliers d'utilisateurs si la base et le cache sont bien dimensionnés.</td><td>Le cœur scale comme B ; Notifications et Recherche scalent indépendamment là où ça compte réellement (pics d'envoi, requêtes de recherche).</td></tr>
+          <tr><td class="crit">Performances</td><td>FastAPI/async excellent en I/O pur, mais la latence inter-services (réseau, sérialisation) s'ajoute à chaque appel traversant plusieurs domaines.</td><td>Aucune latence réseau interne — un appel de fonction Python, pas une requête HTTP entre services.</td><td>Latence interne nulle pour l'essentiel des parcours (un seul processus) ; latence réseau seulement sur les deux flux qui en bénéficient (événements, recherche).</td></tr>
+          <tr><td class="crit">Complexité de développement</td><td>Élevée — schémas d'événements à versionner, contrats d'API entre services, tests d'intégration multi-services.</td><td>Modérée — la discipline de cloisonnement (apps, permissions) doit être tenue manuellement, sans barrière physique.</td><td>Modérée à élevée sur les deux services extraits, faible ailleurs — la complexité est concentrée là où elle rapporte.</td></tr>
+          <tr><td class="crit">Coût d'infrastructure</td><td>Élevé — onze composants à provisionner et faire tourner en continu (Keycloak, Kafka, N PostgreSQL, MinIO, Novu, OpenSearch, Redis, gateway).</td><td>Faible — une application, une base, Redis, MinIO.</td><td>Modéré — l'application, une base, Redis, MinIO, plus deux petits services et leur base.</td></tr>
+          <tr><td class="crit">Maintenance</td><td>Lourde — dépendances de version à synchroniser sur onze systèmes, chacun avec son cycle de mises à jour de sécurité.</td><td>Légère — un seul système à maintenir à jour.</td><td>Légère à modérée — trois systèmes au lieu d'un, largement gérable.</td></tr>
+          <tr><td class="crit">Disponibilité</td><td>Une panne d'un composant partagé (Kafka, Keycloak) peut dégrader plusieurs services à la fois — nouveau point de fragilité central, à haute disponibilité lui-même.</td><td>Panne = l'application entière est affectée, mais un seul système à surveiller et faire redémarrer.</td><td>La panne d'un service extrait (ex. Notifications) ne bloque pas le cœur métier — le comportement recherché par la demande initiale, obtenu sans le coût complet du Scénario A.</td></tr>
+          <tr><td class="crit">Tolérance aux pannes</td><td>Bonne en théorie (isolation des pannes) — à condition d'implémenter correctement retries, circuit breakers et compensation, ce qui est un chantier en soi.</td><td>Limitée par nature — un bug grave affecte tout, mais le périmètre à tester avant déploiement est unique et bien connu.</td><td>Bonne sur les flux extraits (les événements Kafka/Redis Streams sont rejouables), suffisante ailleurs vu la taille du périmètre restant.</td></tr>
+          <tr><td class="crit">Sécurité</td><td>Surface d'attaque étendue (onze systèmes exposés), mais Keycloak centralise correctement l'authentification si bien opéré.</td><td>Surface réduite, auth mature (Django + DRF/OAuth toolkit) — moins de composants à durcir.</td><td>Surface légèrement supérieure à B, largement inférieure à A.</td></tr>
+          <tr><td class="crit">Facilité de déploiement</td><td>Difficile sans orchestrateur mature (Kubernetes ou équivalent) et pipelines par service — irréaliste sans équipe DevOps dédiée.</td><td>Simple — un pipeline, un artefact à déployer.</td><td>Simple pour le cœur, un peu plus pour les deux services — trois pipelines, gérable avec la même équipe.</td></tr>
+          <tr><td class="crit">Observabilité</td><td>Nécessite du tracing distribué (ex. OpenTelemetry) dès le premier jour pour rester compréhensible — sinon, diagnostiquer un incident devient très coûteux en temps.</td><td>Logs et métriques d'un seul processus — largement plus simple à observer et déboguer.</td><td>Presque aussi simple que B ; tracing utile seulement sur les deux flux traversant une frontière de service.</td></tr>
+          <tr><td class="crit">Transactions entre services</td><td>Pas de transaction ACID inter-services — nécessite le patron Saga (transactions compensatoires), complexe à concevoir et à tester correctement.</td><td>Transactions ACID natives — publier une pièce, l'enlever, la payer reste une seule transaction cohérente.</td><td>ACID pour tout le cœur métier (paiements, pièces, enlèvements) ; les deux services extraits n'ont jamais besoin de transaction stricte avec le cœur (notifications et recherche tolèrent l'incohérence temporaire).</td></tr>
+          <tr><td class="crit">Cohérence des données</td><td>Cohérence à terme (eventual consistency) partout par défaut — à documenter et assumer pour chaque parcours utilisateur.</td><td>Cohérence forte partout, par défaut.</td><td>Cohérence forte sur le cœur métier ; cohérence à terme seulement là où elle est déjà acceptable (un e-mail envoyé quelques secondes après l'action, un résultat de recherche légèrement en retard).</td></tr>
+          <tr><td class="crit">Gestion des événements</td><td>Native et bien pensée (Kafka) — mais un bus d'événements à cette échelle est un système à part entière à administrer.</td><td>Signaux Django ou tâches Celery — suffisant pour un monolithe, pas conçu pour du inter-services à grande échelle.</td><td>Redis Streams (ou équivalent léger) au démarrage, migration vers Kafka seulement si le volume d'événements le justifie réellement — pas de coût payé par anticipation.</td></tr>
+          <tr><td class="crit">Difficulté DevOps</td><td>Très élevée — orchestration multi-services, multi-bases, multi-pipelines ; suppose une équipe SRE/Platform dédiée.</td><td>Faible — proche de ce qui existe déjà sur Sendra aujourd'hui (deux applications Laravel).</td><td>Modérée — un peu plus que B, très loin de A.</td></tr>
+          <tr><td class="crit">Capacité 100k+ utilisateurs</td><td>Oui, mais la capacité vient de la bonne conception (cache, index, files d'attente), pas du découpage en services en soi — un monolithe mal indexé ne va pas plus loin en microservices.</td><td>Oui — de nombreuses plateformes de cette taille et bien au-delà tournent sur un monolithe correctement mis à l'échelle (cache, réplique de lecture, CDN).</td><td>Oui, avec en plus une marge sur les deux points historiquement les plus sensibles à la charge (notifications en masse, recherche).</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="roadmap">
+    <div class="section-head"><span class="section-num">10</span><h2>Feuille de route — Scénario C</h2></div>
+    <div class="roadmap">
+      <div class="phase">
+        <div class="phase-label">Phase 1<span class="trigger">Socle, avant tout développement métier</span></div>
+        <div>
+          <h3>Le monolithe modulaire</h3>
+          <ul>
+            <li><b>Django</b> avec une app par domaine (users, annonces, pieces, enlevements, paiements, admin, statistiques) — frontières nettes dès la conception, même dans une seule base.</li>
+            <li><b>MinIO</b> pour tous les fichiers, dès le premier commit — aucun fichier ne touche jamais le disque local d'un serveur applicatif.</li>
+            <li><b>Redis + Celery</b> pour l'asynchrone (envois, traitements différables) et le cache.</li>
+            <li><b>CI/CD + observabilité de base</b> (le chantier identifié comme prioritaire sur Sendra actuel, valable ici aussi).</li>
+          </ul>
+        </div>
+      </div>
+      <div class="phase">
+        <div class="phase-label">Phase 2<span class="trigger">Dès que le cœur métier est stable</span></div>
+        <div>
+          <h3>Les deux extractions sûres</h3>
+          <ul>
+            <li><b>Service Notifications</b>, consommant les événements via Redis Streams — Novu derrière, pour les templates et canaux.</li>
+            <li><b>Service Recherche</b>, OpenSearch alimenté par synchronisation événementielle depuis le cœur — jamais source de vérité.</li>
+          </ul>
+        </div>
+      </div>
+      <div class="phase">
+        <div class="phase-label">Phase 3<span class="trigger">Seulement si un signal concret l'exige</span></div>
+        <div>
+          <h3>Évolutions conditionnelles</h3>
+          <ul>
+            <li><b>Kafka</b> si le volume ou la durabilité des événements dépasse ce que Redis Streams tient confortablement.</li>
+            <li><b>Keycloak</b> si un vrai besoin de SSO multi-partenaires apparaît (plusieurs apps distinctes, clients externes) — pas par défaut pour un seul écosystème que vous contrôlez.</li>
+            <li><b>Extraction d'un troisième domaine</b> — uniquement si une équipe dédiée doit le faire évoluer à un rythme propre, jamais par principe.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="devops">
+    <div class="section-head"><span class="section-num">11</span><h2>La couche DevOps du Scénario A</h2></div>
+    <div class="prose" style="margin-bottom:24px;">
+      <p>Onze systèmes distincts ne tiennent que si l'infrastructure qui les relie est traitée comme un produit à part entière, pas comme un à-côté. Cinq briques, dans l'ordre où les monter.</p>
+    </div>
+    <div class="diagram-frame">
+      <div class="cap">Plateforme complète — orchestration, réseau inter-services, secrets, observabilité</div>
+      <pre class="mermaid">
+flowchart TD
+    DEV["Dépôt Git — un dépôt par service"] --> CI["CI par service<br/>tests + build image"]
+    CI --> REG["Registre d'images<br/>(Harbor / GHCR / ECR)"]
+    REG --> CD["CD — GitOps (Argo CD / Flux)"]
+
+    subgraph K8S["Cluster Kubernetes"]
+      GW["API Gateway<br/>(Kong / Traefik)"]
+      MESH["Service mesh<br/>(Istio / Linkerd) — mTLS, retries, circuit breakers"]
+      SVC["Pods des microservices"]
+      GW --> MESH --> SVC
+    end
+
+    CD --> K8S
+    VAULT["Secrets — Vault / KMS"] --> SVC
+    IAC["Infra as Code — Terraform"] --> K8S
+    IAC --> VAULT
+
+    SVC --> OTEL["OpenTelemetry — collecteur"]
+    OTEL --> TRACE["Traces — Tempo / Jaeger"]
+    OTEL --> METRICS["Métriques — Prometheus"]
+    OTEL --> LOGS["Logs applicatifs — Loki"]
+    METRICS --> GRAF["Grafana — tableaux de bord"]
+    TRACE --> GRAF
+    LOGS --> GRAF
+    GRAF --> ALERT["Alerting — astreinte"]
+      </pre>
+    </div>
+    <div class="scenario-grid" style="grid-template-columns: repeat(2, 1fr);">
+      <div class="scenario-card b">
+        <span class="tag">Orchestration</span>
+        <h3>Kubernetes + GitOps</h3>
+        <ul>
+          <li>Un cluster, un namespace par service — isolation des ressources et des droits.</li>
+          <li>Argo CD ou Flux : l'état désiré vit dans Git, le cluster converge automatiquement — aucun déploiement manuel en SSH.</li>
+          <li>Autoscaling horizontal par service, selon sa charge propre — le vrai bénéfice du découpage complet.</li>
+        </ul>
+      </div>
+      <div class="scenario-card b">
+        <span class="tag">Réseau inter-services</span>
+        <h3>Gateway + service mesh</h3>
+        <ul>
+          <li>Un point d'entrée unique (API Gateway) pour les clients — routage, rate limiting, authentification des requêtes entrantes.</li>
+          <li>Un mesh (Istio/Linkerd) pour le trafic <em>entre</em> services — mTLS automatique, retries, circuit breakers sans code applicatif dédié.</li>
+        </ul>
+      </div>
+      <div class="scenario-card b">
+        <span class="tag">Secrets &amp; configuration</span>
+        <h3>Vault + Terraform</h3>
+        <ul>
+          <li>Aucun mot de passe/clé en clair dans un <span class="path">.env</span> commité — les onze systèmes du Scénario A en génèrent beaucoup.</li>
+          <li>L'infrastructure elle-même versionnée (Terraform) — un cluster reconstructible, pas un serveur bricolé à la main.</li>
+        </ul>
+      </div>
+      <div class="scenario-card b">
+        <span class="tag">Observabilité</span>
+        <h3>Métriques, traces, logs</h3>
+        <ul>
+          <li>OpenTelemetry dès le premier service — instrumenter après coup, sur onze services, coûte largement plus cher.</li>
+          <li>Le tracing distribué est ici la brique <em>non négociable</em> : sans lui, un parcours qui traverse quatre services devient impossible à déboguer.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section id="activity-log">
+    <div class="section-head"><span class="section-num">12</span><h2>Service de journalisation des activités</h2></div>
+    <div class="prose" style="margin-bottom:24px;">
+      <p>Distinct des logs techniques (erreurs, performance, déjà couverts par Loki) — celui-ci répond à une question métier : <em>qui a fait quoi, sur quoi, et quand</em>, à travers tous les services. Indispensable dès qu'il y a des paiements, des approbations, et plusieurs rôles avec des droits différents.</p>
+    </div>
+    <div class="diagram-frame">
+      <div class="cap">Chaque service publie ses activités ; un seul service en garde la trace</div>
+      <pre class="mermaid">
+flowchart TD
+    S1["User Service"] -->|"activité : connexion, modification profil"| TOPIC["Kafka — topic activity.log<br/>événement unique, même schéma pour tous"]
+    S2["Annonce Service"] -->|"activité : création, modification, suppression"| TOPIC
+    S4["Enlèvement Service"] -->|"activité : programmé, terminé"| TOPIC
+    S7["Paiements Service"] -->|"activité : paiement confirmé, remboursement"| TOPIC
+    ADM["Admin Service"] -->|"activité : approbation, rejet, promotion de compte"| TOPIC
+
+    TOPIC --> ACT["Service Journalisation<br/>consomme, horodate, chaîne les entrées"]
+    ACT --> STORE[("Stockage append-only<br/>OpenSearch ou ClickHouse")]
+    ACT --> ADMR["API de consultation<br/>— réservée à Admin / conformité"]
+      </pre>
+    </div>
+    <div class="prose">
+      <p><b>Ce qui rend ce service fiable, pas juste présent</b> : un schéma d'événement unique et obligatoire pour tous les producteurs (<span class="mono">acteur</span>, <span class="mono">action</span>, <span class="mono">ressource</span>, <span class="mono">horodatage</span>, <span class="mono">contexte</span>) ; un stockage <em>append-only</em> où aucune entrée n'est jamais modifiée ni supprimée, seulement ajoutée ; et un accès en lecture strictement réservé (Admin, conformité) — la journalisation elle-même ne doit pas devenir une nouvelle fuite de données personnelles.</p>
+    </div>
+  </section>
+
+  <section id="other-services">
+    <div class="section-head"><span class="section-num">13</span><h2>Autres services à considérer</h2></div>
+    <div class="prose" style="margin-bottom:24px;">
+      <p>Au-delà de la liste initiale, six services que le métier de Sendra (déconstruction, pièces recyclées, enlèvements) justifie concrètement — pas des services génériques de catalogue e-commerce.</p>
+    </div>
+    <div class="scenario-grid" style="grid-template-columns: repeat(3, 1fr);">
+      <div class="scenario-card c">
+        <span class="tag">Traçabilité</span>
+        <h3>Service Inventaire &amp; Provenance</h3>
+        <ul>
+          <li>Relie chaque pièce au véhicule dont elle est issue (VIN, date d'extraction, état).</li>
+          <li>Distinct du Service Pièces (qui gère l'annonce commerciale) — celui-ci gère le stock physique et sa traçabilité réglementaire.</li>
+        </ul>
+      </div>
+      <div class="scenario-card c">
+        <span class="tag">Confiance</span>
+        <h3>Service Avis &amp; Réputation</h3>
+        <ul>
+          <li>Notes et avis entre acheteurs et vendeurs de pièces — signal de confiance central dans une place de marché.</li>
+          <li>Alimente le Service Recherche (classement) sans lui appartenir.</li>
+        </ul>
+      </div>
+      <div class="scenario-card c">
+        <span class="tag">Anti-fraude</span>
+        <h3>Service Risque &amp; Fraude</h3>
+        <ul>
+          <li>Consomme les événements Paiements + Annonces pour détecter annonces suspectes, comptes à comportement anormal, contestations de paiement.</li>
+          <li>Un candidat naturel au machine learning une fois assez de volume/historique accumulé dans le Service Journalisation.</li>
+        </ul>
+      </div>
+      <div class="scenario-card c">
+        <span class="tag">Géospatial</span>
+        <h3>Service Cartographie</h3>
+        <ul>
+          <li>Formalise ce qui existe déjà dans Sendra actuel — recherche de pièces/enlèvements à proximité, PostGIS dédié.</li>
+          <li>Se nourrit des mêmes événements que le Service Recherche, avec un moteur spécialisé plutôt que OpenSearch seul.</li>
+        </ul>
+      </div>
+      <div class="scenario-card c">
+        <span class="tag">Documents</span>
+        <h3>Service Génération de documents</h3>
+        <ul>
+          <li>PV de constatation, factures, attestations d'enlèvement — rendu PDF isolé, avec sa propre charge (pics lors des exports en masse).</li>
+          <li>Lit les données via API, n'écrit jamais dans les bases des autres services.</li>
+        </ul>
+      </div>
+      <div class="scenario-card c">
+        <span class="tag">Configuration</span>
+        <h3>Service de configuration &amp; feature flags</h3>
+        <ul>
+          <li>Active/désactive une fonctionnalité par service sans redéploiement — précieux dès onze services à faire évoluer indépendamment.</li>
+          <li>Permet aussi les déploiements progressifs (canary) service par service.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <footer class="closing">
+    <p>Le principe <span class="kw">1 service = 1 base = 1 déploiement</span> est juste en théorie et coûteux en pratique tant qu'aucun domaine n'a démontré un besoin réel d'indépendance — c'est la réserve que porte ce document. La décision de le maintenir malgré tout change ce qui suit : la couche DevOps (§11) et la journalisation des activités (§12) ne sont plus optionnelles, elles deviennent la condition pour que le Scénario A reste opérable.</p>
+  </footer>
+
+</div>

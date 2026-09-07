@@ -1,0 +1,112 @@
+# Rapport d'activité — Plateforme Sendra
+
+**Période :** semaine du 31 août au 4 septembre 2026
+**Périmètre de cette section :** travail réalisé par l'assistant IA (Claude) sur `backendSendra`, `sendraApp`, `sendra_mobile`, l'infrastructure serveur et l'étude de refonte. Chaque contributeur ajoute sa propre partie ci-dessous — cette section ne couvre que ce qui a été fait de ce côté.
+
+---
+
+## 1. Correctifs et fonctionnalités livrés sur préprod
+
+Tout ce qui suit a été développé, testé et déployé sur **preprod.sendra.sn / backpreprod.sendra.sn** uniquement — rien n'a touché la vraie production (`app.sendra.sn` / `backend.sendra.sn`).
+
+- **Mot de passe oublié / changement de mot de passe** — flux complet API + web + mobile (`/reset-password`, `/change-password`, écrans OTP et reset côté `sendra_mobile`, bouton admin côté back-office). Testé de bout en bout.
+- **Image de dommages invisible côté back-office** — l'URL pointait vers le stockage de `sendraApp` au lieu de celui de `backendSendra` (l'app mobile et le back-office sont deux applications distinctes). Corrigé pour utiliser `config('services.backend.storage_url')`, comme pour la photo du signalement.
+- **Comportement du canvas de dommages** — choisir Voiture/Moto effaçait par erreur les dommages déjà constatés par l'agent. Retiré ce comportement, ajouté deux boutons explicites : *Nouveau gabarit vierge* et *Revenir à la version de l'agent*.
+- **CORS sur le stockage de `backpreprod`** — le canvas de dommages ne pouvait pas charger l'image existante en cross-domain (aucun en-tête `Access-Control-Allow-Origin`). Corrigé au niveau du vhost Apache. *(Configuration serveur, pas du code — à refaire manuellement sur la vraie prod le jour du déploiement.)*
+- **Tableau de bord lent** — `infos()` comptait 4 fois via `count(CarPosition::all()/->get())`, ce qui hydrate toute la table en PHP juste pour compter. Remplacé par `->count()`.
+- **Index manquants** — ajout d'index composites sur `car_positions (is_deleted, etat)` et `(created_at)`, plus un `ORDER BY` explicite sur les listes Signalés/Enlevés/En cours (l'absence de tri donnait un ordre non garanti, en pratique du plus ancien au plus récent).
+- **Traductions françaises manquantes** (`validation.php`, `auth.php`), champ de connexion `type="email"` incompatible avec un numéro de téléphone, rubrique Citoyens dans la gestion des comptes, réinitialisation de mot de passe côté admin, template de mail avec mot de passe codé en dur — correctifs déjà en cours la semaine précédente, finalisés et vérifiés cette semaine.
+- **Redimensionnement des images côté API** (`backendSendra`) — photos de signalement et signatures de dommages plafonnées à 1600px avant écriture disque (JPEG si le build GD le supporte, repli automatique sur PNG sinon — constaté que l'image Docker locale n'a pas libjpeg). Limite de taille ajoutée sur les payloads base64 entrants (aucune limite n'existait avant). `listerSignalements` : requête `whereDate()` non-sargable remplacée par une comparaison directe indexable. `statistiques()` : 4 requêtes `count()` séparées fusionnées en une seule requête groupée. `voirSignalements` : plafond défensif de 200 signalements par réponse.
+- **Notification d'approbation asynchrone** (`DommagesController`) — l'envoi de l'e-mail à l'administration se faisait de façon synchrone dans la requête (temps de connexion SMTP Brevo pouvant dépasser le timeout HTTP de l'app mobile, affichant à tort "Impossible de joindre le serveur" alors que les dommages étaient bien enregistrés). Déplacé en `dispatch()->afterResponse()` : la réponse part immédiatement, l'e-mail juste après, sans bloquer la requête. Logs de succès/entrée ajoutés (la méthode ne loguait auparavant que les échecs, rendant impossible de diagnostiquer un mail parti sans effet visible).
+- **Formulaire Véhicule (mobile + web)** — sélecteur Type de véhicule (Voiture/Moto) en tête d'écran, filtrant uniquement la liste de marques suggérées (non persisté) ; marque en saisie libre + suggestions (Autocomplete mobile, `<datalist>` web) à partir des listes complètes voiture/moto fournies par le métier, au lieu d'un dropdown fermé à 14 marques ; numéro du véhicule reformaté en temps réel au format `AB-0000-KO` (majuscules, tirets automatiques), validé strictement à la soumission côté client et côté serveur ; catégorie `BPP` → `VPP` ; ajout de `SUV` dans les types.
+- **Infraction (mobile + web)** — ajout de "Pluie" comme 3ᵉ option de moment du constat ; le champ `pluie` existait déjà en base mais était systématiquement forcé à `false` des deux côtés, jamais exposé dans l'interface.
+- **Détail du signalement, après approbation (mobile)** — Informations de base / Véhicule / Infraction / Dommages repliés dans un seul bouton dépliable ("Constatation") ; Enlèvement mis en relief visuellement comme prochaine étape (bandeau distinct) au lieu d'être une ligne de menu identique aux autres. Un signalement résolu (`ENLEVE`) réaffiche les 5 items à plat, comme avant approbation.
+
+---
+
+## 2. Étude de refonte — architecture cible
+
+Le chef de projet a transmis `ETUDE_MICROSERVICES.pdf` (comparatif microservices FastAPI / Django modulaire / hybride, Scénario A retenu). Une **contre-étude** a été produite en réaction, publiée en document interactif : *« Sendra à l'échelle »*.
+
+Contenu : réévaluation des trois scénarios à l'échelle réelle de Sendra (85 signalements, 2 monolithes Laravel, 1 développeur, aucun CI/CD), réponse point par point à la proposition détaillée du chef (MinIO, Kafka, Novu, Keycloak, un service par fonctionnalité), recommandation d'un monolithe modulaire avec deux extractions ciblées (Notifications, Recherche), position sur PostgreSQL/PostGIS/pg_trgm et sur OpenSearch, feuille de route en 3 phases, et une section dédiée à la question du chef sur la cible à 14M de citoyens / 200 agents dans le temps (précédents réels de monolithes à cette échelle, ce qui doit réellement évoluer : réplicas, cache, PgBouncer, partitionnement, Kafka si le volume de notifications l'exige).
+
+**Le chef de projet a validé ce document — mise à jour : décision prise depuis.** Il maintient le **Scénario A (microservices FastAPI)** tel quel, avec deux ajouts explicitement demandés : une couche DevOps complète et un service de journalisation de toutes les activités. `ETUDE_MICROSERVICES.html`/`.pdf` a été complété en conséquence :
+
+- **§11 — Couche DevOps** : Kubernetes + GitOps (Argo CD/Flux, fin du déploiement manuel en SSH), API Gateway + service mesh (mTLS, retries, circuit breakers automatiques entre les services), Vault + Terraform (secrets, infra versionnée), OpenTelemetry dès le premier service (métriques, traces, logs).
+- **§12 — Service de journalisation des activités** : chaque service publie ses actions sur un topic Kafka unique (`activity.log`, schéma d'événement identique pour tous les producteurs) ; stockage append-only (OpenSearch/ClickHouse) ; accès en lecture réservé Admin/conformité.
+- **§13 — Six services complémentaires proposés**, justifiés par le métier réel de Sendra (pas génériques) : Inventaire & Provenance (traçabilité pièce ↔ véhicule d'origine), Avis & Réputation, Risque & Fraude, Cartographie (formalise l'existant), Génération de documents, Configuration & feature flags.
+
+Le document reste sinon inchangé (comparatif §1-10 conservé tel quel comme référence des compromis assumés). L'implémentation concrète (squelette des microservices, CI/CD, etc.) reste en pause — aucune date de démarrage communiquée à ce jour.
+
+---
+
+## 3. Intégration du travail de l'équipe
+
+Fusion sans perte des commits poussés en parallèle par l'équipe/un autre outil, notamment un correctif de performance côté mobile (`dommages_screen.dart` — affichage immédiat du gabarit local au lieu d'attendre deux appels réseau séquentiels). Historique complet préservé, aucun conflit de fond.
+
+---
+
+## 4. Découvertes faites cette semaine
+
+- **40 signalements sur 85** en vraie base de production référencent une photo dont le fichier n'existe **nulle part sur le disque**, même en vraie prod — une anomalie de données préexistante, indépendante de tout travail de cette semaine. Signalée, pas encore traitée (voir §5).
+- **La vraie production n'a aucun mécanisme de récupération de mot de passe** — ni API (`/reset-password`), ni bouton admin. Un citoyen qui oublie son mot de passe n'a aujourd'hui aucun moyen de le récupérer. C'est un des correctifs de cette semaine (§1), encore uniquement sur préprod.
+- Une alerte relayée sur une "erreur d'envoi de mail récente" s'est révélée être une trace du **21 août**, antérieure au correctif Brevo déjà validé — pas un problème actuel, juste une vieille ligne de log à ignorer.
+- Un processus `ripgrep` de VS Code consommait ~390 % CPU en continu (workspace ouvert sur `/` au lieu d'un dossier de projet) — tué, mais se relance tant que la racine du workspace n'est pas changée côté client.
+
+---
+
+## 5. Opérations ponctuelles
+
+- Création d'un compte citoyen en **vraie production** (à la demande, pour permettre une connexion réelle à l'app Play Store faute de mécanisme de reset disponible) — connexion vérifiée par un appel API réel.
+
+---
+
+## Ce qui n'a *pas* été fait / reste en attente
+
+1. **Rien de ce qui précède n'a été déployé sur la vraie production** — tout reste sur préprod, en attente de la décision du chef sur `DECISION_DEPLOIEMENT.md`.
+2. Les 40 photos orphelines en vraie prod (§4) — identifiées, pas d'action de remédiation entreprise.
+3. Restriction des comptes MySQL (`sendra`/`aboubacry` en `localhost`) + rotation du mot de passe partagé — toujours en pause (reporté depuis la semaine précédente).
+4. Exposition d'Adminer (`private.sendra.sn`) — toujours pas traitée.
+5. Bug préexistant `[banner]` dans `layouts/app.blade.php` — délibérément laissé de côté, hors périmètre.
+6. Findings élevés/moyens/dette technique de `AUDIT_SENDRA.md` non encore réaudités systématiquement pour confirmer leur clôture.
+7. Implémentation de la refonte (CI/CD, squelette des microservices Scénario A) — **en pause**, aucune date de démarrage communiquée.
+8. **Nouveau formulaire Véhicule (type/marque/plaque/pluie/regroupement des boutons)** — codé et testé (suite de tests + `flutter analyze`) mais **jamais vérifié visuellement** sur un vrai appareil mobile ni dans un vrai navigateur : aucun accès à un écran physique pour confirmer le rendu de l'Autocomplete, du sélecteur voiture/moto ou du bouton "Constatation" dépliable.
+9. Cette section n'a jamais eu d'accès direct SSH/serveur — tout ce qui touche `preprod.sendra.sn`/`backpreprod.sendra.sn` en direct (config Apache, requêtes SQL manuelles, logs serveur) a été vérifié via relais avec l'agent qui dispose de cet accès, jamais exécuté ici de première main.
+
+---
+
+## 6. Contribution complémentaire — Codex
+
+Cette section distingue les interventions réalisées avec Codex des travaux déjà décrits ci-dessus. Les changements sur les serveurs ont été exécutés par l'agent disposant de l'accès SSH ; Codex a travaillé sur le dépôt local, produit les commits et préparé les procédures de déploiement contrôlé.
+
+### Réalisé
+
+- **Refonte intérieure de l'application mobile** — harmonisation visuelle des écrans de connexion et du parcours principal, ajout d'un écran de démarrage applicatif compatible avec les contraintes Android 12, amélioration de la responsivité et prise en compte des zones sûres Android afin que les boutons ne soient plus masqués par la barre de navigation du téléphone.
+- **Navigation et conservation de l'état** — correction du rechargement systématique des signalements lors des passages entre Participations et Cartographie ; amélioration du retour depuis la Politique de confidentialité afin de revenir dans l'application sans devoir la quitter complètement.
+- **Accueil / Participations** — ajout d'un bloc de filtrage par statut (Tous, Signalés, En cours, Résolus), avec compteurs et présentation harmonisée ; correction de l'affichage des images et des débordements observés sur les cartes de signalement.
+- **Parcours de constatation mobile** — enchaînement direct Informations de base → Véhicule → Infraction → Dommages, sans retour obligatoire à la page de détail entre chaque étape ; harmonisation des icônes sur la page Détail du signalement.
+- **Formulaire Véhicule mobile** — titre simplifié en « Véhicule », palette visuelle de couleurs, pictogrammes pour l'état général et le pays étranger, suppression des valeurs textuelles `null`, puis alignement des choix Marque/Type/Catégorie avec les référentiels du back-office.
+- **Formulaire Infraction mobile** — remplacement de l'ancien couple Nuit/Pluie par une présentation visuelle Jour/Nuit dans la première itération : carte Jour bleu ciel avec soleil et carte Nuit noire avec lune et étoiles. La prise en charge de Pluie a ensuite été réintroduite dans l'évolution consolidée décrite en §1.
+- **Dommages mobile** — choix préalable Voiture/Moto, affichage d'un seul gabarit à la fois, possibilité de faire défiler la page sans dessiner involontairement, réduction de la zone occupée par Effacer/Envoyer pour approbation et respect de la barre système du téléphone.
+- **Workflow d'approbation** — adaptation du parcours agent : les dommages constituent la dernière saisie avant l'attente d'approbation ; l'enlèvement n'est accessible qu'après validation administrative. Le formulaire d'enlèvement conserve le motif, la date, le lieu et le nom du responsable.
+- **Back-office `preprod.sendra.sn`** — harmonisation des onglets Véhicule, Infraction et Dommages : palette de couleurs, pictogrammes, cartes Jour/Nuit et choix Voiture/Moto. Ajout d'un versionnement de l'URL de `signature.js` pour empêcher le navigateur de conserver l'ancien canvas en cache.
+- **Cohérence mobile/API/back-office** — analyse des champs transmis pour le signalement n°85. Les informations de base, le numéro, le modèle et l'infraction arrivaient bien ; les anciennes valeurs libres (`ford`, `4×4`, `suv`) ne correspondaient pas aux options exactes du back-office et donnaient l'impression de données absentes. Les listes mobiles ont été alignées et l'oubli de persistance de `pays_etranger` dans `VehiculeController` a été corrigé.
+- **Déploiement préproduction accompagné** — commit `143933f` préparé et poussé, liste des trois fichiers web à transférer fournie, procédure de sauvegarde/validation/rollback rédigée. Le déploiement a été réalisé par relais SSH avec sauvegarde dans `/root/backups/preprod_web_20260902_110516/`, validation PHP/JavaScript et contrôle HTTP.
+- **Livrable Android** — plusieurs APK de test ont été générés au fil des corrections. Le dernier APK produit après l'alignement des listes Véhicule a été compilé avec succès en mode debug.
+
+### Non réalisé / limites de cette contribution
+
+1. **Aucune intervention directe en SSH par Codex** : l'accès serveur et les opérations sur `/var/www` ont été réalisés par l'agent serveur, sur la base des procédures fournies.
+2. **Aucun déploiement en vraie production** (`app.sendra.sn` / `backend.sendra.sn`) et aucune modification directe des données de production.
+3. **Pas de migration de base de données** dans cette contribution ; les correctifs utilisent le schéma existant.
+4. **Pas de correction du composant Blade `<x-banner>` manquant**. L'erreur de `php artisan view:cache` a été confirmée comme préexistante et indépendante des fichiers déployés ; la préproduction continue à compiler les vues à la volée.
+5. **Pas de vérification directe de la base préproduction depuis Codex**. La cohérence des données a été évaluée à partir du code, des réponses API, des captures du back-office et des contrôles relayés par l'agent serveur.
+6. **Pas de publication Play Store ni de signature release de l'APK** : le livrable fourni est un APK debug destiné aux tests.
+7. **Pas de validation exhaustive multi-appareils/multi-navigateurs**. Les captures réelles reçues ont permis de corriger les principaux problèmes de rendu, mais aucune matrice complète de tests Android, iOS et navigateurs desktop/mobile n'a été exécutée.
+8. **Pas de refonte structurelle du back-office complet** : seuls les écrans et composants directement liés au parcours de signalement/constatation ont été harmonisés.
+
+---
+
+## Section équipe (à compléter)
+
+*Emplacement réservé aux autres contributions qui ne figurent ni dans la section principale ni dans la contribution Codex ci-dessus.*
