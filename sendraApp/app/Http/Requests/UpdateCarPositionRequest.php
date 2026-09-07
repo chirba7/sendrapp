@@ -22,10 +22,11 @@ class UpdateCarPositionRequest extends FormRequest
     public function rules(): array
     {
         return [
-            // Format imposé : deux lettres, quatre chiffres, deux lettres
+            // Format imposé : deux lettres, un nombre variable de chiffres
+            // (0, 00, 000, 0000... selon la plaque), deux lettres
             // (ex. AB-0000-KO) — insensible à la casse, normalisé en
             // majuscules avant enregistrement (voir vehicule()).
-            'numero_vehicule' => ['required', 'string', 'regex:/^[A-Za-z]{2}-\d{4}-[A-Za-z]{2}$/'],
+            'numero_vehicule' => ['required', 'string', 'regex:/^[A-Za-z]{2}-\d+-[A-Za-z]{2}$/'],
             'marque' => 'required|string|max:255',
             'type' => 'required|string|max:255',
             'model' => 'required|string|max:255',
@@ -46,7 +47,7 @@ class UpdateCarPositionRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'numero_vehicule.regex' => 'Le numéro du véhicule doit être au format AB-0000-KO.',
+            'numero_vehicule.regex' => 'Le numéro du véhicule doit être au format AB-0000-KO (le nombre de chiffres peut varier).',
         ];
     }
 }

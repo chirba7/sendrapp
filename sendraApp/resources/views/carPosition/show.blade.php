@@ -267,7 +267,7 @@
                                                             <h6 class="text-sm text-medium">Numéro du véhicule</h6>
                                                         </td>
                                                         <td>
-                                                            <input type="text" class="form-control @error('numero_vehicule') is-invalid @enderror" id="numero_vehicule" placeholder="AB-0000-KO" pattern="[A-Z]{2}-\d{4}-[A-Z]{2}" value="{{ old('numero_vehicule', strtoupper($carPosition->numero_vehicule)) }}" name="numero_vehicule" style="text-transform:uppercase">
+                                                            <input type="text" class="form-control @error('numero_vehicule') is-invalid @enderror" id="numero_vehicule" placeholder="AB-0000-KO" pattern="[A-Z]{2}-\d+-[A-Z]{2}" value="{{ old('numero_vehicule', strtoupper($carPosition->numero_vehicule)) }}" name="numero_vehicule" style="text-transform:uppercase">
                                                             @error('numero_vehicule')
                                                             <div class="invalid-feedback">{{ $message }}</div>
                                                             @enderror
@@ -530,19 +530,35 @@
                                             });
                                             fillBrandOptions('voiture');
 
-                                            // Plaque : AA-0000-AA — majuscules et tirets automatiques,
-                                            // pas de blocage strict de caractère par caractère (l'utilisateur
-                                            // peut coller/corriger librement), la validation stricte se fait
-                                            // à la soumission (attribut pattern + contrôle serveur).
+                                            // Plaque : AA-<chiffres>-AA — majuscules et tirets automatiques.
+                                            // Le nombre de chiffres n'est pas fixe (0, 00, 000, 0000...) : le
+                                            // segment chiffres se termine dès qu'une lettre suit, pas après un
+                                            // nombre de caractères donné. Validation stricte à la soumission
+                                            // (attribut pattern + contrôle serveur).
                                             if (numeroInput) {
                                                 numeroInput.addEventListener('input', () => {
                                                     const raw = numeroInput.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
-                                                    const letters1 = raw.slice(0, 2).replace(/[^A-Z]/g, '');
-                                                    const digits = raw.slice(2, 6).replace(/[^0-9]/g, '');
-                                                    const letters2 = raw.slice(6, 8).replace(/[^A-Z]/g, '');
-                                                    let formatted = letters1;
-                                                    if (letters1.length === 2) formatted += '-' + digits;
-                                                    if (digits.length === 4) formatted += '-' + letters2;
+                                                    const letters1 = [];
+                                                    const digits = [];
+                                                    const letters2 = [];
+                                                    for (const char of raw) {
+                                                        const isLetter = /[A-Z]/.test(char);
+                                                        const isDigit = /[0-9]/.test(char);
+                                                        if (isLetter) {
+                                                            if (digits.length === 0 && letters1.length < 2) {
+                                                                letters1.push(char);
+                                                            } else if (digits.length > 0 && letters2.length < 2) {
+                                                                letters2.push(char);
+                                                            }
+                                                        } else if (isDigit) {
+                                                            if (letters1.length === 2 && letters2.length === 0) {
+                                                                digits.push(char);
+                                                            }
+                                                        }
+                                                    }
+                                                    let formatted = letters1.join('');
+                                                    if (letters1.length === 2) formatted += '-' + digits.join('');
+                                                    if (letters2.length > 0) formatted += '-' + letters2.join('');
                                                     numeroInput.value = formatted;
                                                 });
                                             }

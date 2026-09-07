@@ -10,9 +10,11 @@ import '../../utils/sendra_theme.dart';
 import '../../utils/vehicle_brands.dart';
 import 'infraction_screen.dart';
 
-/// Formate la saisie de plaque en AA-0000-AA au fil de la frappe
-/// (majuscules forcées, tirets automatiques). La validation stricte du
-/// format se fait séparément, à la soumission.
+/// Formate la saisie de plaque en AA-<chiffres>-AA au fil de la frappe
+/// (majuscules forcées, tirets automatiques). Le nombre de chiffres n'est
+/// pas fixe (0, 00, 000, 0000... selon la plaque) : le segment se termine
+/// dès qu'une lettre suit, pas après un nombre de caractères donné. La
+/// validation stricte du format se fait séparément, à la soumission.
 class _PlateInputFormatter extends TextInputFormatter {
   @override
   TextEditingValue formatEditUpdate(
@@ -25,14 +27,18 @@ class _PlateInputFormatter extends TextInputFormatter {
     final letters2 = <String>[];
 
     for (final char in raw.split('')) {
-      if (RegExp(r'[A-Z]').hasMatch(char)) {
+      final isLetter = RegExp(r'[A-Z]').hasMatch(char);
+      final isDigit = RegExp(r'[0-9]').hasMatch(char);
+      if (isLetter) {
         if (digits.isEmpty && letters1.length < 2) {
           letters1.add(char);
-        } else if (digits.length == 4 && letters2.length < 2) {
+        } else if (digits.isNotEmpty && letters2.length < 2) {
           letters2.add(char);
         }
-      } else if (RegExp(r'[0-9]').hasMatch(char)) {
-        if (letters1.length == 2 && digits.length < 4) {
+      } else if (isDigit) {
+        // Le segment chiffres se termine dès que letters2 a commencé —
+        // pas de longueur fixe imposée avant ça.
+        if (letters1.length == 2 && letters2.isEmpty) {
           digits.add(char);
         }
       }
@@ -43,7 +49,7 @@ class _PlateInputFormatter extends TextInputFormatter {
       buffer.write('-');
       buffer.write(digits.join());
     }
-    if (digits.length == 4) {
+    if (letters2.isNotEmpty) {
       buffer.write('-');
       buffer.write(letters2.join());
     }
@@ -219,12 +225,14 @@ class _VehicleFormState extends State<VehicleForm> {
       return;
     }
 
-    if (!RegExp(r'^[A-Z]{2}-\d{4}-[A-Z]{2}$')
+    // Le nombre de chiffres varie selon la plaque (0, 00, 000, 0000...) —
+    // seul le nombre de lettres de part et d'autre est fixe.
+    if (!RegExp(r'^[A-Z]{2}-\d+-[A-Z]{2}$')
         .hasMatch(_numeroController.text)) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
-              'Le numéro du véhicule doit être au format AB-0000-KO.'),
+              'Le numéro du véhicule doit être au format AB-0000-KO (le nombre de chiffres peut varier).'),
         ),
       );
       return;
