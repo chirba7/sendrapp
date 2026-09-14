@@ -5,6 +5,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:walletium/routes/routes.dart';
+import 'package:walletium/services/offline_signalement_service.dart';
 import 'firebase_options.dart';
 import 'utils/sendra_theme.dart';
 
@@ -59,6 +60,10 @@ void main() async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+
+  // Renvoie les signalements créés hors ligne dès qu'une connexion est
+  // disponible, et à chaque retour de réseau ensuite.
+  OfflineSignalementService.instance.demarrerSynchroAuto();
 
   runApp(const MyApp(initialRoute: Routes.splashScreen));
 }
