@@ -9,7 +9,6 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:get/get.dart';
-import 'package:http/http.dart' as http;
 import 'package:walletium/controller/deposit_controller.dart';
 import 'package:walletium/routes/routes.dart';
 import 'package:walletium/services/offline_signalement_service.dart';
@@ -136,8 +135,15 @@ class _DepositScreenState extends State<DepositScreen> {
 
     if (source == null) return;
 
-    final pickedFile =
-        await picker.pickImage(source: source, imageQuality: 70);
+    // 1600px suffit (le backend redimensionne à 1600px de toute façon) et
+    // garde les 5 photos en base64 sous le post_max_size (8 Mo) du serveur :
+    // au-delà, PHP vide la requête et le signalement est refusé.
+    final pickedFile = await picker.pickImage(
+      source: source,
+      imageQuality: 70,
+      maxWidth: 1600,
+      maxHeight: 1600,
+    );
     if (pickedFile == null) return;
 
     setState(() {
@@ -195,23 +201,29 @@ class _DepositScreenState extends State<DepositScreen> {
         photos: photos,
       );
 
-      final enLigne = await _offline.estEnLigne();
-      bool envoye = false;
+      final resultat = await _offline.estEnLigne()
+          ? await _offline.envoyer(signalement, token)
+          : ResultatEnvoi.aReessayer();
 
-      if (enLigne) {
-        envoye = await _envoyerDirect(signalement, token);
-      }
-
-      if (!envoye) {
-        // Hors ligne ou échec réseau : on stocke localement, la synchro
-        // automatique s'en chargera au retour de la connexion.
-        await _offline.enfiler(signalement);
-        _message(
-          'Pas de connexion : signalement enregistré. Il sera envoyé '
-          'automatiquement au retour du réseau.',
-        );
-      } else {
-        _message('Votre signalement a été pris en compte !');
+      switch (resultat.statut) {
+        case StatutEnvoi.envoye:
+          _message('Votre signalement a été pris en compte !');
+          break;
+        case StatutEnvoi.rejete:
+          // Refus du serveur (validation) : ce n'est pas un problème de
+          // réseau, un renvoi automatique échouerait pareil. On laisse le
+          // formulaire rempli pour que l'utilisateur corrige.
+          _message('Signalement refusé : ${resultat.message}');
+          return;
+        case StatutEnvoi.aReessayer:
+          // Hors ligne, timeout ou erreur serveur : on stocke localement, la
+          // synchro automatique s'en chargera au retour de la connexion.
+          await _offline.enfiler(signalement);
+          _message(
+            'Envoi impossible pour le moment : signalement enregistré. Il '
+            'sera envoyé automatiquement dès que possible.',
+          );
+          break;
       }
 
       _reinitialiser();
@@ -221,37 +233,6 @@ class _DepositScreenState extends State<DepositScreen> {
       _message('Une erreur s\'est produite : $e');
     } finally {
       if (mounted) setState(() => _isLoading = false);
-    }
-  }
-
-  Future<bool> _envoyerDirect(PendingSignalement s, String token) async {
-    try {
-      final reponse = await http
-          .post(
-            Uri.parse('${Strings.apiURI}faireSignalement'),
-            headers: {
-              'Authorization': 'Bearer $token',
-              'Content-Type': 'application/json',
-              'Accept': 'application/json',
-            },
-            body: jsonEncode({
-              'titre': s.titre,
-              'commune': s.commune,
-              'latitude': s.latitude,
-              'longitude': s.longitude,
-              'uuid': s.uuid,
-              'photos': s.photos.map((p) => p.toJson()).toList(),
-            }),
-          )
-          .timeout(const Duration(seconds: 60));
-
-      if (reponse.statusCode == 200) {
-        final corps = jsonDecode(reponse.body);
-        return corps is Map && (corps['message']?.toString() ?? '').contains('succès');
-      }
-      return false;
-    } catch (_) {
-      return false;
     }
   }
 

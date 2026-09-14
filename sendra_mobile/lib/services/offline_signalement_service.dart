@@ -36,6 +36,22 @@ class PhotoSignalement {
       );
 }
 
+enum StatutEnvoi { envoye, rejete, aReessayer }
+
+/// Issue d'un envoi au backend. `message` n'est renseigné que pour un rejet.
+class ResultatEnvoi {
+  final StatutEnvoi statut;
+  final String? message;
+
+  const ResultatEnvoi._(this.statut, [this.message]);
+
+  factory ResultatEnvoi.envoye() => const ResultatEnvoi._(StatutEnvoi.envoye);
+  factory ResultatEnvoi.rejete(String message) =>
+      ResultatEnvoi._(StatutEnvoi.rejete, message);
+  factory ResultatEnvoi.aReessayer() =>
+      const ResultatEnvoi._(StatutEnvoi.aReessayer);
+}
+
 /// Un signalement complet, tel que stocké localement en attendant l'envoi.
 class PendingSignalement {
   final String uuid;
@@ -156,10 +172,12 @@ class OfflineSignalementService {
   }
 
   /// Envoie un signalement au backend.
-  /// Retourne `true` s'il a été accepté (ou définitivement rejeté, donc à
-  /// retirer de la file) ; `false` s'il faut réessayer plus tard (réseau,
-  /// timeout, erreur serveur 5xx).
-  Future<bool> _envoyer(PendingSignalement s, String token) async {
+  ///
+  /// Distingue trois issues : accepté, rejeté par le serveur (validation —
+  /// un renvoi à l'identique échouerait pareil) et échec à réessayer (réseau,
+  /// timeout, jeton expiré, 5xx). Seul ce dernier cas justifie la file
+  /// hors ligne : un rejet ne doit jamais s'afficher comme « pas de connexion ».
+  Future<ResultatEnvoi> envoyer(PendingSignalement s, String token) async {
     try {
       final reponse = await http
           .post(
@@ -180,29 +198,55 @@ class OfflineSignalementService {
           )
           .timeout(const Duration(seconds: 60));
 
+      final corps = _decoder(reponse.body);
+      final message = corps['message']?.toString() ?? '';
+
       if (reponse.statusCode == 200) {
-        final corps = _decoder(reponse.body);
-        final message = corps['message']?.toString() ?? '';
         // Succès réel du contrat v1.
         if (message.contains('succès')) {
-          return true;
+          return ResultatEnvoi.envoye();
         }
         // 200 mais erreur de validation (failedValidation renvoie 200 avec
-        // status_code 422) : un renvoi à l'identique échouera pareil. On
-        // retire de la file pour ne pas boucler indéfiniment.
-        return corps['status_code'] == 422 || corps['error'] == true;
+        // status_code 422).
+        if (corps['status_code'] == 422 || corps['error'] == true) {
+          return ResultatEnvoi.rejete(_detailValidation(corps));
+        }
+        return ResultatEnvoi.aReessayer();
       }
 
       // 422 réel (image invalide) : rejet définitif, inutile de réessayer.
       if (reponse.statusCode == 422) {
-        return true;
+        return ResultatEnvoi.rejete(message.isNotEmpty ? message : 'Signalement refusé.');
       }
 
       // 401/403 (jeton expiré) ou 5xx : on garde pour une tentative ultérieure.
-      return false;
+      return ResultatEnvoi.aReessayer();
     } catch (_) {
       // Réseau coupé, timeout : on réessaiera.
-      return false;
+      return ResultatEnvoi.aReessayer();
+    }
+  }
+
+  /// Premier message d'erreur de `errorList`, sinon le message générique.
+  String _detailValidation(Map<String, dynamic> corps) {
+    final erreurs = corps['errorList'];
+    if (erreurs is Map && erreurs.isNotEmpty) {
+      final premiere = erreurs.values.first;
+      if (premiere is List && premiere.isNotEmpty) {
+        return premiere.first.toString();
+      }
+    }
+    return corps['message']?.toString() ?? 'Signalement refusé.';
+  }
+
+  /// Écarte un signalement rejeté par le serveur sans le détruire : renommé
+  /// en `.rejete`, il sort de la file (plus de boucle de renvoi) mais reste
+  /// sur le téléphone pour diagnostic.
+  Future<void> _mettreDeCote(String uuid) async {
+    final dir = await _dossier();
+    final fichier = File('${dir.path}/$uuid.json');
+    if (await fichier.exists()) {
+      await fichier.rename('${dir.path}/$uuid.rejete');
     }
   }
 
@@ -231,9 +275,11 @@ class OfflineSignalementService {
       if (token == null || token.isEmpty) return;
 
       for (final signalement in file) {
-        final traite = await _envoyer(signalement, token);
-        if (traite) {
+        final resultat = await envoyer(signalement, token);
+        if (resultat.statut == StatutEnvoi.envoye) {
           await _supprimer(signalement.uuid);
+        } else if (resultat.statut == StatutEnvoi.rejete) {
+          await _mettreDeCote(signalement.uuid);
         } else {
           // Un échec « à réessayer » (réseau/serveur) : inutile d'insister
           // sur les suivants maintenant, on relancera au prochain signal.
