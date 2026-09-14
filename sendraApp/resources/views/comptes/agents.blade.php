@@ -10,6 +10,18 @@
                         <h2 class="text-success">Comptes Agent</h2>
                     </div>
                 </div>
+
+                <div class="col-md-6 d-flex justify-content-md-end mt-3 mt-md-0">
+                    @if ($archives)
+                        <a href="{{ route('agents') }}" class="main-btn light-btn btn-hover">
+                            <i class="lni lni-arrow-left"></i> Comptes actifs
+                        </a>
+                    @else
+                        <a href="{{ route('agents', ['archives' => 1]) }}" class="main-btn light-btn btn-hover">
+                            <i class="lni lni-trash-can"></i> Comptes supprimés
+                        </a>
+                    @endif
+                </div>
             </div>
             <!-- end row -->
         </div>
@@ -23,13 +35,23 @@
         </div>
         @endif
 
+        @if (session('error'))
+        <div class="row alert-box danger-alert">
+            <div class="col-12 alert">
+                <p class="text-medium">
+                    {{ session('error') }}
+                </p>
+            </div>
+        </div>
+        @endif
+
         <!-- End Row -->
         <div class="row">
             <div class="col-lg-12">
                 <div class="card-style mb-30">
                     <div class="title d-flex flex-wrap align-items-center justify-content-between">
                         <div class="left">
-                            <h6 class="text-medium mb-30">Liste des comptes Agent</h6>
+                            <h6 class="text-medium mb-30">{{ $archives ? 'Comptes Agent supprimés' : 'Liste des comptes Agent' }}</h6>
                         </div>
                     </div>
                     <!-- End Title -->
@@ -64,7 +86,7 @@
                                     </th>
                                     <th>
                                         <h6 class="text-sm text-medium text-end">
-                                            Modifier
+                                            Actions
                                         </h6>
                                     </th>
                             <tbody>
@@ -86,11 +108,7 @@
                                         <p class="text-sm">{{$user->role->nomRole}}</p>
                                     </td>
                                     <td>
-                                        <div class="action d-flex justify-content-end">
-                                            <a href="{{route('modifier', [$user->id])}}" class="edit text-success ">
-                                                <i class="lni lni-pencil"></i>
-                                            </a>
-                                        </div>
+                                        @include('comptes.partials.actions', ['user' => $user, 'archives' => $archives])
                                     </td>
                                 </tr>
                                 @endforeach

@@ -41,4 +41,19 @@ class User extends Authenticatable implements JWTSubject
     {
         return [];
     }
+
+    /**
+     * Comptes encore affiliés à SENDRA.
+     *
+     * La colonne `deleted` est posée par le back-office quand un compte est
+     * supprimé. Elle vaut NULL sur tous les comptes historiques : la
+     * condition doit couvrir NULL explicitement, `deleted != 1` les
+     * exclurait aussi.
+     */
+    public function scopeNonArchives($query)
+    {
+        return $query->where(function ($requete) {
+            $requete->whereNull('deleted')->orWhere('deleted', false);
+        });
+    }
 }

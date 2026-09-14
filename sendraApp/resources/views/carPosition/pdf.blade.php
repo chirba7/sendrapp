@@ -228,8 +228,21 @@
                 <td colspan="4">
                     <h6><b>INDIQUEZ LES DOMMAGES PAR DES SYMBOLES : <span style="margin-left: 120px;">RAYURES:</span> <span style="margin-left: 120px;">ENFONCEMENT:</span> </b></h6>
                     <br>
-                    @if ($carPosition->dommage_image)
-                    <img src="{{ public_path('storage/dommages/'.$carPosition->dommage_image) }}" alt="constation image" width="100%" height="200px">
+                    {{-- 11/09/2026 : la signature est lue dans le stockage du backend
+                         (disque `backend`) et intégrée en data URI — DomPDF refuse de
+                         lire un fichier hors de base_path() (option chroot). --}}
+                    @php
+                        $cleDommage = $carPosition->dommage_image ? 'dommages/'.$carPosition->dommage_image : null;
+                        $octetsDommage = $cleDommage && \Illuminate\Support\Facades\Storage::disk('backend')->exists($cleDommage)
+                            ? \Illuminate\Support\Facades\Storage::disk('backend')->get($cleDommage)
+                            : null;
+                        // Type lu dans le contenu : l'extension .png ne dit pas la vérité.
+                        $imageDommage = $octetsDommage
+                            ? 'data:'.(new \finfo(FILEINFO_MIME_TYPE))->buffer($octetsDommage).';base64,'.base64_encode($octetsDommage)
+                            : null;
+                    @endphp
+                    @if ($imageDommage)
+                    <img src="{{ $imageDommage }}" alt="constation image" width="100%" height="200px">
                     @else
                     <img src="{{ public_path('img/constation image.png') }}" alt="constation image" width="100%" height="200px">
                     @endif

@@ -278,8 +278,14 @@ class CarPositionController extends Controller
 
         // Générez un nom de fichier unique
         $filename = uniqid('dommages') . '.png';
-        // Enregistrez l'image dans le stockage Laravel (dans ce cas, public/storage)
-        Storage::disk('public')->put('dommages/' . $filename, $imageBinary);
+        // 11/09/2026 : écrite dans le stockage du backend, là où la fiche et
+        // l'application mobile la lisent (disque `backend`, config/filesystems.php).
+        // Sur le disque `public` de sendraApp, elle n'était visible nulle part.
+        // Écriture vérifiée : une signature non écrite ne doit pas laisser en
+        // base une référence vers un fichier qui n'existe pas.
+        if (! Storage::disk('backend')->put('dommages/' . $filename, $imageBinary)) {
+            return redirect()->back()->withErrors(['signature' => 'La signature n\'a pas pu être enregistrée. Réessayez ou prévenez l\'administrateur.']);
+        }
         $carPosition->dommage_image = $filename;
         $carPosition->update();
 

@@ -32,7 +32,7 @@ use Illuminate\Support\Facades\Route;
 // ci-dessous pour réserver le back-office au personnel (Admin/Agent/
 // Autorité commune/Autorité préfecture).
 Route::middleware([
-    'auth:sanctum', 'isActived',
+    'auth:sanctum', 'notArchived', 'isActived',
     config('jetstream.auth_session'),
     'role:1,2,3,4',
 ])->group(function () {
@@ -40,7 +40,7 @@ Route::middleware([
 });
 
 Route::middleware([
-    'auth:sanctum', 'isActived',
+    'auth:sanctum', 'notArchived', 'isActived',
     config('jetstream.auth_session'),
     'role:1,2,3,4',
 ])->group(function () {
@@ -75,7 +75,7 @@ Route::middleware([
 // l'approbation"), qui pouvait pourtant approuver comme n'importe quel
 // autre rôle staff avant ce correctif.
 Route::middleware([
-    'auth:sanctum', 'isActived',
+    'auth:sanctum', 'notArchived', 'isActived',
     config('jetstream.auth_session'),
     'role:1,3,4',
 ])->group(function () {
@@ -86,7 +86,7 @@ Route::middleware([
 // n'importe quel compte actif (Agent, Autorité...) pouvait créer ou
 // promouvoir un compte Admin en atteignant ces routes directement.
 Route::middleware([
-    'auth:sanctum', 'isActived',
+    'auth:sanctum', 'notArchived', 'isActived',
     config('jetstream.auth_session'),
     'role:1',
 ])->group(function () {
@@ -109,6 +109,15 @@ Route::middleware([
     // (jamais saisi en clair par l'Admin).
     Route::post('/dashboard/comptes/{user}/reset-password', [UserController::class, 'resetPassword'])->name('reset-password');
 
+    // Archivage d'un compte qui n'est plus affilié à SENDRA : il disparaît
+    // des listes, ne peut plus se connecter et sort des destinataires des
+    // e-mails d'approbation. Volontairement pas un DELETE en base :
+    // `car_positions.user_id` et `car_positions.agent_id` sont en
+    // ON DELETE CASCADE, la suppression de la ligne emporterait tous les
+    // signalements du compte.
+    Route::delete('/dashboard/comptes/{user}', [UserController::class, 'destroy'])->name('supprimer.compte');
+    Route::patch('/dashboard/comptes/{user}/restaurer', [UserController::class, 'restaurer'])->name('restaurer.compte');
+
     // Correction WEB-H-2 : save_agents/save_admin/save_autorites pointaient
     // vers des méthodes UserController inexistantes (500 au moindre appel),
     // et aucun formulaire ne les utilisait — store()/modifier() gèrent déjà
@@ -118,7 +127,7 @@ Route::middleware([
 });
 
 Route::middleware([
-    'auth:sanctum',
+    'auth:sanctum', 'notArchived',
     config('jetstream.auth_session'),
     'role:1,2,3,4',
 ])->group(function () {

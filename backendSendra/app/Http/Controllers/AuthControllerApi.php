@@ -60,6 +60,15 @@ class AuthControllerApi extends Controller
             return response()->json(['error' => 'Unauthorized'], 401);
         }
 
+        // Un compte supprimé depuis le back-office (colonne `users.deleted`)
+        // n'est plus affilié à SENDRA : il ne doit plus obtenir de jeton,
+        // même si son mot de passe reste valable.
+        if (auth()->user()->deleted) {
+            auth()->logout();
+
+            return response()->json(['error' => 'Unauthorized'], 401);
+        }
+
         return $this->respondWithToken($token);
     }
 

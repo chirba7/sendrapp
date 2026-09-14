@@ -54,6 +54,9 @@ class Kernel extends HttpKernel
      */
     protected $middlewareAliases = [
         'isActived' => \App\Http\Middleware\IsActiveMiddleware::class,
+        // Archivage des comptes : un compte marqué `deleted` est
+        // déconnecté et renvoyé vers la page de connexion.
+        'notArchived' => \App\Http\Middleware\EnsureAccountIsNotArchived::class,
         // Correction WEB-C-1 : contrôle de rôle sur la gestion des comptes
         'role' => \App\Http\Middleware\EnsureUserHasRole::class,
         'auth' => \App\Http\Middleware\Authenticate::class,

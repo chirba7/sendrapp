@@ -44,6 +44,23 @@ return [
             'throw' => false,
         ],
 
+        // 11/09/2026 — les médias des signalements (photos, signatures de
+        // dommages) vivent dans le stockage du backend : c'est là que la fiche
+        // et l'application mobile les lisent (BACKEND_STORAGE_URL). Le
+        // back-office y écrit donc ses signatures, au lieu de son propre disque
+        // où personne ne les lisait. En production, les deux applications sont
+        // sur le même serveur : BACKEND_STORAGE_PATH vaut
+        // /var/www/backendSendra/storage/app/public. Sans la variable (poste de
+        // développement), repli sur le disque local — à vérifier au
+        // déploiement, voir la procédure du 11/09/2026.
+        'backend' => [
+            'driver' => 'local',
+            'root' => env('BACKEND_STORAGE_PATH', storage_path('app/public')),
+            'url' => env('BACKEND_STORAGE_URL', 'https://backend.sendra.sn/storage'),
+            'visibility' => 'public',
+            'throw' => false,
+        ],
+
         's3' => [
             'driver' => 's3',
             'key' => env('AWS_ACCESS_KEY_ID'),

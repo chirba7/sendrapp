@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\CarPosition;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 /**
@@ -116,6 +117,72 @@ class SignalementWorkflowTest extends TestCase
 
         $carPosition->refresh();
         $this->assertNotNull($carPosition->dommage_image);
+    }
+
+    public function test_la_signature_est_ecrite_dans_le_stockage_du_backend(): void
+    {
+        // 11/09/2026 — la fiche (show.blade.php) et l'application mobile lisent
+        // les dommages dans le stockage du backend (BACKEND_STORAGE_URL). La
+        // signature saisie ici était écrite sur le disque de sendraApp : elle
+        // n'était donc visible nulle part. Elle doit être écrite là où elle est
+        // lue. Voir sendra-refonte/docs/inventaire-sendraapp.md §5.3.
+        Storage::fake('backend');
+        Storage::fake('public');
+
+        $staff = User::factory()->create(['role_id' => 1, 'is_enabled' => true]);
+        $carPosition = CarPosition::factory()->create();
+
+        $this->actingAs($staff)
+            ->post("/signature/store/{$carPosition->id}", [
+                'signature' => 'data:image/png;base64,' . self::VALID_PNG_BASE64,
+            ])
+            ->assertSessionHasNoErrors();
+
+        $nom = $carPosition->fresh()->dommage_image;
+        $this->assertNotNull($nom);
+        // Convention inchangée : nom seul en base, préfixe dommages/ sur disque.
+        $this->assertStringStartsWith('dommages', $nom);
+        Storage::disk('backend')->assertExists('dommages/' . $nom);
+        Storage::disk('public')->assertMissing('dommages/' . $nom);
+    }
+
+    public function test_une_signature_non_ecrite_ne_laisse_pas_de_reference_en_base(): void
+    {
+        // Un disque en échec (droits, volume plein) ne doit pas produire une
+        // référence vers un fichier absent — c'est ainsi que naissent les
+        // « médias manquants ».
+        Storage::shouldReceive('disk')->with('backend')->andReturnSelf();
+        Storage::shouldReceive('put')->andReturn(false);
+
+        $staff = User::factory()->create(['role_id' => 1, 'is_enabled' => true]);
+        $carPosition = CarPosition::factory()->create(['dommage_image' => null]);
+
+        $this->actingAs($staff)
+            ->post("/signature/store/{$carPosition->id}", [
+                'signature' => 'data:image/png;base64,' . self::VALID_PNG_BASE64,
+            ])
+            ->assertSessionHasErrors('signature');
+
+        $this->assertNull($carPosition->fresh()->dommage_image);
+    }
+
+    public function test_le_pdf_integre_la_signature_lue_dans_le_stockage_du_backend(): void
+    {
+        // Le PDF lisait public_path('storage/dommages/…') : le disque de
+        // sendraApp. DomPDF refuse de lire hors de base_path() (chroot) ; l'image
+        // est donc intégrée en data URI depuis le disque du backend.
+        Storage::fake('backend');
+        Storage::disk('backend')->put('dommages/dommagesTEST.png', base64_decode(self::VALID_PNG_BASE64));
+
+        $agent = User::factory()->create(['role_id' => 2, 'is_enabled' => true]);
+        $carPosition = CarPosition::factory()->create([
+            'dommage_image' => 'dommagesTEST.png',
+            'agent_id' => $agent->id,
+        ]);
+
+        $html = view('carPosition.pdf', compact('carPosition'))->render();
+
+        $this->assertStringContainsString('data:image/png;base64,' . self::VALID_PNG_BASE64, $html);
     }
 
     public function test_listing_and_map_pages_render_for_staff(): void

@@ -1,0 +1,51 @@
+# Rapport d'activité — Plateforme Sendra
+
+**Période :** semaine du 7 au 11 septembre 2026
+**Périmètre de cette section :** travail réalisé par l'assistant IA (Claude, session Cowork) avec ChirBa sur la **refonte du backend** (`sendra-refonte`), le back-office `sendraApp` et les médias de production. Chaque contributeur ajoute sa propre partie ci-dessous.
+
+---
+
+## 1. Refonte du backend — L0, L1, L2 fermés, L3 en cours
+
+Travail mené dans `C:\Projets\sendrapp\sendra-refonte`, clone isolé de la préprod (Docker + MySQL 8), selon le *Plan final de refonte V1.0* du 04/09. Un commit par lot ; aucun déploiement serveur.
+
+- **L0 — Baseline (Gate A)** : inventaires figés (32 endpoints, 12 tables, 105 médias) ; 83 tests de contrat sur les 8 parcours critiques ; `/api/ping` mesuré de 7,4 s à 0,18 s après OPcache et caches.
+- **L1 — Socle (Gate B)** : sondes `/api/health`, logs JSON avec `correlation_id`, pipeline `scripts/ci.sh` partagé avec la CI GitHub, environnement reconstructible sans SSH.
+- **L2 — Modularité (Gate C, 10/09)** : 8 modules `app/Domain/*`, test d'architecture (9 règles), Signalements, Approbations, Enlèvements et Dommages derrière des contrats, abstraction de stockage des médias. Aucun contrat d'API modifié.
+- **L3 — Données (en cours)** : schéma de test aligné sur la préprod (deux écarts corrigés), plan de conversion MySQL → PostgreSQL écrit, **schéma PostgreSQL cible** posé (PostGIS, `pg_trgm`), colonnes mortes retirées sans changer l'API.
+- **État des tests : 157 tests verts sur trois moteurs** — SQLite, MySQL (production) et PostgreSQL + PostGIS (cible), vérifiés sur le poste le 11/09.
+- **19 défauts de contrat figés** pour décision en v2, dont un qui perd de la donnée : une mise à jour partielle du véhicule (`PUT /api/vehicule/{id}`) efface les sept constats de dommage déjà cochés.
+
+## 2. Constats qui demandent une décision
+
+- **Le back-office écrit directement dans `car_positions`**, hors des règles du backend. Enregistrer l'identification d'un véhicule depuis le back-office remet le signalement « EN COURS », même s'il est déjà enlevé ou rejeté ; l'API ne le fait pas.
+- **Les signatures de dommages du back-office sont écrites sur son propre disque** (`/var/www/sendraApp`) alors qu'elles sont lues sur celui du backend — vérifié sur le serveur : 4 signatures côté back-office, 0 en commun. **Le correctif de lecture déployé en préprod ne doit pas partir seul en prod**, sinon ces signatures deviennent invisibles.
+- **Aucune recherche textuelle n'existe** ni dans l'API ni dans le back-office (le champ « Search… » de l'en-tête est inactif).
+- **8 signalements de test** (comptes admin, localisés en Californie, à Paris, dans l'Indiana) : décision de ne pas les reprendre dans la migration.
+- Back-office : les boutons « Enregistrer » sont affichés à tous les rôles (condition `||` toujours vraie).
+
+## 3. Intervention en production — médias perdus retrouvés
+
+- Les **45 médias** (40 photos, 5 signatures) absents depuis début 2025 ont été **retrouvés dans les copies datées du backend** dans `/var/www/` (`backendSendra_17012025`, `_25112024`, `backendsendra_Aboubacry`), une seule version par fichier.
+- **Remis en production le 11/09** par ChirBa en SSH direct, avec un script vérifié : simulation puis application, **45 copiés, 0 erreur, rien d'écrasé**, empreintes SHA-256 contrôlées, liste de retour arrière dans `/root/restauration-medias-2024-20260911-113826.txt`.
+- Les mêmes fichiers sont versés à l'environnement de refonte : 0 référence sans fichier sur 105.
+
+## 4. Incident du 09/09 (sans impact serveur)
+
+La base **locale** de la refonte a été vidée par la suite de tests (une configuration en cache court-circuitait la base de test). Restaurée intégralement par script ; quatre garde-fous posés pour que cela ne puisse plus se reproduire.
+
+---
+
+## Ce qui n'a *pas* été fait / reste en attente
+
+1. **Correctif des signatures du back-office** : prêt et testé (`sendraApp`, 3 tests ; procédure dans `procedures/2026-09-11-medias-et-signatures/`), **non déployé** — préprod d'abord.
+2. **Médias en préprod** : pas encore remis (même script, autre cible).
+3. Vérification visuelle d'une photo restaurée en production à confirmer dans le navigateur.
+4. **Modifications non committées** dans le dépôt `sendra` (`sendraApp`, dossier `procedures/`) ; commit du lot L3 de la refonte à faire depuis Windows.
+5. Suite de la refonte : import des données vers PostgreSQL (S3-05), puis répétition sur un **export frais de la production** — les données de travail viennent de la préprod.
+6. Décision attendue : le back-office passe-t-il par les règles du backend, ou reste-t-il un second écrivain ?
+7. Aucun accès SSH direct de Claude : les commandes serveur ont été exécutées par ChirBa. L'agent serveur a refusé un contrôle en lecture seule (filtre de cybersécurité), d'où le passage par SSH direct.
+
+---
+
+## Section équipe (à compléter)

@@ -90,6 +90,12 @@ class DommagesController extends Controller
         $emails = User::query()
             ->where('role_id', 1)
             ->whereNotNull('email')
+            // Les comptes supprimés depuis le back-office (colonne
+            // `users.deleted`) ne sont plus affiliés à SENDRA et ne doivent
+            // plus recevoir les demandes d'approbation. `deleted` vaut NULL
+            // sur tous les comptes historiques : la condition doit couvrir
+            // NULL explicitement, `deleted != 1` les exclurait aussi.
+            ->nonArchives()
             ->pluck('email')
             ->filter()
             ->unique();

@@ -18,25 +18,43 @@ class UserController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function agents()
+    public function agents(Request $request)
     {
-        $users = User::with('role')->where('role_id', 2)->paginate(5);
-        return view('comptes.agents', compact('users'));
+        return $this->listerComptes($request, 2, 'comptes.agents');
     }
-    public function admin()
+    public function admin(Request $request)
     {
-        $users = User::with('role')->where('role_id', 1)->paginate(5);
-        return view('comptes.admin', compact('users'));
+        return $this->listerComptes($request, 1, 'comptes.admin');
     }
-    public function autorites()
+    public function autorites(Request $request)
     {
-        $users = User::with('role')->where('role_id', 3)->paginate(5);
-        return view('comptes.autorites', compact('users'));
+        return $this->listerComptes($request, 3, 'comptes.autorites');
     }
-    public function utilisateurs()
+    public function utilisateurs(Request $request)
     {
-        $users = User::with('role')->where('role_id', 4)->paginate(5);
-        return view('comptes.utilisateurs', compact('users'));
+        return $this->listerComptes($request, 4, 'comptes.utilisateurs');
+    }
+
+    /**
+     * Liste des comptes d'un rôle. `?archives=1` affiche les comptes
+     * supprimés au lieu des comptes actifs — c'est la seule façon de les
+     * retrouver et de les restaurer.
+     */
+    private function listerComptes(Request $request, int $roleId, string $vue)
+    {
+        $archives = $request->boolean('archives');
+
+        $users = User::with('role')
+            ->where('role_id', $roleId)
+            ->when(
+                $archives,
+                fn ($requete) => $requete->archives(),
+                fn ($requete) => $requete->nonArchives()
+            )
+            ->paginate(5)
+            ->withQueryString();
+
+        return view($vue, compact('users', 'archives'));
     }
     // Correction WEB-M-1 : aucun écran n'affichait les comptes citoyens
     // (role_id=5, créés depuis l'app mobile) — invisibles depuis le
@@ -241,10 +259,68 @@ class UserController extends Controller
         return redirect()->route('login')->with('success', 'Mot de passe mis à jour avec succès ! Veuillez vous reconnecter.');
     }
     /**
-     * Remove the specified resource from storage.
+     * Supprime un compte qui n'est plus affilié à SENDRA.
+     *
+     * La ligne n'est pas effacée : `car_positions.user_id` et
+     * `car_positions.agent_id` sont en ON DELETE CASCADE, un vrai DELETE
+     * emporterait tous les signalements du compte, leurs photos et leurs
+     * dommages. Le compte est marqué `deleted` : il sort des listes, ne
+     * peut plus se connecter (middleware `notArchived`) et n'est plus
+     * destinataire des e-mails de demande d'approbation envoyés par le
+     * backend. Réservé aux Admins par le middleware `role:1` de la route.
      */
-    public function destroy(string $id)
+    public function destroy(User $user)
     {
-        //
+        if ($user->id === Auth::id()) {
+            return back()->with('error', 'Vous ne pouvez pas supprimer votre propre compte.');
+        }
+
+        if (!in_array((int) $user->role_id, [1, 2, 3, 4], true)) {
+            return back()->with('error', 'Seuls les comptes du personnel (Admin, Agent, Autorité commune, Autorité préfecture) peuvent être supprimés ici.');
+        }
+
+        if ($user->estArchive()) {
+            return back()->with('error', 'Ce compte est déjà supprimé.');
+        }
+
+        // Garde-fou : il doit rester au moins un Admin actif, sinon plus
+        // personne ne peut gérer les comptes — ni restaurer celui-ci.
+        $dernierAdmin = (int) $user->role_id === 1
+            && User::nonArchives()->where('role_id', 1)->where('id', '!=', $user->id)->doesntExist();
+
+        if ($dernierAdmin) {
+            return back()->with('error', "Impossible de supprimer ce compte : c'est le dernier Admin actif.");
+        }
+
+        $user->deleted = true;
+        $user->save();
+
+        Log::info('Compte supprimé (archivé).', [
+            'userId' => $user->id,
+            'email' => $user->email,
+            'parUserId' => Auth::id(),
+        ]);
+
+        return back()->with('success', 'Compte supprimé : il n’apparaît plus dans les listes, ne peut plus se connecter et ne reçoit plus les e-mails. Il reste restaurable depuis « Comptes supprimés ».');
+    }
+
+    /**
+     * Restaure un compte supprimé par erreur.
+     */
+    public function restaurer(User $user)
+    {
+        if (!$user->estArchive()) {
+            return back()->with('error', "Ce compte n'est pas supprimé.");
+        }
+
+        $user->deleted = false;
+        $user->save();
+
+        Log::info('Compte restauré.', [
+            'userId' => $user->id,
+            'parUserId' => Auth::id(),
+        ]);
+
+        return back()->with('success', 'Compte restauré avec succès.');
     }
 }
