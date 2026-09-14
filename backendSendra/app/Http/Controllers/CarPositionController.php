@@ -24,42 +24,77 @@ class CarPositionController extends Controller
         // une image réelle avant écriture disque, et CarPosition/CarPhoto
         // étaient sauvegardés en deux temps sans transaction (un signalement
         // sans photo pouvait rester en base si l'écriture du fichier échouait).
-        $imageBinary = base64_decode($request->input('image'), true);
+        $uuid = $request->input('uuid');
 
-        if ($imageBinary === false || @getimagesizefromstring($imageBinary) === false) {
-            return response()->json(['message' => 'Le fichier fourni n\'est pas une image valide'], 422);
+        // Envoi rejoué (synchro hors ligne après une coupure en plein envoi) :
+        // le signalement existe déjà, on confirme sans créer de doublon.
+        if ($uuid && CarPosition::where('uuid', $uuid)->where('user_id', Auth::user()->id)->exists()) {
+            return response()->json(['message' => 'Signalisation effectuée avec succès'], 200);
         }
 
-        // Correction perf : les photos envoyées telles quelles par un
-        // appareil photo (souvent 3000px+ de large) gonflaient inutilement
-        // le stockage et les réponses de listerSignalements/voirSignalements
-        // (image_url pointe sur l'original). Redimensionnée à 1600px max
-        // avant écriture disque (JPEG si le build GD le supporte, sinon PNG).
-        $optimized = ImageOptimizer::resize($imageBinary);
-        $imageBinary = $optimized['binary'];
-        $extension = $optimized['extension'];
+        // Nouvelle app : une photo par angle. Ancienne app : un seul `image`.
+        // La vue d'ensemble passe en premier : image_url (SignalementRessource)
+        // affiche la première photo.
+        $photos = $request->filled('photos')
+            ? collect($request->input('photos'))
+                ->sortBy(fn ($p) => $p['position'] === 'vue_ensemble' ? 0 : 1)
+                ->values()
+                ->all()
+            : [['position' => null, 'image' => $request->input('image')]];
+
+        $images = [];
+        foreach ($photos as $photo) {
+            $imageBinary = base64_decode($photo['image'], true);
+
+            if ($imageBinary === false || @getimagesizefromstring($imageBinary) === false) {
+                return response()->json(['message' => 'Le fichier fourni n\'est pas une image valide'], 422);
+            }
+
+            // Correction perf : les photos envoyées telles quelles par un
+            // appareil photo (souvent 3000px+ de large) gonflaient inutilement
+            // le stockage et les réponses de listerSignalements/voirSignalements
+            // (image_url pointe sur l'original). Redimensionnée à 1600px max
+            // avant écriture disque (JPEG si le build GD le supporte, sinon PNG).
+            $optimized = ImageOptimizer::resize($imageBinary);
+            unset($imageBinary);
+
+            $images[] = [
+                'position' => $photo['position'],
+                'binary' => $optimized['binary'],
+                'extension' => $optimized['extension'],
+            ];
+        }
+
+        $fichiersEcrits = [];
 
         try {
-            $carPhoto = DB::transaction(function () use ($request, $imageBinary, $extension) {
+            DB::transaction(function () use ($request, $uuid, $images, &$fichiersEcrits) {
                 $carPosition = new CarPosition();
                 $carPosition->latitude = $request->latitude;
                 $carPosition->longitude = $request->longitude;
                 $carPosition->title = $request->titre;
                 $carPosition->commune = $request->commune;
+                $carPosition->uuid = $uuid;
                 $carPosition->user_id = Auth::user()->id;
                 $carPosition->save();
 
-                $filename = uniqid('car_photo') . '.' . $extension;
-                Storage::disk('public')->put('signalement/photo/' . $filename, $imageBinary);
+                foreach ($images as $image) {
+                    $chemin = 'signalement/photo/' . uniqid('car_photo') . '.' . $image['extension'];
+                    Storage::disk('public')->put($chemin, $image['binary']);
+                    $fichiersEcrits[] = $chemin;
 
-                $carPhoto = new CarPhoto();
-                $carPhoto->card_id = $carPosition->id;
-                $carPhoto->filepath = 'signalement/photo/' . $filename;
-                $carPhoto->save();
-
-                return $carPhoto;
+                    $carPhoto = new CarPhoto();
+                    $carPhoto->card_id = $carPosition->id;
+                    $carPhoto->filepath = $chemin;
+                    $carPhoto->position = $image['position'];
+                    $carPhoto->save();
+                }
             });
         } catch (\Throwable $e) {
+            // La transaction annule la base, pas le disque : on retire les
+            // fichiers déjà écrits pour ne pas laisser d'orphelins.
+            Storage::disk('public')->delete($fichiersEcrits);
+
             return response()->json(['message' => 'Erreur lors de la signalisation'], 500);
         }
 

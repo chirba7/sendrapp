@@ -30,7 +30,15 @@ class StoreCarPositionRequest extends FormRequest
             'longitude' => 'required|numeric',
             // Correction perf : aucune limite de taille sur le payload
             // base64 entrant. ~15M caractères ≈ 11 Mo décodés.
-            'image' => 'required|string|max:15000000',
+            // `image` (une seule photo) : anciennes versions de l'app.
+            // `photos` (une par angle) : app avec mode hors ligne.
+            'image' => 'required_without:photos|string|max:15000000',
+            'photos' => 'required_without:image|array|min:1|max:5',
+            'photos.*.position' => 'required|string|in:vue_ensemble,devant,derriere,cote_gauche,cote_droit|distinct',
+            'photos.*.image' => 'required|string|max:15000000',
+            // Clé de déduplication : un envoi rejoué (synchro hors ligne,
+            // réseau instable) ne doit pas créer de doublon.
+            'uuid' => 'nullable|string|max:254',
         ];
     }
     public function failedValidation(Validator $validator)
