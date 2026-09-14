@@ -45,6 +45,67 @@ class _DepositScreenState extends State<DepositScreen> {
 
   int get _nbPhotos => _photos.values.where((f) => f != null).length;
 
+  // Sur Android, le système peut tuer l'app pendant que l'appareil photo est
+  // ouvert (mémoire basse, fréquent à partir de la 3e photo) : l'app
+  // « redémarre » et perd le formulaire. Les chemins des photos déjà prises
+  // et l'angle en cours de capture sont donc gardés dans les préférences,
+  // puis restaurés ici, avec la photo « perdue » récupérée par image_picker.
+  static const _clePhotosBrouillon = 'signalement_brouillon_photos';
+  static const _cleCaptureEnCours = 'signalement_capture_en_cours';
+
+  @override
+  void initState() {
+    super.initState();
+    _restaurerBrouillon();
+  }
+
+  Future<void> _restaurerBrouillon() async {
+    final prefs = await SharedPreferences.getInstance();
+    final restaurees = <String, File>{};
+
+    try {
+      final brut = prefs.getString(_clePhotosBrouillon);
+      if (brut != null) {
+        (jsonDecode(brut) as Map<String, dynamic>).forEach((position, chemin) {
+          final fichier = File(chemin.toString());
+          if (_photos.containsKey(position) && fichier.existsSync()) {
+            restaurees[position] = fichier;
+          }
+        });
+      }
+
+      final enCours = prefs.getString(_cleCaptureEnCours);
+      if (Platform.isAndroid && enCours != null && _photos.containsKey(enCours)) {
+        final perdue = await ImagePicker().retrieveLostData();
+        if (!perdue.isEmpty && perdue.file != null) {
+          restaurees[enCours] = File(perdue.file!.path);
+        }
+      }
+    } catch (e) {
+      print('Restauration du brouillon impossible: $e');
+    }
+
+    await prefs.remove(_cleCaptureEnCours);
+    if (restaurees.isEmpty || !mounted) return;
+
+    setState(() => _photos.addAll(restaurees));
+    await _sauverBrouillon();
+    _message('Photos du signalement en cours restaurées.');
+  }
+
+  Future<void> _sauverBrouillon() async {
+    final prefs = await SharedPreferences.getInstance();
+    final chemins = {
+      for (final e in _photos.entries)
+        if (e.value != null) e.key: e.value!.path,
+    };
+    if (chemins.isEmpty) {
+      await prefs.remove(_clePhotosBrouillon);
+    } else {
+      await prefs.setString(_clePhotosBrouillon, jsonEncode(chemins));
+    }
+  }
+
   Future<void> getLocation() async {
     bool serviceEnabled;
     LocationPermission permission;
@@ -135,6 +196,9 @@ class _DepositScreenState extends State<DepositScreen> {
 
     if (source == null) return;
 
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_cleCaptureEnCours, position);
+
     // 1600px suffit (le backend redimensionne à 1600px de toute façon) et
     // garde les 5 photos en base64 sous le post_max_size (8 Mo) du serveur :
     // au-delà, PHP vide la requête et le signalement est refusé.
@@ -144,17 +208,20 @@ class _DepositScreenState extends State<DepositScreen> {
       maxWidth: 1600,
       maxHeight: 1600,
     );
-    if (pickedFile == null) return;
+    await prefs.remove(_cleCaptureEnCours);
+    if (pickedFile == null || !mounted) return;
 
     setState(() {
       _photos[position] = File(pickedFile.path);
     });
+    await _sauverBrouillon();
   }
 
   void _retirer(String position) {
     setState(() {
       _photos[position] = null;
     });
+    _sauverBrouillon();
   }
 
   Future<void> _soumettre() async {
@@ -241,6 +308,7 @@ class _DepositScreenState extends State<DepositScreen> {
     for (final position in _photos.keys.toList()) {
       _photos[position] = null;
     }
+    _sauverBrouillon();
   }
 
   void _message(String message) {
@@ -372,7 +440,9 @@ class _DepositScreenState extends State<DepositScreen> {
           fit: StackFit.expand,
           children: [
             if (rempli)
-              Image.file(fichier, fit: BoxFit.cover)
+              // Vignette décodée en petit : 5 photos en pleine résolution
+              // en mémoire suffisaient à faire tuer l'app par Android.
+              Image.file(fichier, fit: BoxFit.cover, cacheWidth: 400)
             else
               Column(
                 mainAxisAlignment: MainAxisAlignment.center,

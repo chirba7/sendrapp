@@ -85,7 +85,46 @@
                                     <div class="row justify-content-center align-items-center g-2">
                                         <div class="col-md-6">
                                             <div class="profile_card_5 mb-1">
-                                                <img class="circle-rounded" src="{{ config('services.backend.storage_url') . '/' . $photo->filepath }}" alt="" width="90%" height="90%">
+                                                @php
+                                                    $anglesPhotos = [
+                                                        'vue_ensemble' => "Vue d'ensemble", 'devant' => 'Devant',
+                                                        'derriere' => 'Derrière', 'cote_gauche' => 'Côté gauche', 'cote_droit' => 'Côté droit',
+                                                    ];
+                                                @endphp
+                                                @if ($photos->isEmpty())
+                                                    <p class="text-muted text-center my-4">Aucune photo pour ce signalement.</p>
+                                                @elseif ($photos->count() === 1)
+                                                    <img class="circle-rounded" src="{{ config('services.backend.storage_url') . '/' . $photo->filepath }}" alt="{{ $anglesPhotos[$photo->position] ?? 'Photo du signalement' }}" width="90%" height="90%">
+                                                @else
+                                                    {{-- Plusieurs photos (une par angle) : carrousel défilant. --}}
+                                                    <div id="carrouselPhotos" class="carousel slide" data-bs-ride="false" data-bs-touch="true">
+                                                        <div class="carousel-indicators">
+                                                            @foreach ($photos as $p)
+                                                                <button type="button" data-bs-target="#carrouselPhotos" data-bs-slide-to="{{ $loop->index }}" @class(['active' => $loop->first]) @if ($loop->first) aria-current="true" @endif aria-label="Photo {{ $loop->iteration }}"></button>
+                                                            @endforeach
+                                                        </div>
+                                                        <div class="carousel-inner rounded">
+                                                            @foreach ($photos as $p)
+                                                                <div @class(['carousel-item', 'active' => $loop->first])>
+                                                                    <a href="{{ config('services.backend.storage_url') . '/' . $p->filepath }}" target="_blank" rel="noopener">
+                                                                        <img class="d-block w-100" style="max-height: 420px; object-fit: contain; background: #000;" src="{{ config('services.backend.storage_url') . '/' . $p->filepath }}" alt="{{ $anglesPhotos[$p->position] ?? 'Photo ' . $loop->iteration }}">
+                                                                    </a>
+                                                                    <div class="carousel-caption py-1 px-2 rounded" style="background: rgba(0,0,0,.55); bottom: 2.5rem;">
+                                                                        {{ $anglesPhotos[$p->position] ?? 'Photo' }} · {{ $loop->iteration }}/{{ $photos->count() }}
+                                                                    </div>
+                                                                </div>
+                                                            @endforeach
+                                                        </div>
+                                                        <button class="carousel-control-prev" type="button" data-bs-target="#carrouselPhotos" data-bs-slide="prev">
+                                                            <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+                                                            <span class="visually-hidden">Précédente</span>
+                                                        </button>
+                                                        <button class="carousel-control-next" type="button" data-bs-target="#carrouselPhotos" data-bs-slide="next">
+                                                            <span class="carousel-control-next-icon" aria-hidden="true"></span>
+                                                            <span class="visually-hidden">Suivante</span>
+                                                        </button>
+                                                    </div>
+                                                @endif
                                             </div>
                                         </div>
                                         <div class="col-md-6">

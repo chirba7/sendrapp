@@ -6,6 +6,7 @@ import 'package:walletium/views/screens/vehicule_screen.dart';
 import '../../utils/session.dart';
 import '../../utils/strings.dart';
 import '../../utils/sendra_theme.dart';
+import '../../widgets/others/galerie_photos_signalement.dart';
 import 'carto.dart';
 import 'dommages_screen.dart';
 import 'enlevement_screen.dart';
@@ -295,6 +296,13 @@ class _DepositMoneyDetailsScreenState extends State<DepositMoneyDetailsScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 4),
+              child: GaleriePhotosSignalement(
+                signalementData: signalementData,
+                hauteur: 220,
+              ),
+            ),
             _workflowHeader(signalementData),
             _localisationButton(),
             if (!grouped) _menuItem('Informations de base', signalementData),

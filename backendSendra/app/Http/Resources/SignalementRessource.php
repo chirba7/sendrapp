@@ -37,6 +37,15 @@ class SignalementRessource extends JsonResource
                 ? $request->getSchemeAndHttpHost() . '/storage/' . $firstPhoto->filepath
                 : null,
             'image' => $firstPhoto ? $firstPhoto->filepath : null,
+            // Toutes les photos (une par angle), dans l'ordre d'enregistrement
+            // — la vue d'ensemble d'abord. image_url/image restent pour les
+            // écrans et versions de l'app qui n'affichent qu'une photo.
+            'images' => $this->photo
+                ? $this->photo->sortBy('id')->values()->map(fn ($p) => [
+                    'url' => $request->getSchemeAndHttpHost() . '/storage/' . $p->filepath,
+                    'position' => $p->position,
+                ])->all()
+                : [],
         ];
     }
 }

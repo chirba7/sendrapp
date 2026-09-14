@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../utils/sendra_theme.dart';
+import '../../widgets/others/galerie_photos_signalement.dart';
 import 'vehicule_screen.dart';
 
 class BasicInfoForm extends StatelessWidget {
@@ -18,7 +19,7 @@ class BasicInfoForm extends StatelessWidget {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(20, 12, 20, 110),
           children: [
-            _buildImageContainer(signalementData['image_url'], context),
+            GaleriePhotosSignalement(signalementData: signalementData),
             const SizedBox(height: 20),
             _buildReadOnlyField('Titre', signalementData['titre']?.toString()),
             _buildReadOnlyField(
@@ -81,56 +82,6 @@ class BasicInfoForm extends StatelessWidget {
         ),
         readOnly: true,
         style: TextStyle(color: Colors.black, fontSize: 16),
-      ),
-    );
-  }
-
-  Widget _buildImageContainer(dynamic rawImageUrl, BuildContext context) {
-    final imageUrl = rawImageUrl?.toString() ?? '';
-    return GestureDetector(
-      onTap: () {
-        showDialog(
-          context: context,
-          builder: (_) => Dialog(
-            child: Container(
-              padding: EdgeInsets.all(16.0),
-              child: Image.network(imageUrl, fit: BoxFit.contain),
-            ),
-          ),
-        );
-      },
-      child: Column(
-        children: [
-          Text(
-            'Appuyez pour agrandir l\'image',
-            style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
-          ),
-          SizedBox(height: 10),
-          Container(
-            width: double.infinity,
-            height: 250,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(12),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
-                  spreadRadius: 1,
-                  blurRadius: 10,
-                  offset: Offset(0, 3), // décalage de l'ombre
-                ),
-              ],
-            ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: imageUrl.isEmpty
-                  ? const ColoredBox(
-                      color: Color(0xFFEAF1ED),
-                      child: Icon(Icons.image_not_supported_outlined),
-                    )
-                  : Image.network(imageUrl, fit: BoxFit.cover),
-            ),
-          ),
-        ],
       ),
     );
   }

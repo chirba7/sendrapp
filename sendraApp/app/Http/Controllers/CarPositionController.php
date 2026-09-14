@@ -107,13 +107,16 @@ class CarPositionController extends Controller
      */
     public function show(CarPosition $carPosition)
     {
-        $photo = CarPhoto::where('card_id', $carPosition->id)->first();
+        // Toutes les photos du signalement (une par angle depuis l'app avec
+        // mode hors ligne), vue d'ensemble d'abord.
+        $photos = CarPhoto::where('card_id', $carPosition->id)->orderBy('id')->get();
+        $photo = $photos->first();
         // Le binding de route fournit déjà le bon signalement. Appeler
         // first() sur une nouvelle requête repartait de toute la table et
         // affichait systématiquement le signalement n° 1 avec la photo du
         // signalement demandé.
         $carPosition->load('user');
-        return view('carPosition.show', compact('carPosition', 'photo'));
+        return view('carPosition.show', compact('carPosition', 'photo', 'photos'));
     }
 
     /**
