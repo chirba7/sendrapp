@@ -25,7 +25,10 @@ class StoreCarPositionRequest extends FormRequest
     {
         return [
             'titre' => 'required|string',
-            'commune' => 'required|string',
+            // Hors ligne, la commune (géocodage inverse, qui exige le réseau)
+            // peut manquer : un signalement valide ne doit pas être refusé
+            // pour autant. L'app tente de la compléter avant la synchro.
+            'commune' => 'nullable|string',
             'latitude' => 'required|numeric',
             'longitude' => 'required|numeric',
             // Correction perf : aucune limite de taille sur le payload

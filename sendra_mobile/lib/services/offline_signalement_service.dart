@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:geocoding/geocoding.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -239,6 +240,66 @@ class OfflineSignalementService {
     return corps['message']?.toString() ?? 'Signalement refusé.';
   }
 
+  /// Hors ligne, le géocodage inverse échoue et la commune part vide. Au
+  /// moment de la synchro le réseau est revenu : on la calcule à partir des
+  /// coordonnées et on met à jour le fichier en attente. En cas d'échec, le
+  /// signalement part tel quel (le backend accepte une commune vide).
+  Future<PendingSignalement> _completerCommune(PendingSignalement s) async {
+    if (s.commune.isNotEmpty || s.latitude == null || s.longitude == null) {
+      return s;
+    }
+    try {
+      final lieux = await placemarkFromCoordinates(s.latitude!, s.longitude!)
+          .timeout(const Duration(seconds: 10));
+      if (lieux.isEmpty) return s;
+      final lieu = lieux.first;
+      final commune = (lieu.subLocality?.isNotEmpty ?? false)
+          ? lieu.subLocality!
+          : (lieu.locality ?? '');
+      if (commune.isEmpty) return s;
+
+      final complete = PendingSignalement(
+        uuid: s.uuid,
+        titre: s.titre,
+        commune: commune,
+        latitude: s.latitude,
+        longitude: s.longitude,
+        photos: s.photos,
+        createdAt: s.createdAt,
+      );
+      await enfiler(complete);
+      return complete;
+    } catch (_) {
+      return s;
+    }
+  }
+
+  /// Les versions précédentes refusaient côté serveur tout signalement créé
+  /// hors ligne (commune vide) et le mettaient de côté en `.rejete`. Le
+  /// backend l'accepte désormais : on les remet une fois dans la file pour
+  /// qu'ils partent à la prochaine synchro.
+  Future<void> _reintegrerRejetesUneFois() async {
+    const cle = 'signalements_rejetes_reintegres_v1';
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (prefs.getBool(cle) == true) return;
+
+      final dir = await _dossier();
+      final rejetes = dir
+          .listSync()
+          .whereType<File>()
+          .where((f) => f.path.endsWith('.rejete'));
+      for (final fichier in rejetes) {
+        await fichier.rename(
+          fichier.path.replaceFirst(RegExp(r'\.rejete$'), '.json'),
+        );
+      }
+      await prefs.setBool(cle, true);
+    } catch (_) {
+      // Sans effet bloquant : la synchro normale continue.
+    }
+  }
+
   /// Écarte un signalement rejeté par le serveur sans le détruire : renommé
   /// en `.rejete`, il sort de la file (plus de boucle de renvoi) mais reste
   /// sur le téléphone pour diagnostic.
@@ -274,7 +335,8 @@ class OfflineSignalementService {
       final token = prefs.getString('token');
       if (token == null || token.isEmpty) return;
 
-      for (final signalement in file) {
+      for (final stocke in file) {
+        final signalement = await _completerCommune(stocke);
         final resultat = await envoyer(signalement, token);
         if (resultat.statut == StatutEnvoi.envoye) {
           await _supprimer(signalement.uuid);
@@ -294,7 +356,7 @@ class OfflineSignalementService {
   /// À appeler une fois au démarrage de l'app : tente une synchro immédiate
   /// puis en relance une à chaque retour de connexion.
   void demarrerSynchroAuto() {
-    synchroniser();
+    _reintegrerRejetesUneFois().whenComplete(synchroniser);
     _subscription ??= Connectivity().onConnectivityChanged.listen((etats) {
       final enLigne = etats.any((e) => e != ConnectivityResult.none);
       if (enLigne) {
