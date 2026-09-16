@@ -286,9 +286,10 @@ class _DepositScreenState extends State<DepositScreen> {
           // Hors ligne, timeout ou erreur serveur : on stocke localement, la
           // synchro automatique s'en chargera au retour de la connexion.
           await _offline.enfiler(signalement);
+          final diag = resultat.message != null ? ' (${resultat.message})' : '';
           _message(
-            'Envoi impossible pour le moment : signalement enregistré. Il '
-            'sera envoyé automatiquement dès que possible.',
+            'Envoi impossible pour le moment$diag : signalement enregistré. '
+            'Il sera renvoyé automatiquement dès que possible.',
           );
           break;
       }

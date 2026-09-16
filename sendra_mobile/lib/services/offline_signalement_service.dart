@@ -49,8 +49,10 @@ class ResultatEnvoi {
   factory ResultatEnvoi.envoye() => const ResultatEnvoi._(StatutEnvoi.envoye);
   factory ResultatEnvoi.rejete(String message) =>
       ResultatEnvoi._(StatutEnvoi.rejete, message);
-  factory ResultatEnvoi.aReessayer() =>
-      const ResultatEnvoi._(StatutEnvoi.aReessayer);
+  // `message` sert au diagnostic (code HTTP ou erreur réseau) : il permet de
+  // distinguer un vrai hors-ligne d'un échec serveur (413, 5xx, TLS...).
+  factory ResultatEnvoi.aReessayer([String? message]) =>
+      ResultatEnvoi._(StatutEnvoi.aReessayer, message);
 }
 
 /// Un signalement complet, tel que stocké localement en attendant l'envoi.
@@ -212,7 +214,7 @@ class OfflineSignalementService {
         if (corps['status_code'] == 422 || corps['error'] == true) {
           return ResultatEnvoi.rejete(_detailValidation(corps));
         }
-        return ResultatEnvoi.aReessayer();
+        return ResultatEnvoi.aReessayer('Réponse inattendue (HTTP 200)');
       }
 
       // 422 réel (image invalide) : rejet définitif, inutile de réessayer.
@@ -220,11 +222,13 @@ class OfflineSignalementService {
         return ResultatEnvoi.rejete(message.isNotEmpty ? message : 'Signalement refusé.');
       }
 
-      // 401/403 (jeton expiré) ou 5xx : on garde pour une tentative ultérieure.
-      return ResultatEnvoi.aReessayer();
-    } catch (_) {
-      // Réseau coupé, timeout : on réessaiera.
-      return ResultatEnvoi.aReessayer();
+      // 401/403 (jeton expiré), 413 (payload trop volumineux), 5xx... : on
+      // garde pour une tentative ultérieure, en remontant le code pour le
+      // diagnostic (une limite serveur ne se résout pas en réessayant).
+      return ResultatEnvoi.aReessayer('HTTP ${reponse.statusCode}');
+    } catch (e) {
+      // Réseau coupé, timeout, erreur TLS : on réessaiera.
+      return ResultatEnvoi.aReessayer(e.toString());
     }
   }
 
