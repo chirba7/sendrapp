@@ -1,0 +1,154 @@
+/* =============================================================
+   SENDRA — rafraîchissement visuel du back-office
+   -------------------------------------------------------------
+   Chargé APRÈS main.css : ce fichier ne contient que des
+   surcharges, rien n'est retiré du gabarit d'origine. Supprimer
+   la ligne <link> dans resources/views/layouts/base.blade.php
+   restaure l'apparence précédente à l'identique.
+
+   Accent : #048b44, le vert du logo SENDRA (le gabarit PlainAdmin
+   utilisait le bleu #365cf5 pour les états actifs et #219653 pour
+   les boutons « success » — deux accents concurrents).
+   ============================================================= */
+
+:root {
+    --sendra-vert: #048b44;
+    --sendra-vert-fonce: #037237;
+    --sendra-vert-tint: rgba(4, 139, 68, 0.1);
+    --sendra-encre: #1a2142;
+    --sendra-gris: #5d657b;
+    --sendra-gris-clair: #8f9aad;
+    --sendra-filet: #eef1f6;
+    --sendra-bord: #e6ebf3;
+
+    /* Bootstrap : recolore .text-success (toutes les icônes du menu
+       et les titres de page) et .btn-success d'un seul coup. */
+    --bs-success: #048b44;
+    --bs-success-rgb: 4, 139, 68;
+}
+
+/* ---------------------------------------------------- Boutons */
+.main-btn {
+    padding: 11px 20px;
+    border-radius: 8px;
+    font-weight: 600;
+    transition: background 0.2s ease-out, color 0.2s ease-out;
+}
+.success-btn { background: var(--sendra-vert); }
+.success-btn:hover { background: var(--sendra-vert-fonce); color: #fff; }
+.success-btn-outline { color: var(--sendra-vert); border-color: var(--sendra-vert); }
+.success-btn-outline:hover { background: var(--sendra-vert); }
+.success-btn-light { color: var(--sendra-vert); background: var(--sendra-vert-tint); }
+.success-btn-light:hover { background: var(--sendra-vert); color: #fff; }
+
+/* ----------------------------------------------------- Cartes */
+.card-style {
+    padding: 20px 24px;
+    border-radius: 10px;
+    box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04),
+        0 8px 20px -8px rgba(145, 158, 171, 0.18);
+}
+@media (max-width: 767px) {
+    .card-style { padding: 18px; }
+}
+
+/* --------------------------------------------------- Tableaux */
+.table th h6 {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--sendra-gris-clair);
+}
+.table > :not(caption) > * > * {
+    border-bottom-width: 0;
+    box-shadow: none;
+    padding: 12px 5px;
+    vertical-align: middle;
+}
+.table tbody tr { border-top: 1px solid var(--sendra-filet); }
+.table tbody tr:hover { background: #f8fafc; }
+.table td p { color: var(--sendra-gris); }
+.table td p a:hover { color: var(--sendra-vert); }
+/* Vignette de la photo du signalement */
+.top-selling-table td img {
+    width: 44px;
+    height: 44px;
+    object-fit: cover;
+    border-radius: 8px;
+}
+
+/* ---------------------------------------------- Pastilles d'état */
+/* La couleur par état (SIGNALE / EN COURS / ENLEVE / REJETE) arrive
+   avec la passe sur les gabarits : aujourd'hui toutes les lignes
+   sortent en .status-btn.close-btn, donc toutes en rouge. Ici on ne
+   règle que la forme. */
+.status-btn {
+    padding: 6px 13px;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+}
+.status-btn.success-btn { color: var(--sendra-vert); background: var(--sendra-vert-tint); }
+
+/* ------------------------------------------------ Barre latérale */
+.sidebar-nav-wrapper .sidebar-nav ul .nav-item > a { padding: 9px 25px; }
+.sidebar-nav-wrapper .sidebar-nav ul .nav-item.active > a,
+.sidebar-nav-wrapper .sidebar-nav ul .nav-item.active > a.collapsed,
+.sidebar-nav-wrapper .sidebar-nav ul .nav-item:hover > a,
+.sidebar-nav-wrapper .sidebar-nav ul .nav-item:hover > a.collapsed {
+    color: var(--sendra-vert);
+    background: var(--sendra-vert-tint);
+    box-shadow: inset 3px 0 0 var(--sendra-vert);
+}
+.sidebar-nav-wrapper .sidebar-nav ul .nav-item.active > a .icon,
+.sidebar-nav-wrapper .sidebar-nav ul .nav-item.active > a.collapsed .icon,
+.sidebar-nav-wrapper .sidebar-nav ul .nav-item:hover > a .icon,
+.sidebar-nav-wrapper .sidebar-nav ul .nav-item:hover > a.collapsed .icon,
+.sidebar-nav-wrapper .sidebar-nav ul .nav-item.nav-item-has-children > a:not(.collapsed) .icon {
+    color: var(--sendra-vert);
+}
+.sidebar-nav-wrapper .sidebar-nav ul .nav-item.nav-item-has-children > a::after { right: 20px; }
+.sidebar-nav-wrapper .sidebar-nav ul .dropdown-nav li a.active {
+    color: var(--sendra-vert);
+    font-weight: 600;
+}
+.sidebar-nav-wrapper .navbar-logo { padding: 0 22px; }
+
+/* ------------------------------------------------------ En-tête */
+.header { border-bottom: 1px solid var(--sendra-filet); }
+.header .header-left .header-search form input:focus { border-color: var(--sendra-vert); }
+.header .header-right .profile-box .profile-info .info .image { border-color: var(--sendra-bord); }
+
+/* ------------------------------------------- Titres et messages */
+.title h2.text-success { color: var(--sendra-encre) !important; }
+.alert-box.success-alert .left,
+.success-alert .left { background: var(--sendra-vert); }
+
+/* ---------------------------------------------------- Formulaires */
+.form-control:focus,
+.form-select:focus,
+input:focus,
+textarea:focus,
+select:focus {
+    border-color: var(--sendra-vert);
+    box-shadow: 0 0 0 3px var(--sendra-vert-tint);
+}
+
+/* ----------------------------------------------------- Pagination */
+.page-link {
+    color: var(--sendra-encre);
+    border-color: var(--sendra-bord);
+    border-radius: 8px !important;
+    margin: 0 3px;
+}
+.page-link:hover { background: var(--sendra-vert-tint); color: var(--sendra-vert); }
+.page-item.active .page-link {
+    background: var(--sendra-vert);
+    border-color: var(--sendra-vert);
+    color: #fff;
+}
+.page-link:focus { box-shadow: 0 0 0 3px var(--sendra-vert-tint); }
+
+/* --------------------------------------------------------- Liens */
+a:hover { color: var(--sendra-vert); }
