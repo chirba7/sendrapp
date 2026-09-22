@@ -6,6 +6,7 @@ use App\Http\Controllers\CarPositionController;
 use App\Http\Controllers\DommagesController;
 use App\Http\Controllers\EnlevementController;
 use App\Http\Controllers\InfractionController;
+use App\Http\Controllers\MissionController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\VehiculeController;
@@ -92,6 +93,12 @@ Route::middleware('jwt.auth')->group(function () {
 
         // Statistiques
         Route::get('/statistiques', [CarPositionController::class, 'statistiques']);
+    });
+
+    Route::middleware('role:2')->group(function () {
+        Route::get('/missions', [MissionController::class, 'index']);
+        Route::post('/missions/{mission}/pointer', [MissionController::class, 'checkIn'])
+            ->middleware('throttle:10,1');
     });
 
     // Correction ACL : l'approbation est réservée à Admin/Autorité commune/

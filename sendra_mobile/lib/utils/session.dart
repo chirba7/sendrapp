@@ -26,4 +26,6 @@ class Session {
     final roleId = await getRoleId();
     return roleId != null && roleId >= 1 && roleId <= 4;
   }
+
+  static Future<bool> isAgent() async => (await getRoleId()) == 2;
 }

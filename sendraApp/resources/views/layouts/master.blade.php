@@ -53,6 +53,12 @@
                 </a>
             </li>
             @if (Auth::user()->role->nomRole == 'Admin')
+            <li class="nav-item {{request()->is('dashboard/missions*') ? 'active' : ''}}">
+                <a href="{{route('missions.index')}}">
+                    <span class="icon text-success"><i class="lni lni-clipboard"></i></span>
+                    <span class="text">Missions</span>
+                </a>
+            </li>
             <li class="nav-item nav-item-has-children {{request()->is('dashboard/signalement/signales') || request()->is('dashboard/signalement/encours') || request()->is('dashboard/signalement/enleves') ? 'active' : ''}}">
                 <a href="#0" class="collapsed" data-bs-toggle="collapse" data-bs-target="#ddmenu_3" aria-controls="ddmenu_3" aria-expanded="false" aria-label="Toggle navigation">
                     <span class="icon text-success">

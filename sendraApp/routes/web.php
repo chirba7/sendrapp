@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\CarPositionController;
 use App\Http\Controllers\UserController;
+use App\Http\Controllers\MissionController;
 use App\Models\CarPosition;
 use App\Models\User;
 use Illuminate\Support\Facades\Route;
@@ -99,6 +100,11 @@ Route::middleware([
     // sinon "citoyens" serait interprété comme un id de compte.
     Route::get('/dashboard/comptes/citoyens', [UserController::class, 'citoyens'])->name('citoyens');
     Route::post('/ajouter', [UserController::class, 'store'])->name('ajouter.compte');
+
+    Route::get('/dashboard/missions', [MissionController::class, 'index'])->name('missions.index');
+    Route::get('/dashboard/missions/creer', [MissionController::class, 'create'])->name('missions.create');
+    Route::post('/dashboard/missions', [MissionController::class, 'store'])->name('missions.store');
+    Route::delete('/dashboard/missions/{mission}', [MissionController::class, 'destroy'])->name('missions.destroy');
 
     Route::get('/dashboard/comptes/{user}', [UserController::class, 'show'])->name('modifier');
     Route::patch('/dashboard/comptes/{user}', [UserController::class, 'modifier'])->name('modifier.compte');
