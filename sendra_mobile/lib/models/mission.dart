@@ -1,6 +1,7 @@
 class Mission {
   const Mission({
     required this.id,
+    required this.code,
     required this.title,
     required this.type,
     required this.status,
@@ -12,11 +13,14 @@ class Mission {
     required this.checkedIn,
     required this.vehicles,
     required this.pounds,
+    required this.trucks,
+    this.providerName,
     this.trailerBrand,
     this.trailerPlate,
   });
 
   final int id;
+  final String code;
   final String title;
   final String type;
   final String status;
@@ -28,6 +32,8 @@ class Mission {
   final bool checkedIn;
   final List<MissionVehicle> vehicles;
   final List<String> pounds;
+  final List<MissionTruck> trucks;
+  final String? providerName;
   final String? trailerBrand;
   final String? trailerPlate;
 
@@ -38,6 +44,7 @@ class Mission {
     final rawVehicles = json['vehicles'] ?? json['vehicules'];
     return Mission(
       id: int.tryParse('${json['id']}') ?? 0,
+      code: '${json['code'] ?? ''}',
       title: '${json['title'] ?? json['titre'] ?? 'Mission'}',
       type: '${json['type'] ?? 'brute'}',
       status: '${json['status'] ?? json['statut'] ?? 'planifiee'}',
@@ -52,6 +59,14 @@ class Mission {
       pounds: json['pounds'] is List
           ? (json['pounds'] as List).map((value) => value.toString()).toList()
           : const [],
+      trucks: json['trucks'] is List
+          ? (json['trucks'] as List)
+              .whereType<Map>()
+              .map((item) =>
+                  MissionTruck.fromJson(Map<String, dynamic>.from(item)))
+              .toList()
+          : const [],
+      providerName: json['provider_name']?.toString(),
       trailerBrand: json['trailer_brand']?.toString() ??
           json['remorque_marque']?.toString(),
       trailerPlate: json['trailer_plate']?.toString() ??
@@ -65,6 +80,22 @@ class Mission {
           : const [],
     );
   }
+}
+
+class MissionTruck {
+  const MissionTruck(
+      {this.brand, this.registration, this.driverName, this.seats});
+  final String? brand;
+  final String? registration;
+  final String? driverName;
+  final int? seats;
+
+  factory MissionTruck.fromJson(Map<String, dynamic> json) => MissionTruck(
+        brand: json['trailer_brand']?.toString(),
+        registration: json['registration']?.toString(),
+        driverName: json['driver_name']?.toString(),
+        seats: int.tryParse('${json['seats'] ?? ''}'),
+      );
 }
 
 class MissionVehicle {

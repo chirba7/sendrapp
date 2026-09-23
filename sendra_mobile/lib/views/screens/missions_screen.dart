@@ -144,12 +144,13 @@ class _MissionCard extends StatelessWidget {
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Row(children: [
             Expanded(
-              child: Text(mission.title,
+              child: Text(
+                  mission.code.isNotEmpty ? mission.code : mission.title,
                   style: const TextStyle(
                       fontSize: 17, fontWeight: FontWeight.w700)),
             ),
             _Badge(
-              label: mission.isProgrammed ? 'Programmée' : 'Brute',
+              label: mission.isProgrammed ? 'Programmée' : 'Directe',
               color:
                   mission.isProgrammed ? SendraTheme.green : SendraTheme.amber,
             ),
@@ -158,6 +159,8 @@ class _MissionCard extends StatelessWidget {
           _Info(icon: Icons.event_outlined, text: dateLabel),
           if (mission.address.isNotEmpty)
             _Info(icon: Icons.place_outlined, text: mission.address),
+          if ((mission.providerName ?? '').isNotEmpty)
+            _Info(icon: Icons.business_outlined, text: mission.providerName!),
           if ((mission.trailerBrand ?? '').isNotEmpty ||
               (mission.trailerPlate ?? '').isNotEmpty)
             _Info(
@@ -171,6 +174,15 @@ class _MissionCard extends StatelessWidget {
               icon: Icons.local_parking_outlined,
               text: 'Fourrières disponibles : ${mission.pounds.join(', ')}',
             ),
+          ...mission.trucks.map((truck) => _Info(
+                icon: Icons.local_shipping_outlined,
+                text: [
+                  truck.brand,
+                  truck.registration,
+                  truck.driverName,
+                  if (truck.seats != null) '${truck.seats} places',
+                ].where((value) => value?.isNotEmpty ?? false).join(' • '),
+              )),
           const SizedBox(height: 12),
           if (!mission.checkedIn) ...[
             Container(

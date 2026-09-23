@@ -10,7 +10,7 @@ class Mission extends Model
     use HasFactory;
 
     protected $fillable = [
-        'title', 'type', 'status', 'scheduled_at', 'address', 'latitude',
+        'code', 'title', 'commune_id', 'type', 'status', 'provider_name', 'scheduled_at', 'address', 'latitude',
         'longitude', 'check_in_radius_meters', 'trailer_brand',
         'trailer_plate', 'pounds', 'created_by',
     ];
@@ -32,5 +32,15 @@ class Mission extends Model
     public function vehicles()
     {
         return $this->belongsToMany(CarPosition::class, 'mission_vehicle')->withTimestamps();
+    }
+
+    public function commune()
+    {
+        return $this->belongsTo(Commune::class);
+    }
+
+    public function trucks()
+    {
+        return $this->hasMany(MissionTruck::class);
     }
 }

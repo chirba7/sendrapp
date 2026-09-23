@@ -24,24 +24,26 @@
             <div class="table-responsive">
                 <table class="table align-middle">
                     <thead><tr>
-                        <th>Mission</th><th>Date</th><th>Lieu</th><th>Agents</th><th>Pointages</th><th>Véhicules</th><th></th>
+                        <th>Mission</th><th>Date</th><th>Commune</th><th>Agents</th><th>Pointages</th><th>Véhicules</th><th></th>
                     </tr></thead>
                     <tbody>
                     @forelse ($missions as $mission)
                         <tr>
                             <td>
-                                <strong>{{ $mission->title }}</strong><br>
+                                <strong>{{ $mission->code ?: $mission->title }}</strong><br><small>{{ $mission->title }}</small><br>
                                 <span class="badge {{ $mission->type === 'programmee' ? 'bg-success' : 'bg-warning text-dark' }}">
-                                    {{ $mission->type === 'programmee' ? 'Programmée' : 'Brute' }}
+                                    {{ $mission->type === 'programmee' ? 'Programmée' : 'Directe' }}
                                 </span>
                             </td>
-                            <td>{{ $mission->scheduled_at->format('d/m/Y H:i') }}</td>
-                            <td>{{ $mission->address }}</td>
-                            <td>{{ $mission->agents->count() }}</td>
+                            <td>{{ $mission->scheduled_at?->format('d/m/Y H:i') ?: '—' }}</td>
+                            <td>{{ $mission->commune?->nomCommune ?: '—' }}</td>
+                            <td>{{ $mission->agents->count() ?: 'Tous' }}</td>
                             <td>{{ $mission->agents->filter(fn ($agent) => $agent->pivot->checked_in_at)->count() }}</td>
                             <td>{{ $mission->vehicles->count() }}</td>
                             <td class="text-end">
-                                <form action="{{ route('missions.destroy', $mission) }}" method="POST" onsubmit="return confirm('Supprimer cette mission ?')">
+                                <a class="btn btn-sm btn-outline-success" href="{{route('missions.show',$mission)}}">Détails</a>
+                                <a class="btn btn-sm btn-outline-secondary" href="{{route('missions.edit',$mission)}}">Modifier</a>
+                                <form class="d-inline" action="{{ route('missions.destroy', $mission) }}" method="POST" onsubmit="return confirm('Supprimer cette mission ?')">
                                     @csrf @method('DELETE')
                                     <button class="btn btn-sm btn-outline-danger" type="submit">Supprimer</button>
                                 </form>

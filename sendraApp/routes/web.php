@@ -3,6 +3,7 @@
 use App\Http\Controllers\CarPositionController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\MissionController;
+use App\Http\Controllers\CommuneController;
 use App\Models\CarPosition;
 use App\Models\User;
 use Illuminate\Support\Facades\Route;
@@ -101,9 +102,14 @@ Route::middleware([
     Route::get('/dashboard/comptes/citoyens', [UserController::class, 'citoyens'])->name('citoyens');
     Route::post('/ajouter', [UserController::class, 'store'])->name('ajouter.compte');
 
+    Route::resource('/dashboard/communes', CommuneController::class);
+
     Route::get('/dashboard/missions', [MissionController::class, 'index'])->name('missions.index');
     Route::get('/dashboard/missions/creer', [MissionController::class, 'create'])->name('missions.create');
     Route::post('/dashboard/missions', [MissionController::class, 'store'])->name('missions.store');
+    Route::get('/dashboard/missions/{mission}', [MissionController::class, 'show'])->name('missions.show');
+    Route::get('/dashboard/missions/{mission}/modifier', [MissionController::class, 'edit'])->name('missions.edit');
+    Route::put('/dashboard/missions/{mission}', [MissionController::class, 'update'])->name('missions.update');
     Route::delete('/dashboard/missions/{mission}', [MissionController::class, 'destroy'])->name('missions.destroy');
 
     Route::get('/dashboard/comptes/{user}', [UserController::class, 'show'])->name('modifier');

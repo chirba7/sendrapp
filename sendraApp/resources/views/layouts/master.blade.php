@@ -53,6 +53,12 @@
                 </a>
             </li>
             @if (Auth::user()->role->nomRole == 'Admin')
+            <li class="nav-item {{request()->is('dashboard/communes*') ? 'active' : ''}}">
+                <a href="{{route('communes.index')}}">
+                    <span class="icon text-success"><i class="lni lni-map-marker"></i></span>
+                    <span class="text">Communes</span>
+                </a>
+            </li>
             <li class="nav-item {{request()->is('dashboard/missions*') ? 'active' : ''}}">
                 <a href="{{route('missions.index')}}">
                     <span class="icon text-success"><i class="lni lni-clipboard"></i></span>
