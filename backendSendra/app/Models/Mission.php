@@ -43,4 +43,14 @@ class Mission extends Model
     {
         return $this->hasMany(MissionTruck::class);
     }
+
+    public function removals()
+    {
+        return $this->hasMany(MissionRemoval::class);
+    }
+
+    public function dispatches()
+    {
+        return $this->hasMany(MissionDispatch::class);
+    }
 }

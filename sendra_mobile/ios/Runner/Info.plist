@@ -4,6 +4,8 @@
 <dict>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Votre position sert à confirmer votre présence sur le lieu d’une mission.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>L’appareil photo sert à documenter les véhicules enlevés et leur fiche de départ.</string>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>

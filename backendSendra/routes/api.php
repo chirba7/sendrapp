@@ -97,8 +97,11 @@ Route::middleware('jwt.auth')->group(function () {
 
     Route::middleware('role:2')->group(function () {
         Route::get('/missions', [MissionController::class, 'index']);
+        Route::get('/missions/{mission}', [MissionController::class, 'show']);
         Route::post('/missions/{mission}/pointer', [MissionController::class, 'checkIn'])
             ->middleware('throttle:10,1');
+        Route::post('/missions/{mission}/enlevements', [MissionController::class, 'storeRemoval']);
+        Route::post('/missions/{mission}/enlevements/{removal}/destination', [MissionController::class, 'storeRemovalDestination']);
     });
 
     // Correction ACL : l'approbation est réservée à Admin/Autorité commune/

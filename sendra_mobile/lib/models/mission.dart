@@ -14,6 +14,8 @@ class Mission {
     required this.vehicles,
     required this.pounds,
     required this.trucks,
+    required this.removals,
+    required this.dispatches,
     this.providerName,
     this.trailerBrand,
     this.trailerPlate,
@@ -33,6 +35,8 @@ class Mission {
   final List<MissionVehicle> vehicles;
   final List<String> pounds;
   final List<MissionTruck> trucks;
+  final List<MissionRemoval> removals;
+  final List<MissionDispatch> dispatches;
   final String? providerName;
   final String? trailerBrand;
   final String? trailerPlate;
@@ -66,6 +70,20 @@ class Mission {
                   MissionTruck.fromJson(Map<String, dynamic>.from(item)))
               .toList()
           : const [],
+      removals: json['removals'] is List
+          ? (json['removals'] as List)
+              .whereType<Map>()
+              .map((item) =>
+                  MissionRemoval.fromJson(Map<String, dynamic>.from(item)))
+              .toList()
+          : const [],
+      dispatches: json['dispatches'] is List
+          ? (json['dispatches'] as List)
+              .whereType<Map>()
+              .map((item) =>
+                  MissionDispatch.fromJson(Map<String, dynamic>.from(item)))
+              .toList()
+          : const [],
       providerName: json['provider_name']?.toString(),
       trailerBrand: json['trailer_brand']?.toString() ??
           json['remorque_marque']?.toString(),
@@ -84,17 +102,83 @@ class Mission {
 
 class MissionTruck {
   const MissionTruck(
-      {this.brand, this.registration, this.driverName, this.seats});
+      {required this.id,
+      this.brand,
+      this.registration,
+      this.driverName,
+      this.seats});
+  final int id;
   final String? brand;
   final String? registration;
   final String? driverName;
   final int? seats;
 
   factory MissionTruck.fromJson(Map<String, dynamic> json) => MissionTruck(
+        id: int.tryParse('${json['id']}') ?? 0,
         brand: json['trailer_brand']?.toString(),
         registration: json['registration']?.toString(),
         driverName: json['driver_name']?.toString(),
         seats: int.tryParse('${json['seats'] ?? ''}'),
+      );
+}
+
+class MissionRemoval {
+  const MissionRemoval(
+      {required this.id,
+      this.carPositionId,
+      this.truckId,
+      this.dispatchId,
+      required this.label,
+      this.plate,
+      this.poundName,
+      this.sheetPhotoUrl,
+      required this.photos});
+  final int id;
+  final int? carPositionId;
+  final int? truckId;
+  final int? dispatchId;
+  final String label;
+  final String? plate;
+  final String? poundName;
+  final String? sheetPhotoUrl;
+  final Map<String, String> photos;
+
+  factory MissionRemoval.fromJson(Map<String, dynamic> json) => MissionRemoval(
+        id: int.tryParse('${json['id']}') ?? 0,
+        carPositionId: int.tryParse('${json['car_position_id'] ?? ''}'),
+        truckId: int.tryParse('${json['mission_truck_id'] ?? ''}'),
+        dispatchId: int.tryParse('${json['dispatch_id'] ?? ''}'),
+        label: '${json['vehicle_label'] ?? 'Véhicule'}',
+        plate: json['plate']?.toString(),
+        poundName: json['pound_name']?.toString(),
+        sheetPhotoUrl: json['sheet_photo_url']?.toString(),
+        photos: json['photos'] is Map
+            ? Map<String, String>.from((json['photos'] as Map)
+                .map((key, value) => MapEntry('$key', '$value')))
+            : const {},
+      );
+}
+
+class MissionDispatch {
+  const MissionDispatch(
+      {required this.id,
+      required this.truckId,
+      required this.poundName,
+      this.departedAt,
+      this.sheetPhotoUrl});
+  final int id;
+  final int truckId;
+  final String poundName;
+  final DateTime? departedAt;
+  final String? sheetPhotoUrl;
+
+  factory MissionDispatch.fromJson(Map<String, dynamic> json) =>
+      MissionDispatch(
+        id: int.tryParse('${json['id']}') ?? 0,
+        truckId: int.tryParse('${json['mission_truck_id']}') ?? 0,
+        poundName: '${json['pound_name'] ?? ''}',
+        departedAt: DateTime.tryParse('${json['departed_at'] ?? ''}'),
+        sheetPhotoUrl: json['sheet_photo_url']?.toString(),
       );
 }
 
