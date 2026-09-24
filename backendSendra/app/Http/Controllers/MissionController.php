@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Mission;
 use App\Models\MissionRemoval;
 use App\Models\MissionTruck;
+use App\Models\MissionReception;
 use App\Support\ImageOptimizer;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -20,6 +21,7 @@ class MissionController extends Controller
         $missions = Mission::query()
             ->where(function ($query) use ($userId) {
                 $query->whereHas('agents', fn ($agents) => $agents->where('users.id', $userId))
+                    ->orWhere('reception_agent_id', $userId)
                     ->orWhere(function ($direct) {
                         $direct->where('type', 'brute')->doesntHave('agents');
                     });
@@ -27,7 +29,7 @@ class MissionController extends Controller
             ->with([
                 'agents' => fn ($query) => $query->where('users.id', $userId),
                 'commune', 'trucks', 'vehicles', 'removals.photos', 'removals.vehicle',
-                'removals.dispatch', 'dispatches',
+                'removals.dispatch', 'removals.reception', 'dispatches', 'receptionAgent', 'receptionPound',
             ])
             ->whereNotIn('status', ['brouillon', 'annulee'])
             ->orderByRaw('scheduled_at IS NULL, scheduled_at')
@@ -175,11 +177,79 @@ class MissionController extends Controller
         return response()->json(['message' => 'Fourrière du camion enregistrée.', 'data' => $this->serializeForAgent($mission)]);
     }
 
+    public function validateRemoval(Request $request, Mission $mission): JsonResponse
+    {
+        $this->assertCheckedIn($request, $mission);
+        abort_if($mission->removals()->doesntExist(), 422, 'Ajoutez au moins un véhicule enlevé avant de valider.');
+        $missingDestinations = $mission->trucks()->whereHas('removals')->whereNull('destination_pound_name')->count();
+        abort_if($missingDestinations > 0, 422, 'Précisez la fourrière de chaque camion utilisé avant de valider.');
+        $mission->update(['removal_validated_at'=>now(),'removal_validated_by'=>$request->user()->id,'status'=>'en_reception']);
+        $mission->load($this->agentRelations($request->user()->id));
+        return response()->json(['message'=>'Phase d’enlèvement validée.','data'=>$this->serializeForAgent($mission)]);
+    }
+
+    public function checkInReception(Request $request, Mission $mission): JsonResponse
+    {
+        abort_unless($mission->reception_agent_id === $request->user()->id, 403, 'Vous n’êtes pas l’agent de réception de cette mission.');
+        abort_unless($mission->removal_validated_at, 422, 'L’équipe d’enlèvement n’a pas encore validé son intervention.');
+        $data=$request->validate(['latitude'=>['required','numeric','between:-90,90'],'longitude'=>['required','numeric','between:-180,180']]);
+        $mission->load('receptionPound');
+        abort_unless($mission->receptionPound,422,'Aucune fourrière de réception n’est affectée.');
+        $distance=$this->distanceFromGeofence((float)$data['latitude'],(float)$data['longitude'],$mission->receptionPound->geofence??[]);
+        $margin=(int)$mission->receptionPound->geofence_margin_meters;
+        abort_if($distance>$margin,422,'Vous êtes à '.round($distance).' m de la zone de la fourrière. Rapprochez-vous à moins de '.$margin.' m.');
+        $mission->update(['reception_checked_in_at'=>now(),'reception_check_in_latitude'=>$data['latitude'],'reception_check_in_longitude'=>$data['longitude']]);
+        $mission->load($this->agentRelations($request->user()->id));
+        return response()->json(['message'=>'Présence à la fourrière confirmée.','data'=>$this->serializeForAgent($mission)]);
+    }
+
+    public function storeReception(Request $request, Mission $mission, MissionRemoval $removal): JsonResponse
+    {
+        $this->assertReceptionReady($request,$mission);
+        abort_unless($removal->mission_id===$mission->id,404);
+        $existing=MissionReception::where('mission_removal_id',$removal->id)->first();
+        $rule=$existing?'nullable':'required';
+        $request->validate(['front'=>[$rule,'image','max:10240'],'back'=>[$rule,'image','max:10240'],'left'=>[$rule,'image','max:10240'],'right'=>[$rule,'image','max:10240'],'sheet'=>[$rule,'image','max:10240']]);
+        $paths=[];
+        foreach(['front','back','left','right','sheet'] as $key){
+            $column=$key.'_photo_path';
+            $paths[$column]=$existing?->{$column};
+            if($request->hasFile($key)){
+                if($paths[$column]) Storage::disk('public')->delete($paths[$column]);
+                $paths[$column]=$this->storeImage($request->file($key),"missions/{$mission->id}/receptions/{$removal->id}");
+            }
+        }
+        MissionReception::updateOrCreate(['mission_removal_id'=>$removal->id],array_merge([
+            'mission_id'=>$mission->id,'received_by'=>$request->user()->id,'received_at'=>now(),
+        ],$paths));
+        $mission->load($this->agentRelations($request->user()->id));
+        return response()->json(['message'=>'Réception du véhicule enregistrée.','data'=>$this->serializeForAgent($mission)]);
+    }
+
+    public function completeMission(Request $request, Mission $mission): JsonResponse
+    {
+        $this->assertReceptionReady($request,$mission);
+        abort_if($mission->removals()->doesntExist(),422,'Aucun véhicule à réceptionner.');
+        $missing=$mission->removals()->whereDoesntHave('reception')->count();
+        abort_if($missing>0,422,"Il reste {$missing} véhicule(s) à réceptionner.");
+        $mission->update(['status'=>'terminee','completed_at'=>now()]);
+        $mission->load($this->agentRelations($request->user()->id));
+        return response()->json(['message'=>'Mission terminée.','data'=>$this->serializeForAgent($mission)]);
+    }
+
     private function serializeForAgent(Mission $mission): array
     {
         $assignment = $mission->agents->first();
         $checkedIn = (bool) optional($assignment?->pivot)->checked_in_at;
-        if ($checkedIn && ! $mission->relationLoaded('vehicles')) $mission->load('vehicles');
+        $isReceiver = $mission->reception_agent_id === request()->user()->id;
+        $receptionCheckedIn = $isReceiver && (bool)$mission->reception_checked_in_at;
+        $unlocked = $checkedIn || $receptionCheckedIn;
+        if ($unlocked && ! $mission->relationLoaded('vehicles')) $mission->load('vehicles');
+        $readyPounds = collect($mission->pounds ?? [])
+            ->push($mission->receptionPound?->name)
+            ->filter()
+            ->unique()
+            ->values();
 
         return [
             'id' => $mission->id, 'code' => $mission->code, 'title' => $mission->title,
@@ -189,19 +259,23 @@ class MissionController extends Controller
             'latitude' => $mission->commune?->latitude, 'longitude' => $mission->commune?->longitude,
             'check_in_radius_meters' => $mission->commune?->geofence_margin_meters,
             'provider_name' => $mission->provider_name,
-            'pounds' => $checkedIn ? ($mission->pounds ?? []) : [],
-            'trucks' => $checkedIn ? $mission->trucks->map(fn ($truck) => [
+            'pounds' => $unlocked ? $readyPounds : [],
+            'trucks' => $unlocked ? $mission->trucks->map(fn ($truck) => [
                 'id' => $truck->id, 'trailer_brand' => $truck->trailer_brand, 'registration' => $truck->registration,
                 'driver_name' => $truck->driver_name, 'seats' => $truck->seats,
                 'destination_pound_name' => $truck->destination_pound_name,
             ])->values() : [],
             'checked_in' => $checkedIn,
-            'vehicles' => $checkedIn ? $mission->vehicles->map(fn ($vehicle) => [
+            'is_receiver' => $isReceiver, 'reception_checked_in' => $receptionCheckedIn,
+            'removal_validated' => (bool)$mission->removal_validated_at,
+            'reception_pound_name' => $mission->receptionPound?->name,
+            'completed' => (bool)$mission->completed_at,
+            'vehicles' => $unlocked ? $mission->vehicles->map(fn ($vehicle) => [
                 'id' => $vehicle->id,
                 'label' => trim(($vehicle->marque ?? '').' '.($vehicle->model ?? '')) ?: ($vehicle->title ?? 'Véhicule'),
                 'plate' => $vehicle->numero_vehicule,
             ])->values() : [],
-            'removals' => $checkedIn ? $mission->removals->map(fn ($removal) => [
+            'removals' => $unlocked ? $mission->removals->map(fn ($removal) => [
                 'id' => $removal->id, 'car_position_id' => $removal->car_position_id,
                 'vehicle_label' => $removal->vehicle_label ?: trim(($removal->vehicle?->marque ?? '').' '.($removal->vehicle?->model ?? '')) ?: 'Véhicule',
                 'plate' => $removal->plate ?: $removal->vehicle?->numero_vehicule,
@@ -212,6 +286,8 @@ class MissionController extends Controller
                     ? request()->getSchemeAndHttpHost().Storage::url($removal->sheet_photo_path)
                     : null,
                 'photos' => $removal->photos->mapWithKeys(fn ($photo) => [$photo->angle => request()->getSchemeAndHttpHost().Storage::url($photo->path)]),
+                'received' => (bool)$removal->reception,
+                'reception_photos' => $removal->reception ? collect(['front','back','left','right','sheet'])->mapWithKeys(fn($angle)=>[$angle=>request()->getSchemeAndHttpHost().Storage::url($removal->reception->{$angle.'_photo_path'})]) : (object)[],
             ])->values() : [],
             'dispatches' => $checkedIn ? $mission->dispatches->map(fn ($dispatch) => [
                 'id' => $dispatch->id, 'mission_truck_id' => $dispatch->mission_truck_id,
@@ -223,20 +299,26 @@ class MissionController extends Controller
 
     private function agentRelations(int $userId): array
     {
-        return ['agents' => fn ($query) => $query->where('users.id', $userId), 'vehicles', 'commune', 'trucks', 'removals.photos', 'removals.vehicle', 'removals.dispatch', 'dispatches'];
+        return ['agents' => fn ($query) => $query->where('users.id', $userId), 'vehicles', 'commune', 'trucks', 'removals.photos', 'removals.vehicle', 'removals.dispatch', 'removals.reception', 'dispatches', 'receptionPound', 'receptionAgent'];
     }
 
     private function assertVisibleToAgent(Request $request, Mission $mission): void
     {
         $assigned = $mission->agents()->where('users.id', $request->user()->id)->exists();
         $availableDirect = $mission->type === 'brute' && ! $mission->agents()->exists();
-        abort_unless($assigned || $availableDirect, 403, 'Cette mission ne vous est pas affectée.');
+        abort_unless($assigned || $availableDirect || $mission->reception_agent_id===$request->user()->id, 403, 'Cette mission ne vous est pas affectée.');
     }
 
     private function assertCheckedIn(Request $request, Mission $mission): void
     {
         $checkedIn = $mission->agents()->where('users.id', $request->user()->id)->wherePivotNotNull('checked_in_at')->exists();
         abort_unless($checkedIn, 403, 'Vous devez pointer avant de commencer les enlèvements.');
+    }
+
+    private function assertReceptionReady(Request $request,Mission $mission): void
+    {
+        abort_unless($mission->reception_agent_id===$request->user()->id,403,'Vous n’êtes pas l’agent de réception.');
+        abort_unless($mission->reception_checked_in_at,403,'Vous devez pointer à la fourrière avant la réception.');
     }
 
     private function storeImage($file, string $directory): string

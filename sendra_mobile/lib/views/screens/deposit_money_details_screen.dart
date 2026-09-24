@@ -9,7 +9,6 @@ import '../../utils/sendra_theme.dart';
 import '../../widgets/others/galerie_photos_signalement.dart';
 import 'carto.dart';
 import 'dommages_screen.dart';
-import 'enlevement_screen.dart';
 import 'informationBase_screen.dart';
 import 'infraction_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -318,18 +317,58 @@ class _DepositMoneyDetailsScreenState extends State<DepositMoneyDetailsScreen> {
                   _approvalStatus(signalementData['etat']?.toString()),
               ] else if (grouped) ...[
                 _constatationGroup(signalementData),
-                _enlevementHighlight(signalementData),
+                _missionAssignmentCard(),
               ] else ...[
                 _menuItem('Véhicule', signalementData),
                 _menuItem('Infraction', signalementData),
                 _menuItem('Dommages', signalementData),
-                _menuItem('Enlèvement', signalementData),
               ],
             ] else
               _citizenStatusCard(signalementData['etat']?.toString()),
             const SizedBox(height: 16),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _missionAssignmentCard() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
+      child: Container(
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          color: const Color(0xFFEAF3FF),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: const Color(0xFFB8D5F5)),
+        ),
+        child: const Row(children: [
+          SizedBox(
+            width: 50,
+            height: 50,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.all(Radius.circular(14)),
+              ),
+              child: Icon(Icons.assignment_turned_in_outlined,
+                  color: Color(0xFF2468A2), size: 27),
+            ),
+          ),
+          SizedBox(width: 14),
+          Expanded(
+              child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Prêt pour une mission',
+                  style: TextStyle(fontWeight: FontWeight.w800, fontSize: 17)),
+              SizedBox(height: 4),
+              Text(
+                  'L’enlèvement se réalise désormais depuis une mission affectée.',
+                  style: TextStyle(color: SendraTheme.muted)),
+            ],
+          )),
+        ]),
       ),
     );
   }
@@ -374,83 +413,6 @@ class _DepositMoneyDetailsScreenState extends State<DepositMoneyDetailsScreen> {
               _menuItem('Infraction', signalementData),
               _menuItem('Dommages', signalementData),
             ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _enlevementHighlight(Map<String, dynamic> signalementData) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(18),
-          onTap: () {
-            final signalementId = signalementData['signalementId'];
-            Navigator.of(context).push(MaterialPageRoute(
-              builder: (context) =>
-                  RemovalForm(signalementId: signalementId),
-            ));
-          },
-          child: Container(
-            padding: const EdgeInsets.all(18),
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [SendraTheme.green, SendraTheme.forest],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(18),
-              boxShadow: [
-                BoxShadow(
-                  color: SendraTheme.green.withValues(alpha: .3),
-                  blurRadius: 16,
-                  offset: const Offset(0, 6),
-                ),
-              ],
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 50,
-                  height: 50,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: .18),
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: const Text('🚛', style: TextStyle(fontSize: 25)),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Enlèvement',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w800,
-                          fontSize: 18,
-                        ),
-                      ),
-                      const SizedBox(height: 3),
-                      Text(
-                        'Signalement approuvé — prochaine étape',
-                        style: TextStyle(
-                          color: Colors.white.withValues(alpha: .85),
-                          fontSize: 12.5,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const Icon(Icons.arrow_forward_ios,
-                    color: Colors.white, size: 18),
-              ],
-            ),
           ),
         ),
       ),
@@ -690,10 +652,6 @@ class _DepositMoneyDetailsScreenState extends State<DepositMoneyDetailsScreen> {
               if (updated == true && mounted) {
                 await fetchSignalementData();
               }
-            } else if (title == 'Enlèvement') {
-              Navigator.of(context).push(MaterialPageRoute(
-                builder: (context) => RemovalForm(signalementId: signalementId),
-              ));
             }
           },
         ),
@@ -707,7 +665,6 @@ class _DepositMoneyDetailsScreenState extends State<DepositMoneyDetailsScreen> {
       'Véhicule' => '🚗',
       'Infraction' => '⚠️',
       'Dommages' => '🛠️',
-      'Enlèvement' => '🚛',
       _ => '📌',
     };
   }
@@ -727,9 +684,6 @@ class _DepositMoneyDetailsScreenState extends State<DepositMoneyDetailsScreen> {
       case 'Dommages':
         return Icons.draw; // Icône de rapport pour dommages (plus approprié)
       //return Icons.report_problem;; // Icône de rapport pour dommages (plus approprié)
-      case 'Enlèvement':
-        return Icons
-            .remove_circle; // Icône de suppression définitive (plus explicite pour "enlèvement")
       default:
         return Icons.list; // Icône de liste générique pour un menu
     }

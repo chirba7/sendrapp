@@ -1,0 +1,5 @@
+@if($media->isEmpty())
+<div class="empty-stage"><div><div class="fs-1">📷</div>{{$empty}}</div></div>
+@else
+<div id="{{$carouselId}}" class="carousel slide" data-bs-touch="true"><div class="carousel-indicators">@foreach($media as $item)<button type="button" data-bs-target="#{{$carouselId}}" data-bs-slide-to="{{$loop->index}}" @class(['active'=>$loop->first])></button>@endforeach</div><div class="carousel-inner">@foreach($media as $item)<div @class(['carousel-item','active'=>$loop->first])><a href="{{$item['url']}}" target="_blank" rel="noopener"><img src="{{$item['url']}}" alt="{{$item['label']}}"></a><div class="carousel-caption"><span class="badge bg-dark">{{$item['label']}} · {{$loop->iteration}}/{{$media->count()}}</span></div></div>@endforeach</div>@if($media->count()>1)<button class="carousel-control-prev" type="button" data-bs-target="#{{$carouselId}}" data-bs-slide="prev"><span class="carousel-control-prev-icon"></span></button><button class="carousel-control-next" type="button" data-bs-target="#{{$carouselId}}" data-bs-slide="next"><span class="carousel-control-next-icon"></span></button>@endif</div>
+@endif

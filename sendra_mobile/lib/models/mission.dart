@@ -16,6 +16,11 @@ class Mission {
     required this.trucks,
     required this.removals,
     required this.dispatches,
+    required this.isReceiver,
+    required this.receptionCheckedIn,
+    required this.removalValidated,
+    required this.completed,
+    this.receptionPoundName,
     this.providerName,
     this.trailerBrand,
     this.trailerPlate,
@@ -37,6 +42,11 @@ class Mission {
   final List<MissionTruck> trucks;
   final List<MissionRemoval> removals;
   final List<MissionDispatch> dispatches;
+  final bool isReceiver;
+  final bool receptionCheckedIn;
+  final bool removalValidated;
+  final bool completed;
+  final String? receptionPoundName;
   final String? providerName;
   final String? trailerBrand;
   final String? trailerPlate;
@@ -84,6 +94,11 @@ class Mission {
                   MissionDispatch.fromJson(Map<String, dynamic>.from(item)))
               .toList()
           : const [],
+      isReceiver: json['is_receiver'] == true,
+      receptionCheckedIn: json['reception_checked_in'] == true,
+      removalValidated: json['removal_validated'] == true,
+      completed: json['completed'] == true,
+      receptionPoundName: json['reception_pound_name']?.toString(),
       providerName: json['provider_name']?.toString(),
       trailerBrand: json['trailer_brand']?.toString() ??
           json['remorque_marque']?.toString(),
@@ -135,6 +150,8 @@ class MissionRemoval {
       this.plate,
       this.poundName,
       this.sheetPhotoUrl,
+      required this.received,
+      required this.receptionPhotos,
       required this.photos});
   final int id;
   final int? carPositionId;
@@ -144,6 +161,8 @@ class MissionRemoval {
   final String? plate;
   final String? poundName;
   final String? sheetPhotoUrl;
+  final bool received;
+  final Map<String, String> receptionPhotos;
   final Map<String, String> photos;
 
   factory MissionRemoval.fromJson(Map<String, dynamic> json) => MissionRemoval(
@@ -155,6 +174,11 @@ class MissionRemoval {
         plate: json['plate']?.toString(),
         poundName: json['pound_name']?.toString(),
         sheetPhotoUrl: json['sheet_photo_url']?.toString(),
+        received: json['received'] == true,
+        receptionPhotos: json['reception_photos'] is Map
+            ? Map<String, String>.from((json['reception_photos'] as Map)
+                .map((key, value) => MapEntry('$key', '$value')))
+            : const {},
         photos: json['photos'] is Map
             ? Map<String, String>.from((json['photos'] as Map)
                 .map((key, value) => MapEntry('$key', '$value')))

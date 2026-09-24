@@ -226,9 +226,10 @@ class _HomeScreenState extends State<HomeScreen> {
       icon: Icons.check_circle,
     ),
     Slide(
-      title: "Enlèvement",
-      description: "Organisez l'enlèvement des véhicules signalés.",
-      icon: Icons.remove_circle,
+      title: "Missions",
+      description:
+          "Réalisez les enlèvements depuis les missions qui vous sont affectées.",
+      icon: Icons.assignment_turned_in,
     ),
   ];
 

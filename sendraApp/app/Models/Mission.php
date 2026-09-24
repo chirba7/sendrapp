@@ -12,7 +12,8 @@ class Mission extends Model
     protected $fillable = [
         'code', 'title', 'commune_id', 'type', 'status', 'provider_name', 'scheduled_at', 'address', 'latitude',
         'longitude', 'check_in_radius_meters', 'trailer_brand',
-        'trailer_plate', 'pounds', 'created_by',
+        'trailer_plate', 'pounds', 'created_by', 'reception_agent_id', 'reception_pound_id',
+        'removal_validated_at', 'removal_validated_by', 'reception_checked_in_at', 'completed_at',
     ];
 
     protected $casts = [
@@ -20,6 +21,7 @@ class Mission extends Model
         'pounds' => 'array',
         'latitude' => 'float',
         'longitude' => 'float',
+        'removal_validated_at' => 'datetime', 'reception_checked_in_at' => 'datetime', 'completed_at' => 'datetime',
     ];
 
     public function agents()
@@ -48,4 +50,7 @@ class Mission extends Model
     {
         return $this->hasMany(MissionTruck::class);
     }
+    public function receptionAgent() { return $this->belongsTo(User::class, 'reception_agent_id'); }
+    public function receptionPound() { return $this->belongsTo(Pound::class, 'reception_pound_id'); }
+    public function removals() { return $this->hasMany(MissionRemoval::class); }
 }

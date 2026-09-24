@@ -103,6 +103,10 @@ Route::middleware('jwt.auth')->group(function () {
         Route::post('/missions/{mission}/enlevements', [MissionController::class, 'storeRemoval']);
         Route::post('/missions/{mission}/enlevements/{removal}/modifier', [MissionController::class, 'updateRemoval']);
         Route::post('/missions/{mission}/camions/{truck}/destination', [MissionController::class, 'storeTruckDestination']);
+        Route::post('/missions/{mission}/valider-enlevement', [MissionController::class, 'validateRemoval']);
+        Route::post('/missions/{mission}/pointer-reception', [MissionController::class, 'checkInReception'])->middleware('throttle:10,1');
+        Route::post('/missions/{mission}/receptions/{removal}', [MissionController::class, 'storeReception']);
+        Route::post('/missions/{mission}/terminer', [MissionController::class, 'completeMission']);
     });
 
     // Correction ACL : l'approbation est réservée à Admin/Autorité commune/

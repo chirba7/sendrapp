@@ -30,18 +30,15 @@ document.addEventListener('DOMContentLoaded', () => {
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom: 19, attribution: '© OpenStreetMap'}).addTo(map);
     let marker = L.marker([lat, lng], {draggable:true}).addTo(map);
     const drawn = new L.FeatureGroup().addTo(map);
-    let bufferLayer = null;
     const raw = document.getElementById('geofence').value;
     if (raw) { try { const geo = JSON.parse(raw); L.geoJSON(geo).eachLayer(layer => drawn.addLayer(layer)); if (drawn.getLayers().length) map.fitBounds(drawn.getBounds()); } catch (_) {} }
     map.addControl(new L.Control.Draw({edit:{featureGroup:drawn}, draw:{polyline:false,rectangle:false,circle:false,circlemarker:false,marker:false}}));
     const saveMarker = p => { document.getElementById('latitude').value=p.lat.toFixed(7); document.getElementById('longitude').value=p.lng.toFixed(7); };
     marker.on('dragend', e => saveMarker(e.target.getLatLng()));
     map.on('click', e => { marker.setLatLng(e.latlng); saveMarker(e.latlng); });
-    const refreshBuffer = () => { if(bufferLayer) map.removeLayer(bufferLayer);const layer=drawn.getLayers()[0];if(!layer)return;const km=parseInt(document.getElementById('geofence-margin').value)/1000;const buffered=turf.buffer(layer.toGeoJSON(),km,{units:'kilometers'});bufferLayer=L.geoJSON(buffered,{style:{color:'#07883F',weight:2,dashArray:'6 6',fillOpacity:.08}}).addTo(map);bufferLayer.bringToBack(); };
-    const saveShape = () => { const layer=drawn.getLayers()[0]; document.getElementById('geofence').value=layer ? JSON.stringify(layer.toGeoJSON().geometry) : ''; refreshBuffer(); };
+    const saveShape = () => { const layer=drawn.getLayers()[0]; document.getElementById('geofence').value=layer ? JSON.stringify(layer.toGeoJSON().geometry) : ''; };
     map.on(L.Draw.Event.CREATED, e => { drawn.clearLayers(); drawn.addLayer(e.layer); saveShape(); });
     map.on(L.Draw.Event.EDITED, saveShape); map.on(L.Draw.Event.DELETED, saveShape);
-    document.getElementById('geofence-margin').addEventListener('change',refreshBuffer);refreshBuffer();
 });
 </script>
 @endsection

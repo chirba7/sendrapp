@@ -7,4 +7,5 @@ use Illuminate\Database\Eloquent\Model;
 class MissionTruck extends Model
 {
     protected $fillable = ['trailer_brand', 'registration', 'driver_name', 'seats', 'destination_pound_name'];
+    public function removals() { return $this->hasMany(MissionRemoval::class); }
 }

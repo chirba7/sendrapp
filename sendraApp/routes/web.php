@@ -4,6 +4,7 @@ use App\Http\Controllers\CarPositionController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\MissionController;
 use App\Http\Controllers\CommuneController;
+use App\Http\Controllers\PoundController;
 use App\Models\CarPosition;
 use App\Models\User;
 use Illuminate\Support\Facades\Route;
@@ -103,6 +104,12 @@ Route::middleware([
     Route::post('/ajouter', [UserController::class, 'store'])->name('ajouter.compte');
 
     Route::resource('/dashboard/communes', CommuneController::class);
+    Route::resource('/dashboard/fourrieres', PoundController::class)
+        ->parameters(['fourrieres'=>'pound'])
+        ->names([
+            'index'=>'pounds.index','create'=>'pounds.create','store'=>'pounds.store','show'=>'pounds.show',
+            'edit'=>'pounds.edit','update'=>'pounds.update','destroy'=>'pounds.destroy',
+        ]);
 
     Route::get('/dashboard/missions', [MissionController::class, 'index'])->name('missions.index');
     Route::get('/dashboard/missions/creer', [MissionController::class, 'create'])->name('missions.create');

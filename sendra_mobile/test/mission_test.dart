@@ -38,6 +38,10 @@ void main() {
     final mission = Mission.fromJson({
       'id': 20,
       'checked_in': true,
+      'is_receiver': true,
+      'reception_checked_in': true,
+      'removal_validated': true,
+      'reception_pound_name': 'Fourrière A',
       'trucks': [
         {
           'id': 7,
@@ -53,6 +57,10 @@ void main() {
           'mission_truck_id': 7,
           'pound_name': 'Fourrière A',
           'sheet_photo_url': 'https://example.test/fiche.jpg',
+          'received': true,
+          'reception_photos': {
+            'sheet': 'https://example.test/reception-fiche.jpg'
+          },
           'photos': {'front': 'https://example.test/front.jpg'}
         }
       ],
@@ -62,9 +70,12 @@ void main() {
     });
 
     expect(mission.trucks.single.id, 7);
+    expect(mission.isReceiver, isTrue);
+    expect(mission.receptionCheckedIn, isTrue);
     expect(mission.trucks.single.destinationPoundName, 'Fourrière A');
     expect(mission.removals.single.photos['front'], contains('front.jpg'));
     expect(mission.removals.single.sheetPhotoUrl, contains('fiche.jpg'));
+    expect(mission.removals.single.received, isTrue);
     expect(mission.dispatches.single.poundName, 'Fourrière A');
   });
 }

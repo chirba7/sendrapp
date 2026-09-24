@@ -150,6 +150,51 @@ class MissionService {
     return Mission.fromJson(Map<String, dynamic>.from(decoded['data'] as Map));
   }
 
+  Future<Mission> validateRemoval(int missionId) =>
+      _postMission('$missionId/valider-enlevement', {});
+
+  Future<Mission> checkInReception(
+          int missionId, double latitude, double longitude) =>
+      _postMission('$missionId/pointer-reception',
+          {'latitude': latitude, 'longitude': longitude});
+
+  Future<Mission> completeMission(int missionId) =>
+      _postMission('$missionId/terminer', {});
+
+  Future<Mission> storeReception(
+      int missionId, int removalId, Map<String, File> photos) async {
+    final request = http.MultipartRequest(
+        'POST',
+        Uri.parse(
+            '${Strings.apiURI}missions/$missionId/receptions/$removalId'));
+    request.headers.addAll(await _authHeaders());
+    for (final entry in photos.entries) {
+      request.files
+          .add(await http.MultipartFile.fromPath(entry.key, entry.value.path));
+    }
+    final response = await http.Response.fromStream(await request.send())
+        .timeout(const Duration(seconds: 90));
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw Exception(
+          _message(response, 'Impossible d’enregistrer la réception.'));
+    }
+    final decoded = jsonDecode(response.body) as Map;
+    return Mission.fromJson(Map<String, dynamic>.from(decoded['data'] as Map));
+  }
+
+  Future<Mission> _postMission(String path, Map<String, dynamic> body) async {
+    final response = await http
+        .post(Uri.parse('${Strings.apiURI}missions/$path'),
+            headers: await _headers(), body: jsonEncode(body))
+        .timeout(const Duration(seconds: 20));
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw Exception(
+          _message(response, 'Impossible de poursuivre la mission.'));
+    }
+    final decoded = jsonDecode(response.body) as Map;
+    return Mission.fromJson(Map<String, dynamic>.from(decoded['data'] as Map));
+  }
+
   Future<Map<String, String>> _authHeaders() async {
     final headers = await _headers();
     headers.remove('Content-Type');

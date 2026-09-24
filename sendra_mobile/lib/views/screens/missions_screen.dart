@@ -13,6 +13,7 @@ class MissionsScreen extends StatefulWidget {
 class _MissionsScreenState extends State<MissionsScreen> {
   final _service = MissionService();
   late Future<List<Mission>> _missions;
+  String _filter = 'all';
   @override
   void initState() {
     super.initState();
@@ -47,69 +48,138 @@ class _MissionsScreenState extends State<MissionsScreen> {
               return _StateMessage(
                   message: 'Vos prochaines missions apparaîtront ici.',
                   onRetry: () => setState(_reload));
-            return RefreshIndicator(
-                onRefresh: _refresh,
-                child: ListView.separated(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 110),
-                  itemCount: missions.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 12),
-                  itemBuilder: (_, index) {
-                    final mission = missions[index];
-                    return Card(
-                        child: InkWell(
-                            borderRadius: BorderRadius.circular(12),
-                            onTap: () async {
-                              await Navigator.of(context).push(
-                                  MaterialPageRoute(
-                                      builder: (_) => MissionDetailsScreen(
-                                          missionId: mission.id,
-                                          initialMission: mission)));
-                              if (mounted) setState(_reload);
+            final visible = missions
+                .where((mission) =>
+                    _filter == 'all' ||
+                    (_filter == 'programmee' && mission.isProgrammed) ||
+                    (_filter == 'directe' && !mission.isProgrammed))
+                .toList();
+            return Column(children: [
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.fromLTRB(16, 10, 16, 4),
+                child: Row(children: [
+                  _filterChip('all', 'Toutes', Icons.view_agenda_outlined,
+                      const Color(0xFF52606D)),
+                  _filterChip('programmee', 'Programmées',
+                      Icons.event_available_outlined, SendraTheme.green),
+                  _filterChip('directe', 'Directes', Icons.flash_on_outlined,
+                      SendraTheme.amber),
+                ]),
+              ),
+              Expanded(
+                  child: visible.isEmpty
+                      ? const Center(
+                          child: Text('Aucune mission dans ce filtre.'))
+                      : RefreshIndicator(
+                          onRefresh: _refresh,
+                          child: ListView.separated(
+                            padding: const EdgeInsets.fromLTRB(16, 12, 16, 110),
+                            itemCount: visible.length,
+                            separatorBuilder: (_, __) =>
+                                const SizedBox(height: 12),
+                            itemBuilder: (_, index) {
+                              final mission = visible[index];
+                              final hasPointed = mission.isReceiver
+                                  ? mission.receptionCheckedIn
+                                  : mission.checkedIn;
+                              return Card(
+                                  child: InkWell(
+                                      borderRadius: BorderRadius.circular(12),
+                                      onTap: () async {
+                                        await Navigator.of(context).push(
+                                            MaterialPageRoute(
+                                                builder: (_) =>
+                                                    MissionDetailsScreen(
+                                                        missionId: mission.id,
+                                                        initialMission:
+                                                            mission)));
+                                        if (mounted) setState(_reload);
+                                      },
+                                      child: Padding(
+                                          padding: const EdgeInsets.all(16),
+                                          child: Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
+                                                Row(children: [
+                                                  Expanded(
+                                                      child: Text(
+                                                          mission.code
+                                                                  .isNotEmpty
+                                                              ? mission.code
+                                                              : mission.title,
+                                                          style: const TextStyle(
+                                                              fontSize: 17,
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .w700))),
+                                                  _Badge(
+                                                      label: mission.completed
+                                                          ? 'Terminée'
+                                                          : mission.isReceiver
+                                                              ? 'Réception'
+                                                              : mission
+                                                                      .isProgrammed
+                                                                  ? 'Programmée'
+                                                                  : 'Directe',
+                                                      color: mission
+                                                              .isProgrammed
+                                                          ? SendraTheme.green
+                                                          : SendraTheme.amber)
+                                                ]),
+                                                const SizedBox(height: 12),
+                                                if (mission.address.isNotEmpty)
+                                                  _Info(Icons.place_outlined,
+                                                      mission.address),
+                                                _Info(
+                                                    hasPointed
+                                                        ? Icons
+                                                            .check_circle_outline
+                                                        : Icons.my_location,
+                                                    mission.completed
+                                                        ? 'Mission terminée'
+                                                        : hasPointed
+                                                            ? mission.isReceiver
+                                                                ? '${mission.removals.where((r) => r.received).length}/${mission.removals.length} réceptionné(s)'
+                                                                : '${mission.removals.length} enlèvement(s)'
+                                                            : mission.isReceiver &&
+                                                                    !mission
+                                                                        .removalValidated
+                                                                ? 'En attente de l’enlèvement'
+                                                                : 'Ouvrir pour pointer'),
+                                                const Align(
+                                                    alignment:
+                                                        Alignment.centerRight,
+                                                    child: Icon(
+                                                        Icons.chevron_right)),
+                                              ]))));
                             },
-                            child: Padding(
-                                padding: const EdgeInsets.all(16),
-                                child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Row(children: [
-                                        Expanded(
-                                            child: Text(
-                                                mission.code.isNotEmpty
-                                                    ? mission.code
-                                                    : mission.title,
-                                                style: const TextStyle(
-                                                    fontSize: 17,
-                                                    fontWeight:
-                                                        FontWeight.w700))),
-                                        _Badge(
-                                            label: mission.isProgrammed
-                                                ? 'Programmée'
-                                                : 'Directe',
-                                            color: mission.isProgrammed
-                                                ? SendraTheme.green
-                                                : SendraTheme.amber)
-                                      ]),
-                                      const SizedBox(height: 12),
-                                      if (mission.address.isNotEmpty)
-                                        _Info(Icons.place_outlined,
-                                            mission.address),
-                                      _Info(
-                                          mission.checkedIn
-                                              ? Icons.check_circle_outline
-                                              : Icons.my_location,
-                                          mission.checkedIn
-                                              ? '${mission.removals.length} enlèvement(s)'
-                                              : 'Ouvrir pour pointer'),
-                                      const Align(
-                                          alignment: Alignment.centerRight,
-                                          child: Icon(Icons.chevron_right)),
-                                    ]))));
-                  },
-                ));
+                          ))),
+            ]);
           },
         ),
       );
+
+  Widget _filterChip(String value, String label, IconData icon, Color color) {
+    final selected = _filter == value;
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: ChoiceChip(
+        selected: selected,
+        onSelected: (_) => setState(() => _filter = value),
+        avatar: Icon(icon, size: 18, color: selected ? Colors.white : color),
+        label: Text(label),
+        labelStyle: TextStyle(
+            color: selected ? Colors.white : color,
+            fontWeight: FontWeight.w700),
+        selectedColor: color,
+        backgroundColor: color.withValues(alpha: .08),
+        side: BorderSide(color: color.withValues(alpha: .25)),
+        showCheckmark: false,
+      ),
+    );
+  }
 }
 
 class _Info extends StatelessWidget {
