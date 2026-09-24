@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Mission;
 use App\Models\MissionRemoval;
+use App\Models\MissionTruck;
 use App\Support\ImageOptimizer;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -96,6 +97,7 @@ class MissionController extends Controller
             'back' => ['required', 'image', 'max:10240'],
             'left' => ['required', 'image', 'max:10240'],
             'right' => ['required', 'image', 'max:10240'],
+            'sheet' => ['nullable', 'image', 'max:10240'],
         ]);
         if ($mission->type === 'brute' && ! empty($data['car_position_id'])) {
             abort(422, 'Une mission directe ne contient pas de véhicule présélectionné.');
@@ -113,6 +115,9 @@ class MissionController extends Controller
             foreach (['front', 'back', 'left', 'right'] as $angle) {
                 $removal->photos()->create(['angle' => $angle, 'path' => $this->storeImage($request->file($angle), "missions/{$mission->id}/enlevements/{$removal->id}")]);
             }
+            if ($request->hasFile('sheet')) {
+                $removal->update(['sheet_photo_path' => $this->storeImage($request->file('sheet'), "missions/{$mission->id}/enlevements/{$removal->id}")]);
+            }
             return $removal;
         });
 
@@ -120,25 +125,54 @@ class MissionController extends Controller
         return response()->json(['message' => 'Enlèvement enregistré.', 'data' => $this->serializeForAgent($mission)], 201);
     }
 
-    public function storeRemovalDestination(Request $request, Mission $mission, MissionRemoval $removal): JsonResponse
+    public function updateRemoval(Request $request, Mission $mission, MissionRemoval $removal): JsonResponse
     {
         $this->assertCheckedIn($request, $mission);
         abort_unless($removal->mission_id === $mission->id, 404);
         $data = $request->validate([
-            'pound_name' => ['required', 'string', 'max:255'],
-            'sheet' => ['required', 'image', 'max:10240'],
+            'mission_truck_id' => ['required', 'integer', Rule::exists('mission_trucks', 'id')->where('mission_id', $mission->id)],
+            'vehicle_label' => ['nullable', 'string', 'max:255'],
+            'plate' => ['nullable', 'string', 'max:100'],
+            'front' => ['nullable', 'image', 'max:10240'],
+            'back' => ['nullable', 'image', 'max:10240'],
+            'left' => ['nullable', 'image', 'max:10240'],
+            'right' => ['nullable', 'image', 'max:10240'],
+            'sheet' => ['nullable', 'image', 'max:10240'],
         ]);
+
+        $removal->update([
+            'mission_truck_id' => $data['mission_truck_id'],
+            'vehicle_label' => $data['vehicle_label'] ?? $removal->vehicle_label,
+            'plate' => $data['plate'] ?? $removal->plate,
+        ]);
+        foreach (['front', 'back', 'left', 'right'] as $angle) {
+            if (! $request->hasFile($angle)) continue;
+            $photo = $removal->photos()->where('angle', $angle)->first();
+            if ($photo) Storage::disk('public')->delete($photo->path);
+            $removal->photos()->updateOrCreate(['angle' => $angle], [
+                'path' => $this->storeImage($request->file($angle), "missions/{$mission->id}/enlevements/{$removal->id}"),
+            ]);
+        }
+        if ($request->hasFile('sheet')) {
+            if ($removal->sheet_photo_path) Storage::disk('public')->delete($removal->sheet_photo_path);
+            $removal->update(['sheet_photo_path' => $this->storeImage($request->file('sheet'), "missions/{$mission->id}/enlevements/{$removal->id}")]);
+        }
+
+        $mission->load($this->agentRelations($request->user()->id));
+        return response()->json(['message' => 'Données de l’enlèvement mises à jour.', 'data' => $this->serializeForAgent($mission)]);
+    }
+
+    public function storeTruckDestination(Request $request, Mission $mission, MissionTruck $truck): JsonResponse
+    {
+        $this->assertCheckedIn($request, $mission);
+        abort_unless($truck->mission_id === $mission->id, 404);
+        $data = $request->validate(['pound_name' => ['required', 'string', 'max:255']]);
         if (! empty($mission->pounds) && ! in_array($data['pound_name'], $mission->pounds, true)) {
             abort(422, 'Cette fourrière ne fait pas partie de la mission.');
         }
-
-        $removal->update([
-            'pound_name' => $data['pound_name'],
-            'sheet_photo_path' => $this->storeImage($request->file('sheet'), "missions/{$mission->id}/enlevements/{$removal->id}"),
-        ]);
-
+        $truck->update(['destination_pound_name' => $data['pound_name']]);
         $mission->load($this->agentRelations($request->user()->id));
-        return response()->json(['message' => 'Fourrière et fiche du véhicule enregistrées.', 'data' => $this->serializeForAgent($mission)]);
+        return response()->json(['message' => 'Fourrière du camion enregistrée.', 'data' => $this->serializeForAgent($mission)]);
     }
 
     private function serializeForAgent(Mission $mission): array
@@ -159,6 +193,7 @@ class MissionController extends Controller
             'trucks' => $checkedIn ? $mission->trucks->map(fn ($truck) => [
                 'id' => $truck->id, 'trailer_brand' => $truck->trailer_brand, 'registration' => $truck->registration,
                 'driver_name' => $truck->driver_name, 'seats' => $truck->seats,
+                'destination_pound_name' => $truck->destination_pound_name,
             ])->values() : [],
             'checked_in' => $checkedIn,
             'vehicles' => $checkedIn ? $mission->vehicles->map(fn ($vehicle) => [

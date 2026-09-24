@@ -74,7 +74,8 @@ class MissionService {
       int? truckId,
       String? vehicleLabel,
       String? plate,
-      required Map<String, File> photos}) async {
+      required Map<String, File> photos,
+      File? sheet}) async {
     final request = http.MultipartRequest(
         'POST', Uri.parse('${Strings.apiURI}missions/$missionId/enlevements'));
     request.headers.addAll(await _authHeaders());
@@ -88,6 +89,9 @@ class MissionService {
       request.files
           .add(await http.MultipartFile.fromPath(entry.key, entry.value.path));
     }
+    if (sheet != null) {
+      request.files.add(await http.MultipartFile.fromPath('sheet', sheet.path));
+    }
     final response = await http.Response.fromStream(await request.send())
         .timeout(const Duration(seconds: 60));
     if (response.statusCode < 200 || response.statusCode >= 300)
@@ -97,20 +101,51 @@ class MissionService {
     return Mission.fromJson(Map<String, dynamic>.from(decoded['data'] as Map));
   }
 
-  Future<Mission> setRemovalDestination(int missionId, int removalId,
-      {required String poundName, required File sheet}) async {
+  Future<Mission> updateRemoval(int missionId, int removalId,
+      {required int truckId,
+      String? vehicleLabel,
+      String? plate,
+      required Map<String, File> photos,
+      File? sheet}) async {
     final request = http.MultipartRequest(
         'POST',
         Uri.parse(
-            '${Strings.apiURI}missions/$missionId/enlevements/$removalId/destination'));
+            '${Strings.apiURI}missions/$missionId/enlevements/$removalId/modifier'));
     request.headers.addAll(await _authHeaders());
-    request.fields['pound_name'] = poundName;
-    request.files.add(await http.MultipartFile.fromPath('sheet', sheet.path));
+    request.fields['mission_truck_id'] = '$truckId';
+    if ((vehicleLabel ?? '').isNotEmpty)
+      request.fields['vehicle_label'] = vehicleLabel!;
+    if ((plate ?? '').isNotEmpty) request.fields['plate'] = plate!;
+    for (final entry in photos.entries) {
+      request.files
+          .add(await http.MultipartFile.fromPath(entry.key, entry.value.path));
+    }
+    if (sheet != null) {
+      request.files.add(await http.MultipartFile.fromPath('sheet', sheet.path));
+    }
     final response = await http.Response.fromStream(await request.send())
         .timeout(const Duration(seconds: 60));
     if (response.statusCode < 200 || response.statusCode >= 300)
       throw Exception(
-          _message(response, 'Impossible d’enregistrer la fiche du véhicule.'));
+          _message(response, 'Impossible de modifier l’enlèvement.'));
+    final decoded = jsonDecode(response.body) as Map;
+    return Mission.fromJson(Map<String, dynamic>.from(decoded['data'] as Map));
+  }
+
+  Future<Mission> setTruckDestination(
+      int missionId, int truckId, String poundName) async {
+    final response = await http
+        .post(
+          Uri.parse(
+              '${Strings.apiURI}missions/$missionId/camions/$truckId/destination'),
+          headers: await _headers(),
+          body: jsonEncode({'pound_name': poundName}),
+        )
+        .timeout(const Duration(seconds: 20));
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw Exception(_message(
+          response, 'Impossible d’enregistrer la fourrière du camion.'));
+    }
     final decoded = jsonDecode(response.body) as Map;
     return Mission.fromJson(Map<String, dynamic>.from(decoded['data'] as Map));
   }

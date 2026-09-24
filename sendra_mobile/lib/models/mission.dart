@@ -106,12 +106,14 @@ class MissionTruck {
       this.brand,
       this.registration,
       this.driverName,
-      this.seats});
+      this.seats,
+      this.destinationPoundName});
   final int id;
   final String? brand;
   final String? registration;
   final String? driverName;
   final int? seats;
+  final String? destinationPoundName;
 
   factory MissionTruck.fromJson(Map<String, dynamic> json) => MissionTruck(
         id: int.tryParse('${json['id']}') ?? 0,
@@ -119,6 +121,7 @@ class MissionTruck {
         registration: json['registration']?.toString(),
         driverName: json['driver_name']?.toString(),
         seats: int.tryParse('${json['seats'] ?? ''}'),
+        destinationPoundName: json['destination_pound_name']?.toString(),
       );
 }
 

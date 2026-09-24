@@ -4,12 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../../routes/routes.dart';
 import '../../utils/session.dart';
 import '../../utils/strings.dart';
 import '../../utils/sendra_theme.dart';
 import '../screens/drawer_screen.dart';
-import 'package:get/get.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
@@ -164,27 +162,17 @@ class _HomeScreenState extends State<HomeScreen> {
       });
       return decoded['data'];
     } else if (response.statusCode == 401) {
-      // Clear all session data
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.remove('token');
-      await prefs.remove('userId');
-      await prefs.remove('fullName');
-      await prefs.remove('phone');
-      await prefs.remove('lastRoute');
-      await prefs.remove('role_id');
-
+      // Un 401 isolé ne doit pas effacer la session persistée de l'agent.
+      // Seule l'action explicite Déconnexion supprime les données locales.
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text(
-              'Votre session a expiré. Vous allez être redirigé vers la page de connexion.'),
-          backgroundColor: Colors.red,
+          content: Text('Connexion momentanément impossible. Réessayez.'),
+          backgroundColor: Colors.orange,
           duration: Duration(seconds: 3),
           behavior: SnackBarBehavior.floating,
         ),
       );
-      await Future.delayed(const Duration(seconds: 2));
-      Get.offAllNamed(Routes.signInScreen);
-      throw Exception('Session expired');
+      throw Exception('Authentification momentanément indisponible');
     } else {
       throw Exception('Error fetching signalements: ${response.statusCode}');
     }

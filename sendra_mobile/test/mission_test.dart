@@ -34,12 +34,17 @@ void main() {
     expect(mission.vehicles.single.plate, 'DK-1234-AA');
   });
 
-  test('les enlèvements, camions et départs sont décodés', () {
+  test('les enlèvements, fiches et destinations des camions sont décodés', () {
     final mission = Mission.fromJson({
       'id': 20,
       'checked_in': true,
       'trucks': [
-        {'id': 7, 'trailer_brand': 'MAN', 'registration': 'DK-77-AA'}
+        {
+          'id': 7,
+          'trailer_brand': 'MAN',
+          'registration': 'DK-77-AA',
+          'destination_pound_name': 'Fourrière A'
+        }
       ],
       'removals': [
         {
@@ -57,6 +62,7 @@ void main() {
     });
 
     expect(mission.trucks.single.id, 7);
+    expect(mission.trucks.single.destinationPoundName, 'Fourrière A');
     expect(mission.removals.single.photos['front'], contains('front.jpg'));
     expect(mission.removals.single.sheetPhotoUrl, contains('fiche.jpg'));
     expect(mission.dispatches.single.poundName, 'Fourrière A');

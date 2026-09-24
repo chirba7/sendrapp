@@ -101,7 +101,9 @@ return [
     |
     */
 
-    'ttl' => env('JWT_TTL', 9999999999),
+    // La session mobile reste active jusqu'à une déconnexion explicite.
+    // La blacklist permet toujours de révoquer un jeton lors du logout.
+    'ttl' => env('JWT_TTL', null),
 
     /*
     |--------------------------------------------------------------------------
@@ -120,7 +122,7 @@ return [
     |
     */
 
-    'refresh_ttl' => env('JWT_REFRESH_TTL', 20160),
+    'refresh_ttl' => env('JWT_REFRESH_TTL', null),
 
     /*
     |--------------------------------------------------------------------------
