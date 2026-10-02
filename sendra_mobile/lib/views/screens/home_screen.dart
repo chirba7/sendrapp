@@ -391,13 +391,15 @@ class _HomeScreenState extends State<HomeScreen> {
         backgroundColor: Colors.white,
         surfaceTintColor: Colors.transparent,
         iconTheme: const IconThemeData(color: SendraTheme.ink),
-        titleSpacing: 0,
-        title: Row(
-          children: [
-            Image.asset('assets/images/logo.png', width: 132, height: 48),
-            const Spacer(),
-          ],
-        ),
+        centerTitle: true,
+        title: Row(mainAxisSize: MainAxisSize.min, children: [
+          Image.asset('assets/images/logo.png', width: 138, height: 42,
+            fit: BoxFit.contain),
+          const SizedBox(width: 4),
+          const Text('PRO', style: TextStyle(fontSize: 12,
+            fontWeight: FontWeight.w900, color: SendraTheme.forest,
+            letterSpacing: 1.2)),
+        ]),
         elevation: 0,
         actions: [
           IconButton(
@@ -585,8 +587,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               SizedBox(height: 15),
               Text(
-                'Les signalements expirent après 10 jours. Après ce délai, pour découvrir de nouveaux signalements, n\'hésitez pas à en effectuer vous-même ou patientez jusqu\'à ce qu\'un autre utilisateur le fasse.\n\n'
-                'Cliquez sur le signalement afin d\'accéder à la constatation.',
+                'Les signalements restent disponibles dans la liste. Touchez un dossier pour accéder à la constatation.',
                 style: TextStyle(fontSize: 16),
                 textAlign: TextAlign.center,
               ),

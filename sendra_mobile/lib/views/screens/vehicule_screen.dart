@@ -106,6 +106,41 @@ class _VehicleFormState extends State<VehicleForm> {
   final TextEditingController _modeleController = TextEditingController();
   final TextEditingController _categorieController = TextEditingController();
   final TextEditingController _couleurController = TextEditingController();
+  final TextEditingController _autreSituationController =
+      TextEditingController();
+
+  static const Map<String, ({IconData icon, String description})> _detailHelp =
+      {
+    'Défaut de contrôle technique': (
+      icon: Icons.fact_check_outlined,
+      description: 'Contrôle technique absent, expiré ou non conforme.'
+    ),
+    'Pneumatiques manquantes': (
+      icon: Icons.tire_repair_outlined,
+      description: 'Une ou plusieurs roues ou pneumatiques sont absents.'
+    ),
+    'Véhicule immergé': (
+      icon: Icons.water_damage_outlined,
+      description: 'Le véhicule a subi une immersion ou une inondation.'
+    ),
+    'Défauts techniques irréversibles': (
+      icon: Icons.build_circle_outlined,
+      description: 'Des éléments essentiels ne peuvent plus être remis en état.'
+    ),
+    'Véhicule non identifiable': (
+      icon: Icons.no_crash_outlined,
+      description:
+          'Les éléments permettant l’identification sont absents ou illisibles.'
+    ),
+    'Véhicule brûlé': (
+      icon: Icons.local_fire_department_outlined,
+      description: 'Le véhicule présente des dégâts liés à un incendie.'
+    ),
+    'Châssis non réparable': (
+      icon: Icons.car_crash_outlined,
+      description: 'La structure du véhicule ne peut plus être réparée.'
+    ),
+  };
 
   // Sélecteur en tête d'écran : filtre la liste de marques suggérées
   // (voiture/moto) — n'est pas envoyé au serveur, juste une aide de saisie.
@@ -179,6 +214,7 @@ class _VehicleFormState extends State<VehicleForm> {
         );
         _entretien = _cleanValue(data['entretien']).toUpperCase();
         _paysEtranger = _cleanValue(data['pays_etranger']).toUpperCase();
+        _autreSituationController.text = _cleanValue(data['autre_situation']);
         _details = {
           'Défaut de contrôle technique':
               (data['defaut_controle_technique'] == 1),
@@ -227,8 +263,7 @@ class _VehicleFormState extends State<VehicleForm> {
 
     // Le nombre de chiffres varie selon la plaque (0, 00, 000, 0000...) —
     // seul le nombre de lettres de part et d'autre est fixe.
-    if (!RegExp(r'^[A-Z]{2}-\d+-[A-Z]{2}$')
-        .hasMatch(_numeroController.text)) {
+    if (!RegExp(r'^[A-Z]{2}-\d+-[A-Z]{2}$').hasMatch(_numeroController.text)) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
@@ -272,6 +307,7 @@ class _VehicleFormState extends State<VehicleForm> {
         'couleur': _couleurController.text,
         'entretien': _entretien,
         'pays_etranger': _paysEtranger,
+        'autre_situation': _autreSituationController.text.trim(),
         ...updatedDetails,
       }),
     );
@@ -373,17 +409,57 @@ class _VehicleFormState extends State<VehicleForm> {
               Divider(),
               SizedBox(height: 10),
               _buildSectionTitle('Détails du véhicule'),
+              const SizedBox(height: 8),
+              const Text(
+                  'Sélectionnez les situations constatées sur le véhicule.'),
+              const SizedBox(height: 12),
               ..._details.keys.map((key) {
-                return CheckboxListTile(
-                  title: Text(key),
-                  value: _details[key],
-                  onChanged: (value) {
-                    setState(() {
-                      _details[key] = value ?? false;
-                    });
-                  },
+                final help = _detailHelp[key]!;
+                return Card(
+                  margin: const EdgeInsets.only(bottom: 10),
+                  color: _details[key] == true
+                      ? const Color(0xFFE9F7EE)
+                      : Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    side: BorderSide(
+                        color: _details[key] == true
+                            ? SendraTheme.green
+                            : SendraTheme.border),
+                  ),
+                  child: CheckboxListTile(
+                    secondary: Container(
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE1F3E8),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(help.icon, color: SendraTheme.forest),
+                    ),
+                    title: Text(key,
+                        style: const TextStyle(fontWeight: FontWeight.w700)),
+                    subtitle: Text(help.description),
+                    value: _details[key],
+                    onChanged: (value) =>
+                        setState(() => _details[key] = value ?? false),
+                  ),
                 );
               }).toList(),
+              const SizedBox(height: 16),
+              TextField(
+                controller: _autreSituationController,
+                maxLines: 3,
+                maxLength: 500,
+                decoration: InputDecoration(
+                  labelText: 'Autre situation constatée',
+                  hintText: 'Décrivez une situation absente de la liste',
+                  prefixIcon: const Icon(Icons.edit_note_outlined),
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14)),
+                  alignLabelWithHint: true,
+                ),
+              ),
               SizedBox(height: 30),
               ElevatedButton.icon(
                 style: ElevatedButton.styleFrom(
@@ -438,8 +514,8 @@ class _VehicleFormState extends State<VehicleForm> {
         _vehicleKind = label;
       }),
       selectedColor: const Color(0xFFE1F3E8),
-      side: BorderSide(
-          color: selected ? SendraTheme.green : SendraTheme.border),
+      side:
+          BorderSide(color: selected ? SendraTheme.green : SendraTheme.border),
     );
   }
 
@@ -473,8 +549,7 @@ class _VehicleFormState extends State<VehicleForm> {
         optionsBuilder: (TextEditingValue value) {
           if (value.text.isEmpty) return _brandOptions;
           return _brandOptions.where(
-            (brand) =>
-                brand.toLowerCase().contains(value.text.toLowerCase()),
+            (brand) => brand.toLowerCase().contains(value.text.toLowerCase()),
           );
         },
         onSelected: (selection) => _marqueController.text = selection,

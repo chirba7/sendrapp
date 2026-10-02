@@ -16,10 +16,10 @@ class OrangeSmsService
 
     public function __construct()
     {
-        $this->login = env('ORANGE_SMS_LOGIN', '');
-        $this->apiAccessKey = env('ORANGE_SMS_API_KEY', '');
-        $this->token = env('ORANGE_SMS_TOKEN', '');
-        $this->baseUri = env('ORANGE_SMS_BASE_URI', 'https://api.orangesmspro.sn:8443/api');
+        $this->login = config('services.orange_sms.login', '');
+        $this->apiAccessKey = config('services.orange_sms.api_key', '');
+        $this->token = config('services.orange_sms.token', '');
+        $this->baseUri = config('services.orange_sms.base_uri', 'https://api.orangesmspro.sn:8443/api');
 
         // Correction (découverte en testant les autres correctifs) :
         // valider les identifiants ici faisait planter (500) TOUTE route
@@ -41,6 +41,7 @@ class OrangeSmsService
     public function sendSms(string $subject, string $signature, string $recipient, string $content): array
     {
         if (empty($this->login) || empty($this->token) || empty($this->apiAccessKey)) {
+            Log::warning('Orange SMS configuration incomplete');
             return [
                 'success' => false,
                 'message' => 'Les identifiants Orange SMS ne sont pas configurés.',
@@ -69,6 +70,8 @@ class OrangeSmsService
             // Send the request using Laravel's Http client
             $response = Http::asForm()
                 ->withBasicAuth($this->login, $this->token)
+                ->connectTimeout(5)
+                ->timeout(15)
                 ->post($this->baseUri, $params);
 
                 // Correction API-M-5 : logué en debug (pas info) pour ne pas
@@ -86,6 +89,10 @@ class OrangeSmsService
                     'data' => $response->json(),
                 ];
             }
+
+            Log::warning('Orange SMS provider rejected request', [
+                'status' => $response->status(),
+            ]);
 
             return [
                 'success' => false,

@@ -74,11 +74,15 @@
                                     <div class="row mb-3">
                                         <div class="col-md-6">
                                             <label class="form-label" for="inputEmail4">Role</label>
+                                            @if ($user->role_id == 5)
+                                            <input type="text" class="form-control" value="Citoyen" disabled>
+                                            @else
                                             <select id="inputState" class="form-control @error('role') is-invalid @enderror" name="role">
                                                 <option value="1" {{ $user->role_id == 1 ? 'selected' : '' }}>Admin</option>
                                                 <option value="2" {{ $user->role_id == 2 ? 'selected' : '' }}>Agent</option>
                                                 <option value="3" {{ $user->role_id == 3 ? 'selected' : '' }}>Autorité</option>
                                             </select>
+                                            @endif
                                             @error('role')
                                             <div class="invalid-feedback">{{ $message }}</div>
                                             @enderror

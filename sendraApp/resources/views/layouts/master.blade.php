@@ -53,6 +53,9 @@
                 </a>
             </li>
             @if (Auth::user()->role->nomRole == 'Admin')
+            <li class="nav-item {{request()->is('dashboard/pointage*') ? 'active' : ''}}">
+                <a href="{{route('attendance.index')}}"><span class="icon text-success"><i class="lni lni-timer"></i></span><span class="text">Pointage</span></a>
+            </li>
             <li class="nav-item {{request()->is('dashboard/communes*') ? 'active' : ''}}">
                 <a href="{{route('communes.index')}}">
                     <span class="icon text-success"><i class="lni lni-map-marker"></i></span>

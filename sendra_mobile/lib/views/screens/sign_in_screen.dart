@@ -87,6 +87,13 @@ class _SignInScreenState extends State<SignInScreen> {
           final roleId = jsonResponse['role_id'] is int
               ? jsonResponse['role_id'] as int
               : int.tryParse(jsonResponse['role_id']?.toString() ?? '');
+          if (roleId != 2) {
+            setState(() {
+              _errorMessage = 'Cette application est réservée aux agents.';
+              _isLoading = false;
+            });
+            return;
+          }
           await _saveUserData(
             jsonResponse['fullName'].toString(),
             phone,
@@ -351,33 +358,6 @@ class _SignInScreenState extends State<SignInScreen> {
                                       ),
                               ),
                             ),
-                            const SizedBox(height: 14),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                const Flexible(
-                                  child: Text(
-                                    'Vous n’avez pas encore de compte ?',
-                                    style: TextStyle(
-                                      color: _muted,
-                                      fontSize: 13,
-                                    ),
-                                  ),
-                                ),
-                                TextButton(
-                                  onPressed: _isLoading
-                                      ? null
-                                      : () => Get.toNamed(Routes.signUpScreen),
-                                  child: const Text(
-                                    'Créer un compte',
-                                    style: TextStyle(
-                                      color: _forest,
-                                      fontWeight: FontWeight.w800,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
                             const Spacer(),
                             const SizedBox(height: 26),
                             const Row(
@@ -417,26 +397,32 @@ class _SignInScreenState extends State<SignInScreen> {
   }
 
   Widget _brand() {
-    return Column(
-      children: [
-        Image.asset(
-          'assets/images/logo.png',
-          height: 86,
-          width: 250,
-          fit: BoxFit.contain,
-          errorBuilder: (_, __, ___) => const Icon(
-            Icons.recycling_rounded,
-            size: 72,
-            color: _green,
-          ),
-        ),
-        const SizedBox(height: 2),
-        const Text(
-          'Sénégalaise de Déconstruction et de Recyclage Automobile',
+    return Container(
+      padding: const EdgeInsets.fromLTRB(18, 22, 18, 20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: const Color(0xFFE1EBE5)),
+        boxShadow: [BoxShadow(color: _forest.withValues(alpha: .08),
+          blurRadius: 24, offset: const Offset(0, 10))],
+      ),
+      child: Column(children: [
+        Image.asset('assets/images/logo.png', height: 92, width: 270,
+          fit: BoxFit.contain),
+        const SizedBox(height: 8),
+        const Text('Sénégalaise de Déconstruction et de Recyclage Automobile',
           textAlign: TextAlign.center,
-          style: TextStyle(color: _muted, fontSize: 10.5),
+          style: TextStyle(color: _muted, fontSize: 10.5)),
+        const SizedBox(height: 14),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 6),
+          decoration: BoxDecoration(color: const Color(0xFFE1F3E8),
+            borderRadius: BorderRadius.circular(99)),
+          child: const Text('ESPACE AGENT', style: TextStyle(
+            color: _forest, fontSize: 11, fontWeight: FontWeight.w800,
+            letterSpacing: 1.1)),
         ),
-      ],
+      ]),
     );
   }
 

@@ -4,7 +4,9 @@ namespace Tests\Feature;
 
 use App\Models\User;
 use App\Models\UserVerificationCode;
+use App\Services\OrangeSmsService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Mockery;
 use Tests\TestCase;
 
 /**
@@ -15,6 +17,32 @@ use Tests\TestCase;
 class AuthApiTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_verification_code_is_not_reported_sent_when_sms_fails(): void
+    {
+        $sms = Mockery::mock(OrangeSmsService::class);
+        $sms->shouldReceive('sendSms')->once()->andReturn(['success' => false]);
+        $this->app->instance(OrangeSmsService::class, $sms);
+
+        $this->postJson('/api/send-verification-code', ['telephone' => '770000010'])
+            ->assertStatus(503)
+            ->assertJson(['success' => false]);
+
+        $this->assertDatabaseMissing('user_verification_codes', ['phone' => '770000010']);
+    }
+
+    public function test_verification_code_is_saved_after_sms_success(): void
+    {
+        $sms = Mockery::mock(OrangeSmsService::class);
+        $sms->shouldReceive('sendSms')->once()->andReturn(['success' => true]);
+        $this->app->instance(OrangeSmsService::class, $sms);
+
+        $this->postJson('/api/send-verification-code', ['telephone' => '770000011'])
+            ->assertOk()
+            ->assertJson(['success' => true]);
+
+        $this->assertDatabaseHas('user_verification_codes', ['phone' => '770000011']);
+    }
 
     public function test_check_phone_reports_existing_and_unknown_numbers(): void
     {

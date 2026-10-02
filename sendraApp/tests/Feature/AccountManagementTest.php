@@ -78,6 +78,44 @@ class AccountManagementTest extends TestCase
         $response->assertSeeText('Fatou');
     }
 
+    public function test_admin_can_change_citizen_phone_without_changing_its_role(): void
+    {
+        $admin = User::factory()->create(['role_id' => 1, 'is_enabled' => true]);
+        $citizen = User::factory()->create([
+            'role_id' => 5, 'email' => null, 'telephone' => '771111114',
+        ]);
+
+        $this->actingAs($admin)->get('/dashboard/comptes/'.$citizen->id)
+            ->assertOk()->assertSee('Citoyen');
+
+        $this->actingAs($admin)->patch('/dashboard/comptes/'.$citizen->id, [
+            'prenom' => $citizen->first_name,
+            'nom' => $citizen->last_name,
+            'email' => '',
+            'telephone' => '771111115',
+        ])->assertSessionHasNoErrors();
+
+        $citizen->refresh();
+        $this->assertSame('771111115', $citizen->telephone);
+        $this->assertSame(5, $citizen->role_id);
+        $this->assertNull($citizen->email);
+    }
+
+    public function test_duplicate_email_is_reported_as_validation_error(): void
+    {
+        $admin = User::factory()->create(['role_id' => 1, 'is_enabled' => true]);
+        $citizen = User::factory()->create(['role_id' => 5, 'telephone' => '771111116']);
+
+        $this->actingAs($admin)->patch('/dashboard/comptes/'.$citizen->id, [
+            'prenom' => $citizen->first_name,
+            'nom' => $citizen->last_name,
+            'email' => $admin->email,
+            'telephone' => '771111117',
+        ])->assertSessionHasErrors('email');
+
+        $this->assertSame('771111116', $citizen->fresh()->telephone);
+    }
+
     public function test_forced_password_change_flow_enables_the_account(): void
     {
         $staff = User::factory()->create(['role_id' => 2, 'is_enabled' => false]);

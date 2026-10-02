@@ -357,7 +357,7 @@
                                                         <td>
                                                             <select id="categorie" class="form-control @error('categorie') is-invalid @enderror" name="categorie">
                                                                 <option value="">Choisissez une catégorie</option>
-                                                                <option value="VPP" {{ $carPosition->categorie == 'VPP' ? 'selected' : '' }}>VPP</option>
+                                                                <option value="VPP" {{ in_array($carPosition->categorie, ['VPP', 'BPP'], true) ? 'selected' : '' }}>VPP</option>
                                                                 <option value="VUS" {{ $carPosition->categorie == 'VUS' ? 'selected' : '' }}>VUS</option>
                                                                 <option value="VUL" {{ $carPosition->categorie == 'VUL' ? 'selected' : '' }}>VUL</option>
                                                                 <option value="VTM" {{ $carPosition->categorie == 'VTM' ? 'selected' : '' }}>VTM</option>

@@ -22,13 +22,19 @@ class UpdateAgentRequest extends FormRequest
      */
     public function rules(): array
     {
+        $user = $this->route('user');
+        $isCitizen = $user?->role_id == 5;
         return [
             'prenom' => 'required|string|min:3',
             'nom' => 'required|string|min:2',
-            'email' => 'required|email',
+            'email' => [
+                $isCitizen ? 'nullable' : 'required',
+                'email',
+                Rule::unique('users', 'email')->ignore($user),
+            ],
             // Correction WEB-C-1 : sans whitelist, un role_id arbitraire
             // (ex. hors des 4 rôles staff valides) pouvait être assigné.
-            'role' => 'required|in:1,2,3,4',
+            'role' => $isCitizen ? 'prohibited' : 'required|in:1,2,3,4',
             // Correction : même souci qu'à la création (StoreAgentRequest) —
             // ignore() exclut le compte en cours de modification lui-même.
             'telephone' => [
@@ -42,6 +48,7 @@ class UpdateAgentRequest extends FormRequest
     {
         return [
             'telephone.unique' => 'Ce numéro de téléphone est déjà utilisé par un autre compte.',
+            'email.unique' => 'Cette adresse e-mail est déjà utilisée par un autre compte.',
         ];
     }
 }

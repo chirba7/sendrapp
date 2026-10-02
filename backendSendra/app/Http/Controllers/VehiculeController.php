@@ -44,6 +44,7 @@ class VehiculeController extends Controller
         'couleur' => $request->couleur ?? $carPosition->couleur,
         'entretien' => $request->entretien ?? $carPosition->entretien,
         'pays_etranger' => $request->pays_etranger ?? $carPosition->pays_etranger,
+        'autre_situation' => $request->input('autre_situation', $carPosition->autre_situation),
     ];
 
     // Gestion des champs booléens avec $request->boolean()

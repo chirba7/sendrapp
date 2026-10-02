@@ -37,6 +37,8 @@ Route::group([
     Route::post('/login', [AuthControllerApi::class, 'login'])->name('login');
     Route::post('/verify-code', [AuthControllerApi::class, 'verifyCode']);
     Route::post('/register', [AuthControllerApi::class, 'register']);
+    Route::post('/pointage/inscription', [\App\Http\Controllers\AttendanceEnrollmentController::class, 'register'])
+        ->middleware('throttle:5,1');
 
     // Correction API-C-5 : ces deux routes n'ont plus de clé statique en
     // entrée (extractible de l'app mobile, donc sans valeur de protection
@@ -53,6 +55,15 @@ Route::group([
 
 // Protected routes (Authentication required with JWT)
 Route::middleware('jwt.auth')->group(function () {
+    Route::prefix('pointage')->group(function () {
+        Route::get('/statut', [\App\Http\Controllers\AttendanceEnrollmentController::class, 'status']);
+        Route::post('/adhesion', [\App\Http\Controllers\AttendanceEnrollmentController::class, 'join'])->middleware('throttle:5,1');
+        Route::post('/appareil/enregistrer', [\App\Http\Controllers\AttendanceDeviceController::class, 'register'])->middleware('throttle:3,1');
+        Route::post('/appareil/defi', [\App\Http\Controllers\AttendanceDeviceController::class, 'challenge'])->middleware('throttle:10,1');
+        Route::get('/configuration', [\App\Http\Controllers\AttendanceController::class, 'configuration']);
+        Route::get('/historique', [\App\Http\Controllers\AttendanceController::class, 'history']);
+        Route::post('/pointer', [\App\Http\Controllers\AttendanceController::class, 'store'])->middleware('throttle:10,1');
+    });
     // Authentication-related routes
     Route::post('/logout', [AuthControllerApi::class, 'logout']);
     Route::post('/refresh', [AuthControllerApi::class, 'refresh']);

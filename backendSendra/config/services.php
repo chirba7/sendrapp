@@ -35,4 +35,11 @@ return [
         'backoffice_url' => env('BACKOFFICE_URL', 'http://localhost:8001'),
     ],
 
+    'orange_sms' => [
+        'login' => env('ORANGE_SMS_LOGIN', ''),
+        'api_key' => env('ORANGE_SMS_API_KEY', ''),
+        'token' => env('ORANGE_SMS_TOKEN', ''),
+        'base_uri' => env('ORANGE_SMS_BASE_URI', 'https://api.orangesmspro.sn:8443/api'),
+    ],
+
 ];

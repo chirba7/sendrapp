@@ -104,6 +104,21 @@ Route::middleware([
     Route::post('/ajouter', [UserController::class, 'store'])->name('ajouter.compte');
 
     Route::resource('/dashboard/communes', CommuneController::class);
+    Route::prefix('/dashboard/pointage')->name('attendance.')->controller(\App\Http\Controllers\AttendanceController::class)->group(function () {
+        Route::get('/', 'index')->name('index');
+        Route::get('/sites', 'sites')->name('sites');
+        Route::get('/sites/creer', 'createSite')->name('sites.create');
+        Route::post('/sites', 'storeSite')->name('sites.store');
+        Route::get('/sites/{site}/modifier', 'editSite')->name('sites.edit');
+        Route::put('/sites/{site}', 'updateSite')->name('sites.update');
+        Route::get('/affectations', 'assignments')->name('assignments');
+        Route::post('/affectations', 'storeAssignment')->name('assignments.store');
+        Route::patch('/affectations/{assignment}/desactiver', 'disableAssignment')->name('assignments.disable');
+        Route::patch('/inscriptions/{enrollment}/valider', 'approveEnrollment')->name('enrollments.approve');
+        Route::patch('/inscriptions/{enrollment}/reinitialiser-telephone', 'resetDevice')->name('enrollments.reset-device');
+        Route::patch('/inscriptions/{enrollment}/desactiver', 'disableEnrollment')->name('enrollments.disable');
+        Route::delete('/inscriptions/{enrollment}', 'destroyEnrollment')->name('enrollments.destroy');
+    });
     Route::resource('/dashboard/fourrieres', PoundController::class)
         ->parameters(['fourrieres'=>'pound'])
         ->names([

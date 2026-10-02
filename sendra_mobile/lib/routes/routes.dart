@@ -11,7 +11,6 @@ import 'package:walletium/views/screens/edit_profile_screen.dart';
 import 'package:walletium/views/screens/kyc_screen.dart';
 import 'package:walletium/views/screens/onboard_screen.dart';
 import 'package:walletium/views/screens/otp_verification_screen.dart';
-import 'package:walletium/views/screens/phone_verification_screen.dart';
 import 'package:walletium/views/screens/request_money_review_screen.dart';
 import 'package:walletium/views/screens/request_money_screen.dart';
 import 'package:walletium/views/screens/request_money_success_screen.dart';
@@ -21,8 +20,6 @@ import 'package:walletium/views/screens/send_money_details_screen.dart';
 import 'package:walletium/views/screens/send_money_screen.dart';
 import 'package:walletium/views/screens/send_money_success_screen.dart';
 import 'package:walletium/views/screens/sign_in_screen.dart';
-import 'package:walletium/views/screens/sign_up_congratulations_screen.dart';
-import 'package:walletium/views/screens/sign_up_screen.dart';
 import 'package:walletium/views/screens/splash_screen.dart';
 import 'package:walletium/views/screens/transactions_history_screen.dart';
 import 'package:walletium/views/screens/transfer_history_screen.dart';
@@ -36,23 +33,17 @@ import 'package:walletium/widgets/others/bottom_navigation_widget.dart';
 
 import '../views/screens/carto.dart';
 import '../views/screens/profile_screen.dart';
-import '../views/screens/signup_final.dart';
 
 class Routes {
   static const String splashScreen = '/splashScreen';
   static const String onboardScreen = '/onboardScreen';
   static const String welcomeScreen = '/welcomeScreen';
   static const String signInScreen = '/signInScreen';
-  static const String signUpScreen = '/signUpScreen';
-  static const String signUpFinalScreen = '/signUpFinalScreen';
 
   static const String otpVerificationScreen = '/otpVerificationScreen';
-  static const String phoneVerificationScreen = '/phoneVerificationScreen';
   static const String resetPasswordScreen = '/resetPasswordScreen';
   static const String resetPasswordCongratulationsScreen =
       '/resetPasswordCongratulationsScreen';
-  static const String signUpCongratulationsScreen =
-      '/signUpCongratulationsScreen';
   static const String bottomNavigationScreen = '/bottomNavigationScreen';
   static const String changePasswordScreen = '/changePasswordScreen';
   static const String editProfileScreen = '/editProfileScreen';
@@ -110,22 +101,6 @@ class Routes {
     GetPage(
       name: resetPasswordCongratulationsScreen,
       page: () => const ResetPasswordCongratulationsScreen(),
-    ),
-    GetPage(
-      name: signUpScreen,
-      page: () => SignUpScreen(),
-    ),
-    GetPage(
-      name: signUpFinalScreen,
-      page: () => SignUpFinalScreen(),
-    ),
-    GetPage(
-      name: phoneVerificationScreen,
-      page: () => PhoneVerificationScreen(),
-    ),
-    GetPage(
-      name: signUpCongratulationsScreen,
-      page: () => const SignUpCongratulationsScreen(),
     ),
     GetPage(
       name: bottomNavigationScreen,

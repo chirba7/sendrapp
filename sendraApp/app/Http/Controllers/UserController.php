@@ -133,7 +133,9 @@ class UserController extends Controller
         $user->first_name = $request->prenom;
         $user->last_name = $request->nom;
         $user->telephone = $request->telephone;
-        $user->role_id = $request->role;
+        if ($user->role_id != 5) {
+            $user->role_id = $request->role;
+        }
         $user->email = $request->email;
 
         $user->update();

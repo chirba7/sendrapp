@@ -165,7 +165,7 @@ class MissionController extends Controller
             $mission->save();
         }
         $mission->agents()->sync($agents);
-        $mission->vehicles()->sync($data['type'] === 'programmee' ? $vehicles : []);
+        $mission->vehicles()->sync($vehicles);
         $keptTruckIds = [];
         foreach ($data['trucks'] ?? [] as $truck) {
             if (collect($truck)->filter(fn ($v) => $v !== null && $v !== '')->isNotEmpty()) {

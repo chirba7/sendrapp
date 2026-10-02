@@ -115,21 +115,28 @@ class AuthControllerApi extends Controller
 
         $verificationCode = rand(100000, 999999); // Generate a 6-digit code
 
-        // Save or update the verification code
-        UserVerificationCode::updateOrCreate(
-            ['phone' => $request->telephone],
-            [
-                'code' => $verificationCode,
-                'expires_at' => now()->addMinutes(10), // Code expires in 10 minutes
-            ]
-        );
-
-        // Send the code via SMS
-        $this->smsService->sendSms(
+        $smsResult = $this->smsService->sendSms(
             'Code de vérification',
             'EPAVIE',
             '221'.$request->telephone,
             "Votre code de vérification est: $verificationCode"
+        );
+
+        if (($smsResult['success'] ?? false) !== true) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Le SMS de vérification n’a pas pu être envoyé. Veuillez réessayer plus tard.',
+            ], 503);
+        }
+
+        // Le code n'est valable qu'après confirmation de l'envoi par le prestataire.
+        UserVerificationCode::updateOrCreate(
+            ['phone' => $request->telephone],
+            [
+                'code' => $verificationCode,
+                'expires_at' => now()->addMinutes(10),
+                'verified_at' => null,
+            ]
         );
 
         return response()->json([

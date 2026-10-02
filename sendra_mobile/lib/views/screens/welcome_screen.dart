@@ -85,15 +85,6 @@ class WelcomeScreen extends StatelessWidget {
             },
             title: Strings.signIn,
           ),
-          PrimaryButtonWidget(
-            backgroundColor: CustomColor.textColor,
-            borderColor: CustomColor.textColor,
-            textColor: CustomColor.whiteColor,
-            onPressed: () {
-              Get.toNamed(Routes.signUpScreen);
-            },
-            title: Strings.signUp,
-          )
         ],
       ),
     );

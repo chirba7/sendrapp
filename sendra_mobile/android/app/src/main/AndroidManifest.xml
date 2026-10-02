@@ -6,9 +6,9 @@
     <uses-permission android:name="android.permission.CAMERA"/>
 
     <application
-        android:label="Epavie PRO"
+        android:label="EPAVIE PRO"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launchr"
+        android:icon="@mipmap/ic_launcher"
         android:networkSecurityConfig="@xml/network_security_config">
         <activity
             android:name=".MainActivity"

@@ -1,0 +1,2 @@
+# Local Flutter release binaries are distributed outside Git.
+/app_pointage_sendra/releases/*.apk

@@ -30,6 +30,7 @@ class VehiculeResource extends JsonResource
             'vehicule_non_identifiable' => $this->vehicule_non_identifiable,
             'vehicule_brule' => $this->vehicule_brule,
             'chassis_non_reparable' => $this->chassis_non_reparable,
+            'autre_situation' => $this->autre_situation,
         ];
     }
 }

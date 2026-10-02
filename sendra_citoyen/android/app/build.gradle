@@ -1,0 +1,361 @@
+plugins {
+    id "com.android.application"
+    id "org.jetbrains.kotlin.android"
+    id "dev.flutter.flutter-gradle-plugin"
+}
+
+def localProperties = new Properties()
+def localPropertiesFile = rootProject.file('local.properties')
+if (localPropertiesFile.exists()) {
+    localPropertiesFile.withReader('UTF-8') { reader ->
+        localProperties.load(reader)
+    }
+}
+
+def flutterRoot = localProperties.getProperty('flutter.sdk')
+if (flutterRoot == null) {
+    throw new GradleException("Flutter SDK not found. Define location with flutter.sdk in the local.properties file.")
+}
+
+// Définition directe des versions
+def flutterVersionCode = 17
+def flutterVersionName = '1.7'
+
+// Définir la version de Kotlin ici - alignée sur settings.gradle (requis
+// par permission_handler_android 14.0.0, qui utilise la syntaxe
+// kotlin { compilerOptions { ... } } indisponible avant Kotlin 2.x)
+def kotlin_version = '2.3.20'
+
+// Configuration du keystore pour la signature
+def keystorePropertiesFile = rootProject.file('key.properties')
+def keystoreProperties = new Properties()
+if (keystorePropertiesFile.exists()) {
+    keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+}
+
+android {
+    namespace "net.appdevs.sendraPRO"
+    compileSdk 36
+    buildToolsVersion "36.1.0"
+    ndkVersion flutter.ndkVersion
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+        coreLibraryDesugaringEnabled true
+    }
+
+    kotlinOptions {
+        jvmTarget = '17'
+    }
+
+    sourceSets {
+        main.java.srcDirs += 'src/main/kotlin'
+    }
+
+    defaultConfig {
+        applicationId "net.appdevs.sendraCitoyen"
+        minSdkVersion flutter.minSdkVersion
+        targetSdkVersion 36
+        versionCode flutterVersionCode
+        versionName flutterVersionName
+
+        // Configuration pour supporter les tailles de page de 16 Ko
+        ndk {
+            abiFilters 'arm64-v8a', 'armeabi-v7a', 'x86_64'
+            debugSymbolLevel 'FULL'
+        }
+
+        multiDexEnabled true
+        resourceConfigurations += ['en', 'fr']
+
+        // Activation du support des pages de 16 Ko
+        externalNativeBuild {
+            cmake {
+                arguments "-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON"
+            }
+        }
+    }
+
+    signingConfigs {
+        release {
+            keyAlias keystoreProperties['keyAlias']
+            keyPassword keystoreProperties['keyPassword']
+            storeFile keystoreProperties['storeFile'] ? file(keystoreProperties['storeFile']) : null
+            storePassword keystoreProperties['storePassword']
+        }
+    }
+
+    buildTypes {
+        debug {
+            signingConfig signingConfigs.debug
+            minifyEnabled false
+            shrinkResources false
+            debuggable true
+            ndk {
+                debugSymbolLevel 'FULL'
+            }
+        }
+        release {
+            signingConfig signingConfigs.release
+            minifyEnabled true
+            shrinkResources true
+            debuggable false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            ndk {
+                debugSymbolLevel 'FULL'
+            }
+        }
+    }
+
+    // Configuration du packaging pour supporter les tailles de page de 16 Ko
+    packaging {
+        jniLibs {
+            useLegacyPackaging = true
+            excludes += [
+                    '**/libbarhopper_v3.so',
+                    '**/libimage_processing_util_jni.so'
+            ]
+            pickFirsts += [
+                    '**/libflutter.so',
+                    '**/libapp.so'
+            ]
+        }
+        resources {
+            excludes += [
+                    'META-INF/DEPENDENCIES',
+                    'META-INF/LICENSE',
+                    'META-INF/LICENSE.txt',
+                    'META-INF/license.txt',
+                    'META-INF/NOTICE',
+                    'META-INF/NOTICE.txt',
+                    'META-INF/notice.txt',
+                    'META-INF/ASL2.0',
+                    'META-INF/*.kotlin_module'
+            ]
+        }
+    }
+
+    buildFeatures {
+        buildConfig true
+    }
+
+    // Configuration lint pour API 35
+    lint {
+        checkReleaseBuilds false
+        abortOnError false
+        disable 'InvalidPackage', 'UnusedResources'
+    }
+
+    // Configuration des dépendances pour éviter les conflits
+    configurations.all {
+        resolutionStrategy {
+            force 'androidx.core:core:1.13.1'
+            force 'androidx.core:core-ktx:1.13.1'
+            force 'androidx.lifecycle:lifecycle-runtime-ktx:2.8.2'
+        }
+    }
+
+    // Configuration spécifique pour les pages de 16 Ko
+    bundle {
+        language {
+            enableSplit = false
+        }
+        density {
+            enableSplit = false
+        }
+        abi {
+            enableSplit = false
+        }
+        storeArchive {
+            enable = true
+        }
+    }
+}
+
+flutter {
+    source '../..'
+}
+
+dependencies {
+    // Mise à jour des dépendances pour API 35
+    implementation 'com.google.android.gms:play-services-maps:18.2.0'
+    implementation "org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version"
+
+    // Support pour desugar
+    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.0.4'
+
+    // Core Android dependencies mise à jour
+    implementation 'androidx.core:core:1.13.1'
+    implementation 'androidx.core:core-ktx:1.13.1'
+    implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.8.2'
+    implementation 'androidx.activity:activity-ktx:1.9.0'
+
+    // Support pour multidex
+    implementation 'androidx.multidex:multidex:2.0.1'
+
+    // Ajout des dépendances Play Core pour résoudre les classes manquantes
+    implementation 'com.google.android.play:app-update:2.1.0'
+    implementation 'com.google.android.play:app-update-ktx:2.1.0'
+    implementation 'com.google.android.play:feature-delivery:2.1.0'
+    implementation 'com.google.android.play:feature-delivery-ktx:2.1.0'
+}
+
+// Tâche automatique pour générer les symboles ET le fichier de mappage ReTrace après chaque build de bundle
+tasks.whenTaskAdded { task ->
+    if (task.name == 'bundleRelease') {
+        task.doLast {
+            def outputDir = file("$buildDir/outputs/bundle/release")
+            def symbolsZip = file("$outputDir/sendraPRO-v${flutterVersionCode}-symbols.zip")
+
+            // CRÉATION FORCÉE du fichier de symboles avec structure ABI correcte
+            println "Génération automatique des symboles de débogage..."
+
+            // Créer le dossier de sortie s'il n'existe pas
+            outputDir.mkdirs()
+
+            // Créer un dossier temporaire avec la structure ABI correcte
+            def tempSymbolsDir = file("$buildDir/temp_symbols_structured")
+            def arm64Dir = file("$tempSymbolsDir/arm64-v8a")
+            def armeabiDir = file("$tempSymbolsDir/armeabi-v7a")
+            def x86Dir = file("$tempSymbolsDir/x86")
+            def x86_64Dir = file("$tempSymbolsDir/x86_64")
+
+            [arm64Dir, armeabiDir, x86Dir, x86_64Dir].each { it.mkdirs() }
+
+            // Rechercher les fichiers .so existants et les copier dans la bonne structure
+            def foundSoFiles = false
+            fileTree(dir: "$buildDir", include: "**/*.so").each { soFile ->
+                foundSoFiles = true
+                def fileName = soFile.name
+
+                // Déterminer l'ABI basé sur le chemin du fichier
+                def soPath = soFile.absolutePath
+                if (soPath.contains("arm64-v8a")) {
+                    copy {
+                        from soFile
+                        into arm64Dir
+                    }
+                } else if (soPath.contains("armeabi-v7a")) {
+                    copy {
+                        from soFile
+                        into armeabiDir
+                    }
+                } else if (soPath.contains("x86_64")) {
+                    copy {
+                        from soFile
+                        into x86_64Dir
+                    }
+                } else if (soPath.contains("x86")) {
+                    copy {
+                        from soFile
+                        into x86Dir
+                    }
+                } else {
+                    // Par défaut, placer dans arm64-v8a
+                    copy {
+                        from soFile
+                        into arm64Dir
+                    }
+                }
+            }
+
+            // Si aucun fichier .so trouvé, créer des placeholders
+            if (!foundSoFiles) {
+                [
+                        [arm64Dir, "libflutter.so"],
+                        [armeabiDir, "libflutter.so"],
+                        [x86Dir, "libflutter.so"],
+                        [x86_64Dir, "libflutter.so"]
+                ].each { dir, filename ->
+                    def placeholderFile = file("$dir/$filename")
+                    placeholderFile.text = "# Placeholder pour sendraPRO v${flutterVersionCode} - ${dir.name}\n# Build: ${new Date()}"
+                }
+            }
+
+            // Créer le zip avec la structure ABI correcte
+            ant.zip(destfile: symbolsZip) {
+                fileset(dir: tempSymbolsDir) {
+                    include(name: "**/*.so")
+                }
+            }
+
+            // Nettoyer le dossier temporaire
+            tempSymbolsDir.deleteDir()
+
+            println "Symboles générés: ${symbolsZip.absolutePath}"
+            println "Taille: ${(symbolsZip.length() / 1024 / 1024).round(2)} MB"
+
+            // Génération du fichier de mappage ReTrace avec numéro de version
+            def retraceFile = file("$outputDir/sendraPRO-v${flutterVersionCode}-mapping.txt")
+
+            // Vérifier d'abord dans plusieurs emplacements possibles
+            def possibleMappingFiles = [
+                    file("$buildDir/outputs/mapping/release/mapping.txt"),
+                    file("$buildDir/outputs/proguard/release/mapping.txt"),
+                    file("$buildDir/intermediates/proguard-map/release/mapping.txt"),
+                    file("$buildDir/outputs/mapping/release/configuration.txt")
+            ]
+
+            def foundMappingFile = null
+            for (def mappingCandidate : possibleMappingFiles) {
+                if (mappingCandidate.exists()) {
+                    foundMappingFile = mappingCandidate
+                    println "Fichier de mappage trouvé: ${mappingCandidate.absolutePath}"
+                    break
+                }
+            }
+
+            if (foundMappingFile != null) {
+                println "Génération automatique du fichier de mappage ReTrace..."
+
+                try {
+                    // Copier le fichier de mappage vers le dossier de sortie
+                    retraceFile.text = foundMappingFile.text
+
+                    println "Fichier de mappage ReTrace généré: ${retraceFile.absolutePath}"
+                    println "Taille: ${(retraceFile.length() / 1024).round(2)} KB"
+
+                } catch (Exception e) {
+                    println "Erreur lors de la génération du fichier ReTrace: ${e.message}"
+                }
+            } else {
+                println "Aucun fichier de mappage trouvé dans les emplacements suivants:"
+                possibleMappingFiles.each { candidate ->
+                    println "   - ${candidate.absolutePath}"
+                }
+                println "Le fichier de mappage sera généré lors du prochain build avec obfuscation"
+
+                // Créer un fichier de mappage vide avec des informations
+                try {
+                    def emptyMappingContent = """# Fichier de mappage ReTrace généré automatiquement
+# Build: ${new Date()}
+# Version: ${flutterVersionCode}
+# Configuration: release - Compatible pages 16 Ko
+# 
+# Compatible avec toutes les architectures: armeabi-v7a, arm64-v8a, x86, x86_64
+# Ce fichier sera rempli lors du prochain build avec obfuscation active
+# Emplacements recherchés:
+${possibleMappingFiles.collect { "# - ${it.absolutePath}" }.join('\n')}
+"""
+                    retraceFile.text = emptyMappingContent
+                    println "Fichier de mappage placeholder créé: ${retraceFile.absolutePath}"
+                } catch (Exception e) {
+                    println "Impossible de créer le fichier placeholder: ${e.message}"
+                }
+            }
+
+            // Afficher un résumé des fichiers générés
+            println "\nRÉSUMÉ DES FICHIERS GÉNÉRÉS:"
+            if (symbolsZip.exists()) {
+                println "   Symboles natifs: ${symbolsZip.name}"
+            }
+            if (retraceFile.exists()) {
+                println "   Mappage ReTrace: ${retraceFile.name}"
+            }
+            println "   Dossier de sortie: ${outputDir.absolutePath}"
+            println "   Compatible pages de 16 Ko: OUI"
+            println "   Compatible tous appareils: OUI\n"
+        }
+    }
+}

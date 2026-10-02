@@ -29,7 +29,24 @@ services:
     depends_on:
       mysql:
         condition: service_healthy
+    environment:
+      ATTENDANCE_FACE_URL: http://face:8010
+      ATTENDANCE_FACE_TOKEN: ${ATTENDANCE_FACE_TOKEN:-}
+      ATTENDANCE_FACE_ENABLED: ${ATTENDANCE_FACE_ENABLED:-false}
+      ATTENDANCE_FACE_POINTAGE_ENABLED: ${ATTENDANCE_FACE_POINTAGE_ENABLED:-false}
     command: php artisan serve --host=0.0.0.0 --port=8000
+
+  face:
+    build:
+      context: ./face_service
+    restart: unless-stopped
+    mem_limit: 2g
+    memswap_limit: 2g
+    cpus: 1.5
+    environment:
+      FACE_SERVICE_TOKEN: ${ATTENDANCE_FACE_TOKEN:-}
+    volumes:
+      - face_model_cache:/root/.deepface
 
   app:
     build:
@@ -47,3 +64,4 @@ services:
 
 volumes:
   sendra_mysql_data:
+  face_model_cache:

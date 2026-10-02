@@ -7,7 +7,6 @@ use App\Http\Resources\SignalementRessource;
 use App\Models\CarPhoto;
 use App\Models\CarPosition;
 use App\Support\ImageOptimizer;
-use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -133,17 +132,7 @@ class CarPositionController extends Controller
     public function listerSignalements()
     {
 
-        $dateActuelle = Carbon::now();
-        $dateLimite = $dateActuelle->subDays(10)->toDateString();
-
-        // Correction perf : whereDate('created_at', ...) enveloppe la
-        // colonne dans une fonction SQL (DATE(created_at) >= ?), ce qui
-        // empêche MySQL d'utiliser un index sur created_at (scan complet
-        // au lieu d'un accès par plage). $dateLimite est une date à minuit,
-        // donc une comparaison directe >= est strictement équivalente et
-        // reste "sargable".
         $signalement = CarPosition::where('is_deleted', false)
-            ->where('created_at', '>=', $dateLimite)
             ->with('photo')
             ->orderBy('created_at', 'desc')
             ->paginate(10);

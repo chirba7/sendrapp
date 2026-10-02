@@ -63,6 +63,11 @@ class User extends Authenticatable
         return $this->belongsTo(Role::class);
     }
 
+    public function attendanceEnrollment()
+    {
+        return $this->hasOne(AttendanceEnrollment::class);
+    }
+
     /**
      * Comptes encore affiliés à SENDRA.
      *

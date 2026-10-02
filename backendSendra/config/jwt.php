@@ -146,14 +146,13 @@ return [
     |
     */
 
-    'required_claims' => [
+    'required_claims' => array_merge([
         'iss',
         'iat',
-        'exp',
         'nbf',
         'sub',
         'jti',
-    ],
+    ], env('JWT_TTL', null) === null ? [] : ['exp']),
 
     /*
     |--------------------------------------------------------------------------

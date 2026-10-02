@@ -40,6 +40,7 @@ class UpdateCarPositionRequest extends FormRequest
             'vehicule_non_identifiable' => 'nullable|boolean',
             'vehicule_brule' => 'nullable|boolean',
             'chassis_non_reparable' => 'nullable|boolean',
+	    'autre_situation' => 'nullable|string|max:500',
 	    
         ];
     }

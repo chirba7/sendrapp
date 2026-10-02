@@ -129,6 +129,19 @@ class SignalementWorkflowTest extends TestCase
         $this->assertSame('REJETE', $carPosition->etat);
     }
 
+    public function test_staff_listing_keeps_signalements_older_than_ten_days(): void
+    {
+        User::factory()->create(['telephone' => '771000004', 'role_id' => 2]);
+        $older = CarPosition::factory()->create(['created_at' => now()->subDays(30)]);
+        $recent = CarPosition::factory()->create(['created_at' => now()]);
+        $token = $this->loginAndGetToken('771000004');
+
+        $this->getJson('/api/listerSignalements', ['Authorization' => "Bearer {$token}"])
+            ->assertOk()
+            ->assertJsonFragment(['signalementId' => $older->id])
+            ->assertJsonFragment(['signalementId' => $recent->id]);
+    }
+
     private function loginAndGetToken(string $telephone, string $password = 'password'): string
     {
         return $this->postJson('/api/login', compact('telephone', 'password'))->json('token');

@@ -11,6 +11,11 @@ class User extends Authenticatable implements JWTSubject
 {
     use HasFactory, Notifiable;
 
+    public function attendanceEnrollment()
+    {
+        return $this->hasOne(AttendanceEnrollment::class);
+    }
+
     // Correction API-C-4 : empêche /me (et toute sérialisation JSON de
     // User) de renvoyer le hash du mot de passe et les secrets 2FA.
     protected $hidden = [
