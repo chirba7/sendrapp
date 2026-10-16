@@ -86,6 +86,8 @@
                                                 <option value="1" {{ $user->role_id == 1 ? 'selected' : '' }}>Admin</option>
                                                 <option value="2" {{ $user->role_id == 2 ? 'selected' : '' }}>Agent</option>
                                                 <option value="3" {{ $user->role_id == 3 ? 'selected' : '' }}>Autorité</option>
+                                                <option value="4" {{ $user->role_id == 4 ? 'selected' : '' }}>Autorité - Préfecture</option>
+                                                <option value="7" {{ $user->role_id == 7 ? 'selected' : '' }}>Opérateur</option>
                                             </select>
                                             @endif
                                             @error('role')

@@ -62,7 +62,7 @@
                                     <div class="row mb-3">
                                         <div class="col-md-6">
                                             <label class="form-label" for="inputEmail4">Prémon</label>
-                                            <input type="text" class="form-control @error('premon') is-invalid @enderror" id="inputEmail4" name="prenom" value="{{ old('premon') }}">
+                                            <input type="text" class="form-control @error('prenom') is-invalid @enderror" id="inputEmail4" name="prenom" value="{{ old('prenom') }}">
                                             @error('premon')
                                             <div class="invalid-feedback">{{ $message }}</div>
                                             @enderror
@@ -86,10 +86,11 @@
                                         <div class="col-md-6">
                                             <label class="form-label" for="inputEmail4">Role</label>
                                             <select id="inputState" class="form-control @error('role') is-invalid @enderror" name="role">
-                                                <option value="1">Admin</option>
-                                                <option value="2">Agent</option>
-                                                <option value="3">Autorité - Commune</option>
-                                                <option value="4">Autorité - Préfecture</option>
+                                                <option value="1" {{ old('role') == '1' ? 'selected' : '' }}>Admin</option>
+                                                <option value="2" {{ old('role') == '2' ? 'selected' : '' }}>Agent</option>
+                                                <option value="3" {{ old('role') == '3' ? 'selected' : '' }}>Autorité - Commune</option>
+                                                <option value="4" {{ old('role') == '4' ? 'selected' : '' }}>Autorité - Préfecture</option>
+                                                <option value="7" {{ old('role') == '7' ? 'selected' : '' }}>Opérateur</option>
                                             </select>
                                             @error('role')
                                             <div class="invalid-feedback">{{ $message }}</div>

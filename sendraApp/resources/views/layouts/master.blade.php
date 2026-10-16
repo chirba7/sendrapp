@@ -102,6 +102,9 @@
                         <a href="{{route('utilisateurs')}}" class="{{request()->is('dashboard/comptes/utilisateurs') ? 'active' : ''}}"> Autorité préfecture </a>
                     </li>
                     <li>
+                        <a href="{{route('operateurs')}}" class="{{request()->is('dashboard/comptes/operateurs') ? 'active' : ''}}"> Opérateurs </a>
+                    </li>
+                    <li>
                         {{-- Correction WEB-M-1 --}}
                         <a href="{{route('citoyens')}}" class="{{request()->is('dashboard/comptes/citoyens') ? 'active' : ''}}"> Citoyens </a>
                     </li>

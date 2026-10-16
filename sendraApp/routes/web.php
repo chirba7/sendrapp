@@ -97,6 +97,7 @@ Route::middleware([
     Route::get('/dashboard/comptes/agents', [UserController::class, 'agents'])->name('agents');
     Route::get('/dashboard/comptes/autorites', [UserController::class, 'autorites'])->name('autorites');
     Route::get('/dashboard/comptes/utilisateurs', [UserController::class, 'utilisateurs'])->name('utilisateurs');
+    Route::get('/dashboard/comptes/operateurs', [UserController::class, 'operateurs'])->name('operateurs');
     // Correction WEB-M-1 : route déclarée avant le wildcard {user} ci-dessous,
     // sinon "citoyens" serait interprété comme un id de compte.
     Route::get('/dashboard/comptes/citoyens', [UserController::class, 'citoyens'])->name('citoyens');

@@ -46,7 +46,7 @@ class StoreAgentRequest extends FormRequest
             'email' => 'required|email',
             // Correction WEB-C-1 : sans whitelist, un role_id arbitraire
             // (ex. hors des 4 rôles staff valides) pouvait être assigné.
-            'role' => 'required|in:1,2,3,4',
+            'role' => 'required|in:1,2,3,4,7',
             // Correction : le numéro est unique en base (contrainte SQL),
             // mais rien ne le vérifiait avant l'enregistrement — un doublon
             // provoquait une erreur 500 (SQLSTATE 23000) au lieu d'un

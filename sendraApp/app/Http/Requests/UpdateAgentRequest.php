@@ -53,7 +53,7 @@ class UpdateAgentRequest extends FormRequest
             ],
             // Correction WEB-C-1 : sans whitelist, un role_id arbitraire
             // (ex. hors des 4 rôles staff valides) pouvait être assigné.
-            'role' => $isCitizen ? 'prohibited' : 'required|in:1,2,3,4',
+            'role' => $isCitizen ? 'prohibited' : 'required|in:1,2,3,4,7',
             // Correction : même souci qu'à la création (StoreAgentRequest) —
             // ignore() exclut le compte en cours de modification lui-même.
             'telephone' => [

@@ -34,6 +34,12 @@ class UserController extends Controller
     {
         return $this->listerComptes($request, 4, 'comptes.utilisateurs');
     }
+    // Rôle Operateur (création des missions), ajouté à la demande de la
+    // direction : il lui fallait aussi sa liste et son écran d'archives.
+    public function operateurs(Request $request)
+    {
+        return $this->listerComptes($request, 7, 'comptes.operateurs');
+    }
 
     /**
      * Liste des comptes d'un rôle. `?archives=1` affiche les comptes
