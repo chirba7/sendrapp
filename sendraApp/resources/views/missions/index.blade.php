@@ -32,7 +32,7 @@
                             <td>
                                 <strong>{{ $mission->code ?: $mission->title }}</strong><br><small>{{ $mission->title }}</small><br>
                                 <span class="badge {{ $mission->type === 'programmee' ? 'bg-success' : 'bg-warning text-dark' }}">
-                                    {{ $mission->type === 'programmee' ? 'Programmée' : 'Directe' }}
+                                    {{ $mission->type === 'programmee' ? 'Programmée' : 'Ponctuelle' }}
                                 </span>
                             </td>
                             <td>{{ $mission->scheduled_at?->format('d/m/Y H:i') ?: '—' }}</td>

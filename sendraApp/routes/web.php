@@ -37,7 +37,8 @@ use Illuminate\Support\Facades\Route;
 Route::middleware([
     'auth:sanctum', 'notArchived', 'isActived',
     config('jetstream.auth_session'),
-    'role:1,2,3,4',
+    // 7 = Operateur : accède au tableau de bord et aux missions, pas aux comptes.
+    'role:1,2,3,4,7',
 ])->group(function () {
     Route::get('/dashboard', [CarPositionController::class, 'infos'])->name('dashboard');
 });
@@ -49,8 +50,6 @@ Route::middleware([
 ])->group(function () {
     Route::get('/',  [CarPositionController::class, 'infos']);
 
-    Route::patch('/update/profil', [UserController::class, 'update'])->name('update.profil');
-    Route::patch('/update/pass', [UserController::class, 'updatepass'])->name('update.pass');
 
     Route::get('/dashboard/signalement/signales', [CarPositionController::class, 'index'])->name('signales');
     Route::get('/dashboard/signalement/enleves', [CarPositionController::class, 'index2'])->name('enleves');
@@ -126,13 +125,6 @@ Route::middleware([
             'edit'=>'pounds.edit','update'=>'pounds.update','destroy'=>'pounds.destroy',
         ]);
 
-    Route::get('/dashboard/missions', [MissionController::class, 'index'])->name('missions.index');
-    Route::get('/dashboard/missions/creer', [MissionController::class, 'create'])->name('missions.create');
-    Route::post('/dashboard/missions', [MissionController::class, 'store'])->name('missions.store');
-    Route::get('/dashboard/missions/{mission}', [MissionController::class, 'show'])->name('missions.show');
-    Route::get('/dashboard/missions/{mission}/modifier', [MissionController::class, 'edit'])->name('missions.edit');
-    Route::put('/dashboard/missions/{mission}', [MissionController::class, 'update'])->name('missions.update');
-    Route::delete('/dashboard/missions/{mission}', [MissionController::class, 'destroy'])->name('missions.destroy');
 
     Route::get('/dashboard/comptes/{user}', [UserController::class, 'show'])->name('modifier');
     Route::patch('/dashboard/comptes/{user}', [UserController::class, 'modifier'])->name('modifier.compte');
@@ -170,3 +162,31 @@ Route::middleware([
 });
 
 // mame.bousso@sendra.sn
+
+// Son propre profil et son mot de passe : accessibles à tout compte du staff,
+// y compris l'Operateur, qui n'a pas accès au reste de ce groupe.
+Route::middleware([
+    'auth:sanctum', 'notArchived',
+    config('jetstream.auth_session'),
+    'role:1,2,3,4,7',
+])->group(function () {
+    Route::patch('/update/profil', [UserController::class, 'update'])->name('update.profil');
+    Route::patch('/update/pass', [UserController::class, 'updatepass'])->name('update.pass');
+});
+
+// Missions : Admin et Operateur. Le compte rendu de direction confie la
+// création des missions à l'Operateur ; le reste de son périmètre est à
+// préciser, d'où un groupe dédié plutôt qu'un ajout au groupe Admin.
+Route::middleware([
+    'auth:sanctum', 'notArchived', 'isActived',
+    config('jetstream.auth_session'),
+    'role:1,7',
+])->group(function () {
+    Route::get('/dashboard/missions', [MissionController::class, 'index'])->name('missions.index');
+    Route::get('/dashboard/missions/creer', [MissionController::class, 'create'])->name('missions.create');
+    Route::post('/dashboard/missions', [MissionController::class, 'store'])->name('missions.store');
+    Route::get('/dashboard/missions/{mission}', [MissionController::class, 'show'])->name('missions.show');
+    Route::get('/dashboard/missions/{mission}/modifier', [MissionController::class, 'edit'])->name('missions.edit');
+    Route::put('/dashboard/missions/{mission}', [MissionController::class, 'update'])->name('missions.update');
+    Route::delete('/dashboard/missions/{mission}', [MissionController::class, 'destroy'])->name('missions.destroy');
+});

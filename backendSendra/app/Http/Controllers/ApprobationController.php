@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\CarPosition;
+use App\Support\HistoriqueSignalement;
 use Illuminate\Http\Request;
 
 class ApprobationController extends Controller
@@ -27,6 +28,12 @@ class ApprobationController extends Controller
         $carPosition->motife_approbation = $request->motifApprobation;
 
         $carPosition->save();
+
+        HistoriqueSignalement::enregistrer(
+            $carPosition,
+            $request->approbation == 'OUI' ? 'approuve' : 'rejete',
+            $request->motifApprobation
+        );
 
         return response()->json([
             'message' => 'L\'approbation a été soumise avec succès.',

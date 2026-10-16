@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\CarPosition;
+use App\Support\HistoriqueSignalement;
 use App\Models\User;
 use App\Support\ImageOptimizer;
 use Illuminate\Http\Request;
@@ -21,6 +22,17 @@ class DommagesController extends Controller
         $request->validate([
             'signature' => 'required|string|max:15000000',
         ]);
+
+        // Le compte rendu de direction demande qu'un signalement envoyé pour
+        // approbation ne soit plus modifiable par l'agent : le verrou est posé
+        // ici, côté serveur, et pas seulement masqué dans l'application.
+        if ($carPosition->soumis_approbation_at) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Ce signalement a été envoyé pour approbation : il n\'est plus modifiable.',
+                'soumis_le' => $carPosition->soumis_approbation_at,
+            ], 423);
+        }
 
 
         // Extraction des données de l'image en base64
@@ -46,7 +58,12 @@ class DommagesController extends Controller
 
         // Mise à jour de l'enregistrement du signalement avec le nom de fichier de l'image
         $carPosition->dommage_image = $filename;
+        // Enregistrer les dommages vaut envoi pour approbation : on date ce
+        // passage, il sert de verrou et de repère dans l'historique.
+        $carPosition->soumis_approbation_at = now();
         $carPosition->update();
+
+        HistoriqueSignalement::enregistrer($carPosition, 'constat_soumis');
 
         // Tant que l'administration n'a pas statué, chaque validation des
         // dommages représente une demande (ou une nouvelle version) à

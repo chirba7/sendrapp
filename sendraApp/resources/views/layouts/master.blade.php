@@ -52,6 +52,16 @@
                     <span class="text">Cartographie</span>
                 </a>
             </li>
+            {{-- Missions : Admin et Operateur (le reste du menu Admin ne
+                 concerne pas l'Operateur). --}}
+            @if (in_array(Auth::user()->role->nomRole, ['Admin', 'Operateur']))
+            <li class="nav-item {{request()->is('dashboard/missions*') ? 'active' : ''}}">
+                <a href="{{route('missions.index')}}">
+                    <span class="icon text-success"><i class="lni lni-clipboard"></i></span>
+                    <span class="text">Missions</span>
+                </a>
+            </li>
+            @endif
             @if (Auth::user()->role->nomRole == 'Admin')
             <li class="nav-item {{request()->is('dashboard/pointage*') ? 'active' : ''}}">
                 <a href="{{route('attendance.index')}}"><span class="icon text-success"><i class="lni lni-timer"></i></span><span class="text">Pointage</span></a>
@@ -60,12 +70,6 @@
                 <a href="{{route('communes.index')}}">
                     <span class="icon text-success"><i class="lni lni-map-marker"></i></span>
                     <span class="text">Communes</span>
-                </a>
-            </li>
-            <li class="nav-item {{request()->is('dashboard/missions*') ? 'active' : ''}}">
-                <a href="{{route('missions.index')}}">
-                    <span class="icon text-success"><i class="lni lni-clipboard"></i></span>
-                    <span class="text">Missions</span>
                 </a>
             </li>
             <li class="nav-item {{request()->is('dashboard/fourrieres*') ? 'active' : ''}}">

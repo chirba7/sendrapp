@@ -22,6 +22,24 @@ class UpdateCarPositionRequest extends FormRequest
      *
      * @return array<string, \Illuminate\Contracts\Validation\ValidationRule|array<mixed>|string>
      */
+    /**
+     * Un signalement envoyé pour approbation n'est plus modifiable par l'agent
+     * (compte rendu de direction, § 04). Le refus est renvoyé AVANT la
+     * validation des champs : sinon l'agent reçoit « erreur de validation »
+     * au lieu de la vraie raison.
+     */
+    protected function prepareForValidation(): void
+    {
+        $carPosition = $this->route('carPosition');
+        if ($carPosition && $carPosition->soumis_approbation_at) {
+            throw new HttpResponseException(response()->json([
+                'success' => false,
+                'message' => "Ce signalement a été envoyé pour approbation : il n'est plus modifiable.",
+                'soumis_le' => $carPosition->soumis_approbation_at,
+            ], 423));
+        }
+    }
+
     public function rules(): array
     {
         return [

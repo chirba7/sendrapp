@@ -21,11 +21,31 @@ class InfractionRequest extends FormRequest
      *
      * @return array<string, \Illuminate\Contracts\Validation\ValidationRule|array<mixed>|string>
      */
+    /**
+     * Un signalement envoyé pour approbation n'est plus modifiable par l'agent
+     * (compte rendu de direction, § 04). Le refus est renvoyé AVANT la
+     * validation des champs : sinon l'agent reçoit « erreur de validation »
+     * au lieu de la vraie raison.
+     */
+    protected function prepareForValidation(): void
+    {
+        $carPosition = $this->route('carPosition');
+        if ($carPosition && $carPosition->soumis_approbation_at) {
+            throw new HttpResponseException(response()->json([
+                'success' => false,
+                'message' => "Ce signalement a été envoyé pour approbation : il n'est plus modifiable.",
+                'soumis_le' => $carPosition->soumis_approbation_at,
+            ], 423));
+        }
+    }
+
     public function rules(): array
     {
         return [
             'adresse_precise' => 'required|string|max:255',
             'motif_infraction' => 'required|string|max:255',
+            // Justification du motif choisi (zone de texte libre).
+            'explication_infraction' => 'nullable|string|max:2000',
             // Correction API-H-4 : la colonne DB est NOT NULL (avec défaut
             // 'PUBLIC') — 'nullable' autorisait un `null` explicite envoyé
             // par le client et faisait planter l'insertion SQL. 'sometimes'

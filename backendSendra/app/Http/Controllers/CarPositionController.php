@@ -6,6 +6,7 @@ use App\Http\Requests\StoreCarPositionRequest;
 use App\Http\Resources\SignalementRessource;
 use App\Models\CarPhoto;
 use App\Models\CarPosition;
+use App\Support\HistoriqueSignalement;
 use App\Support\ImageOptimizer;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -67,7 +68,7 @@ class CarPositionController extends Controller
         $fichiersEcrits = [];
 
         try {
-            DB::transaction(function () use ($request, $uuid, $images, &$fichiersEcrits) {
+            $carPosition = DB::transaction(function () use ($request, $uuid, $images, &$fichiersEcrits) {
                 $carPosition = new CarPosition();
                 $carPosition->latitude = $request->latitude;
                 $carPosition->longitude = $request->longitude;
@@ -86,8 +87,14 @@ class CarPositionController extends Controller
                     $carPhoto->card_id = $carPosition->id;
                     $carPhoto->filepath = $chemin;
                     $carPhoto->position = $image['position'];
+                    // Photos jointes au signalement par le citoyen ; celles
+                    // prises par l'agent pendant la constatation portent
+                    // 'agent' (compte rendu de direction, § 03).
+                    $carPhoto->source = 'citoyen';
                     $carPhoto->save();
                 }
+
+                return $carPosition;
             });
         } catch (\Throwable $e) {
             // La transaction annule la base, pas le disque : on retire les
@@ -96,6 +103,8 @@ class CarPositionController extends Controller
 
             return response()->json(['message' => 'Erreur lors de la signalisation'], 500);
         }
+
+        HistoriqueSignalement::enregistrer($carPosition, 'cree');
 
         return response()->json(['message' => 'Signalisation effectuée avec succès'], 200);
     }

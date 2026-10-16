@@ -32,6 +32,17 @@ class VehiculeController extends Controller
      */
     public function update(UpdateCarPositionRequest $request, CarPosition $carPosition)
 {
+        // Le compte rendu de direction demande qu'un signalement envoyé pour
+        // approbation ne soit plus modifiable par l'agent : le verrou est posé
+        // ici, côté serveur, et pas seulement masqué dans l'application.
+        if ($carPosition->soumis_approbation_at) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Ce signalement a été envoyé pour approbation : il n\'est plus modifiable.',
+                'soumis_le' => $carPosition->soumis_approbation_at,
+            ], 423);
+        }
+
     // Validation incluse dans UpdateCarPositionRequest
 
     // Mise à jour des champs principaux

@@ -8,6 +8,7 @@ use App\Http\Requests\UpdateCarPositionRequest;
 use App\Http\Resources\SignalementRessource;
 use App\Models\CarPhoto;
 use App\Models\CarPosition;
+use App\Support\HistoriqueSignalement;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Dompdf\Dompdf;
 use Illuminate\Http\Request;
@@ -191,6 +192,8 @@ class CarPositionController extends Controller
         $carPosition->etat = "ENLEVE";
         $carPosition->update();
 
+        HistoriqueSignalement::enregistrer($carPosition, 'enleve', $request->motif_enlevement);
+
         return redirect()->back()->with('success', 'Les données ont été mises à jour avec succès.');
     }
 
@@ -213,6 +216,12 @@ class CarPositionController extends Controller
         $carPosition->motife_approbation = $request->motife_approbation;
 
         $carPosition->update();
+
+        HistoriqueSignalement::enregistrer(
+            $carPosition,
+            $request->approbation == 'OUI' ? 'approuve' : 'rejete',
+            $request->motife_approbation
+        );
 
         return redirect()->back()->with('success', 'Les données ont été mises à jour avec succès.');
     }

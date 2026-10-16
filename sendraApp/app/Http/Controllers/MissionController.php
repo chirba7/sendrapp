@@ -142,7 +142,7 @@ class MissionController extends Controller
             ->all();
 
         $mission->fill([
-            'title' => $data['title'] ?: ($commune ? 'Mission '.$commune->nomCommune : 'Mission directe'),
+            'title' => $data['title'] ?: ($commune ? 'Mission '.$commune->nomCommune : 'Mission ponctuelle'),
             'commune_id' => $commune?->id,
             'type' => $data['type'],
             'status' => $mission->status ?: 'planifiee',

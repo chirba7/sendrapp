@@ -3,6 +3,7 @@
 namespace App\Http\Resources;
 
 use Illuminate\Http\Request;
+use App\Support\HistoriqueSignalement;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 class SignalementRessource extends JsonResource
@@ -44,8 +45,18 @@ class SignalementRessource extends JsonResource
                 ? $this->photo->sortBy('id')->values()->map(fn ($p) => [
                     'url' => $request->getSchemeAndHttpHost() . '/storage/' . $p->filepath,
                     'position' => $p->position,
+                    // 'citoyen' (jointe au signalement) ou 'agent' (prise
+                    // pendant la constatation).
+                    'source' => $p->source,
                 ])->all()
                 : [],
+            'motif_infraction' => $this->motif_infraction,
+            'explication_infraction' => $this->explication_infraction,
+            // Envoyé pour approbation : l'agent ne peut plus le modifier.
+            'verrouille' => (bool) $this->soumis_approbation_at,
+            'soumis_approbation_at' => $this->soumis_approbation_at,
+            // Avancement complet, pour l'affichage du suivi au citoyen.
+            'historique' => HistoriqueSignalement::pour($this->resource),
         ];
     }
 }
