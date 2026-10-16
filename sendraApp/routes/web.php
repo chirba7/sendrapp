@@ -41,6 +41,8 @@ Route::middleware([
     'role:1,2,3,4,7',
 ])->group(function () {
     Route::get('/dashboard', [CarPositionController::class, 'infos'])->name('dashboard');
+    // Même écran que /dashboard : doit suivre les mêmes rôles.
+    Route::get('/', [CarPositionController::class, 'infos']);
 });
 
 Route::middleware([
@@ -48,7 +50,6 @@ Route::middleware([
     config('jetstream.auth_session'),
     'role:1,2,3,4',
 ])->group(function () {
-    Route::get('/',  [CarPositionController::class, 'infos']);
 
 
     Route::get('/dashboard/signalement/signales', [CarPositionController::class, 'index'])->name('signales');
@@ -156,7 +157,10 @@ Route::middleware([
 Route::middleware([
     'auth:sanctum', 'notArchived',
     config('jetstream.auth_session'),
-    'role:1,2,3,4',
+    // 7 = Operateur : c'est la page de changement de mot de passe imposé à la
+    // première connexion. Sans lui, tout compte Operateur tombe en 403 juste
+    // après s'être connecté, sans aucun moyen d'aller plus loin.
+    'role:1,2,3,4,7',
 ])->group(function () {
     Route::get('/modifier/motDePasse', [UserController::class, 'modifierMotDePasse']);
     Route::patch('/motDePasse', [UserController::class, 'modifierMotDePasse2'])->name('motDePasse');
