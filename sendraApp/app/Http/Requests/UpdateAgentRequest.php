@@ -20,6 +20,25 @@ class UpdateAgentRequest extends FormRequest
      *
      * @return array<string, \Illuminate\Contracts\Validation\ValidationRule|array<mixed>|string>
      */
+    /**
+     * Le numéro est saisi de bien des façons : « +221 76 621 25 81 »,
+     * « 00221766212581 », « 76-621-25-81 ». On ne garde que les chiffres et on
+     * retire l'indicatif sénégalais, pour que la validation à 9 chiffres ne
+     * refuse plus une saisie correcte mais formatée.
+     */
+    protected function prepareForValidation(): void
+    {
+        $tel = $this->input('telephone');
+        if (!is_string($tel) && !is_numeric($tel)) {
+            return;
+        }
+        $chiffres = preg_replace('/\\D+/', '', (string) $tel);
+        if (preg_match('/^(00221|221)(\\d{9})$/', $chiffres, $m)) {
+            $chiffres = $m[2];
+        }
+        $this->merge(['telephone' => $chiffres]);
+    }
+
     public function rules(): array
     {
         $user = $this->route('user');

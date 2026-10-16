@@ -24,12 +24,17 @@
                 </div>
             </div>
             @endif
-            @if(count($errors) >0)
+            @if ($errors->any())
             <div class="row alert-box danger-alert">
                 <div class="col-12 alert">
-                    <p class="text-medium">
-                        Une erreur s'est produite !!
-                    </p>
+                    {{-- Avant : « Une erreur s'est produite !! », sans dire laquelle :
+                         impossible de savoir quel champ bloquait. --}}
+                    <p class="text-medium mb-1">Le formulaire n'a pas pu être enregistré :</p>
+                    <ul class="mb-0">
+                        @foreach ($errors->all() as $message)
+                        <li class="text-medium">{{ $message }}</li>
+                        @endforeach
+                    </ul>
                 </div>
             </div>
             @endif
