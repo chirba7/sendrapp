@@ -101,9 +101,12 @@ class MissionController extends Controller
             'right' => ['required', 'image', 'max:10240'],
             'sheet' => ['nullable', 'image', 'max:10240'],
         ]);
-        if ($mission->type === 'brute' && ! empty($data['car_position_id'])) {
-            abort(422, 'Une mission directe ne contient pas de véhicule présélectionné.');
-        }
+        // Une mission ponctuelle peut parfaitement emporter des véhicules déjà
+        // approuvés : le back-office permet d'en sélectionner, et l'agent doit
+        // pouvoir en profiter sur place. Le refus qui était posé ici empêchait
+        // d'enregistrer l'enlèvement après la prise des photos. Le lien reste
+        // contrôlé par la règle `exists` ci-dessus : le véhicule doit
+        // appartenir à cette mission.
 
         $removal = DB::transaction(function () use ($request, $mission, $data) {
             $removal = MissionRemoval::create([
