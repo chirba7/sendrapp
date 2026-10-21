@@ -425,7 +425,7 @@
                 <table class="email-content" width="100%" cellpadding="0" cellspacing="0" role="presentation">
                     <tr>
                         <td class="email-masthead">
-                            <a href="https://app.sendra.sn" class="f-fallback email-masthead_name">
+                            <a href="{{ $webUrl }}" class="f-fallback email-masthead_name">
                                 <img src="{{asset('img/logoSendra.png')}}" alt="logo" />
                             </a>
                         </td>
@@ -438,7 +438,19 @@
                                 <tr>
                                     <td class="content-cell">
                                         <div class="f-fallback">
+                                            @if($isReset)
+                                            <h1>Nouveau mot de passe, {{$nom}}</h1>
+                                            <p style="background:#FFF4E5;border-left:4px solid #FF9F1C;padding:12px 14px;margin:0 0 18px">
+                                                <strong>Ce mot de passe annule tous les précédents.</strong><br>
+                                                Utilisez celui-ci, envoyé le {{ $sentAt }}, et ignorez les e-mails plus anciens.
+                                            </p>
+                                            @else
                                             <h1>Bienvenue, {{$nom}} !</h1>
+                                            <p style="background:#F4F4F7;border-left:4px solid #22BC66;padding:12px 14px;margin:0 0 18px">
+                                                Compte créé le {{ $sentAt }}. Si vous recevez plus tard un e-mail de
+                                                réinitialisation, c'est <strong>le plus récent</strong> qui fait foi.
+                                            </p>
+                                            @endif
                                             @if($showWebLink)
                                             <p>Nous sommes ravis de vous avoir parmi nous. Pour tirer le meilleur parti de la plateform, Cliquez sur le bouton suivant :</p>
                                             <!-- Action -->
@@ -448,7 +460,7 @@
                                                         <table width="100%" border="0" cellspacing="0" cellpadding="0" role="presentation">
                                                             <tr>
                                                                 <td align="center">
-                                                                    <a href="https://app.sendra.sn" class="f-fallback button" target="_blank">Cliquez ici</a>
+                                                                    <a href="{{ $webUrl }}" class="f-fallback button" target="_blank">Ouvrir le back-office</a>
                                                                 </td>
                                                             </tr>
                                                         </table>
@@ -458,7 +470,7 @@
                                             @else
                                             <p>Nous sommes ravis de vous avoir parmi nous. Connectez-vous depuis l'application mobile SENDRA avec les identifiants ci-dessous :</p>
                                             @endif
-                                            <p>Pour référence, voici vos informations de connexion :</p>
+                                            <p>Vos identifiants de connexion @if($isReset)(envoyés le {{ $sentAt }})@endif :</p>
                                             <table class="attributes" width="100%" cellpadding="0" cellspacing="0" role="presentation">
                                                 <tr>
                                                     <td class="attributes_content">
@@ -481,6 +493,8 @@
                                                     </td>
                                                 </tr>
                                             </table>
+                                            <p><strong>À votre première connexion, un nouveau mot de passe vous sera demandé.</strong>
+                                                Choisissez-en un connu de vous seul : l'administrateur ne le connaîtra pas.</p>
                                             <p>Si vous avez des questions, n'hésitez pas à <a href="mailto:contact@sendra.sn">envoyer un email à notre équipe de succès client</a>. (Nous répondons très rapidement.)</p>
                                             <p>Merci,
                                                 <br>Mr Ba et l'équipe de SENDRA
@@ -490,7 +504,7 @@
                                                 <tr>
                                                     <td>
                                                         <p class="f-fallback sub">Si vous rencontrez des problèmes avec le bouton ci-dessus, copiez et collez l'URL ci-dessous dans votre navigateur Web.</p>
-                                                        <p class="f-fallback sub">https://app.sendra.sn</p>
+                                                        <p class="f-fallback sub">{{ $webUrl }}</p>
                                                     </td>
                                                 </tr>
                                             </table>

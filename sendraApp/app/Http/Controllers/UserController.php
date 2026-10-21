@@ -176,7 +176,7 @@ class UserController extends Controller
         // a réussi — même logique que
         // DommagesController::notifierAdministrateurs().
         try {
-            Mail::to($user->email)->send(new AuthMail($user, $temporaryPassword));
+            Mail::to($user->email)->send(new AuthMail($user, $temporaryPassword, isReset: true));
             return back()->with('success', 'Mot de passe réinitialisé — un nouveau mot de passe temporaire a été envoyé à ' . $user->email . '.');
         } catch (\Throwable $exception) {
             Log::error("Échec de l'envoi de l'e-mail de réinitialisation de mot de passe.", [

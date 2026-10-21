@@ -17,8 +17,17 @@ class AuthMail extends Mailable
     /**
      * Create a new message instance.
      */
-    public function __construct(public User $user, public string $plainPassword)
-    {
+    /**
+     * @param bool $isReset Réinitialisation par un administrateur (et non
+     *                      création du compte) : le message doit le dire, sinon
+     *                      les deux e-mails sont indiscernables et l'utilisateur
+     *                      essaie le mot de passe périmé du premier.
+     */
+    public function __construct(
+        public User $user,
+        public string $plainPassword,
+        public bool $isReset = false
+    ) {
         //
     }
 
@@ -28,7 +37,9 @@ class AuthMail extends Mailable
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: 'Nouveau Compte Chez SENDRA',
+            subject: $this->isReset
+                ? 'SENDRA — nouveau mot de passe'
+                : 'SENDRA — votre nouveau compte',
         );
     }
 
@@ -52,7 +63,15 @@ class AuthMail extends Mailable
                 // L'Agent (role_id=2) et le citoyen (5) n'utilisent que
                 // l'app mobile, jamais app.sendra.sn — leur envoyer le
                 // bouton/lien vers le back-office web n'a pas de sens.
-                'showWebLink' => in_array($this->user->role_id, [1, 3, 4], true),
+                // 7 = Operateur : il travaille lui aussi depuis le
+                // back-office web, il lui faut donc le lien.
+                'showWebLink' => in_array($this->user->role_id, [1, 3, 4, 7], true),
+                'isReset' => $this->isReset,
+                // Date d'envoi : permet de reconnaître le dernier e-mail reçu.
+                'sentAt' => now()->format('d/m/Y à H:i'),
+                // Le lien pointait en dur sur app.sendra.sn : un compte créé
+                // depuis la préproduction recevait un lien vers la production.
+                'webUrl' => rtrim(config('app.url'), '/'),
             ],
         );
     }
