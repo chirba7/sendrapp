@@ -20,9 +20,10 @@
             <div class="auth-cover-wrapper bg-success-100">
                 <div class="auth-cover">
                     <div class="title text-center">
-                        <span class="auth-logo"><img src="{{asset('img/EPAVIE.png')}}" alt="epaVie" height="70"></span>
-                        <h1 class="text-success mb-10">Bienvenue</h1>
-                        <p class="text-medium">
+                        {{-- Le logo n'apparaît plus ici : il est déjà présent, en
+                             grand, au-dessus du formulaire à droite. --}}
+                        <h1 class="auth-title">Bienvenue</h1>
+                        <p class="auth-subtitle">
                             Connectez-vous à votre compte existant pour continuer.
                         </p>
                     </div>

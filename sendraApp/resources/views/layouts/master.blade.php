@@ -13,6 +13,30 @@
 @endphp
 @section('body_class', 'role-'.$roleUi['key'])
 @section('contenu')
+{{-- Le menu latéral est reconstruit à chaque page : sans cela il repart en
+     haut à chaque clic. On restitue sa position de défilement, pour que seul
+     le contenu paraisse changer. --}}
+@push('scripts')
+<script>
+(function () {
+    var nav = document.querySelector('.sidebar-nav-wrapper .sidebar-nav');
+    if (!nav) return;
+    var cle = 'sendra:menu-scroll';
+    try {
+        var y = sessionStorage.getItem(cle);
+        if (y) nav.scrollTop = parseInt(y, 10) || 0;
+    } catch (e) {}
+    nav.addEventListener('scroll', function () {
+        try { sessionStorage.setItem(cle, nav.scrollTop); } catch (e) {}
+    }, { passive: true });
+    var actif = nav.querySelector('.nav-item.active');
+    if (actif && (actif.offsetTop < nav.scrollTop || actif.offsetTop > nav.scrollTop + nav.clientHeight - 40)) {
+        nav.scrollTop = Math.max(0, actif.offsetTop - 120);
+    }
+})();
+</script>
+@endpush
+
 <!-- ======== sidebar-nav start =========== -->
 <aside class="sidebar-nav-wrapper">
     <div class="navbar-logo">
@@ -54,14 +78,17 @@
                     ['Communes', route('communes.index'), 'lni-map-marker', [1], $actif('dashboard/communes*')],
                 ],
             ];
+            // Chaque rôle reçoit sa pastille de couleur, reprise de l'accent
+            // défini dans sendra-refresh.css : la liste de sept entrées était
+            // impossible à parcourir d'un coup d'œil.
             $comptes = [
-                ['Ajouter un compte', route('ajouter'), 'dashboard/comptes/ajouter'],
-                ['Admin', route('admin'), 'dashboard/comptes/admin'],
-                ['Agents', route('agents'), 'dashboard/comptes/agents'],
-                ['Autorité commune', route('autorites'), 'dashboard/comptes/autorites'],
-                ['Autorité préfecture', route('utilisateurs'), 'dashboard/comptes/utilisateurs'],
-                ['Opérateurs', route('operateurs'), 'dashboard/comptes/operateurs'],
-                ['Citoyens', route('citoyens'), 'dashboard/comptes/citoyens'],
+                ['Ajouter un compte', route('ajouter'), 'dashboard/comptes/ajouter', 'plus', '#64748b'],
+                ['Admin', route('admin'), 'dashboard/comptes/admin', 'role', '#048b44'],
+                ['Agents', route('agents'), 'dashboard/comptes/agents', 'role', '#1a73e8'],
+                ['Autorité commune', route('autorites'), 'dashboard/comptes/autorites', 'role', '#0f8a7e'],
+                ['Autorité préfecture', route('utilisateurs'), 'dashboard/comptes/utilisateurs', 'role', '#7b3fc4'],
+                ['Opérateurs', route('operateurs'), 'dashboard/comptes/operateurs', 'role', '#e37400'],
+                ['Citoyens', route('citoyens'), 'dashboard/comptes/citoyens', 'role', '#94a3b8'],
             ];
             $comptesActif = collect($comptes)->contains(fn ($c) => request()->is($c[2]));
         @endphp
@@ -90,8 +117,17 @@
                     <span class="text">Comptes</span>
                 </a>
                 <ul id="ddmenu_comptes" class="collapse dropdown-nav {{ $comptesActif ? 'show' : '' }}">
-                    @foreach ($comptes as [$libelle, $url, $chemin])
-                    <li><a href="{{ $url }}" class="{{ request()->is($chemin) ? 'active' : '' }}">{{ $libelle }}</a></li>
+                    @foreach ($comptes as [$libelle, $url, $chemin, $forme, $couleur])
+                    <li>
+                        <a href="{{ $url }}" class="{{ request()->is($chemin) ? 'active' : '' }}">
+                            @if ($forme === 'plus')
+                            <i class="lni lni-circle-plus role-dot-icon" style="color: {{ $couleur }}"></i>
+                            @else
+                            <span class="role-dot" style="background: {{ $couleur }}"></span>
+                            @endif
+                            {{ $libelle }}
+                        </a>
+                    </li>
                     @endforeach
                 </ul>
             </li>

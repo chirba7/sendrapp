@@ -17,7 +17,7 @@
     <link rel="stylesheet" href="{{asset('assets/css/main.css')}}" />
     {{-- Rafraîchissement visuel : surcharges de main.css, chargées après lui.
          Retirer cette ligne restaure l'apparence précédente. --}}
-    <link rel="stylesheet" href="{{asset('assets/css/sendra-refresh.css')}}?v=3" />
+    <link rel="stylesheet" href="{{asset('assets/css/sendra-refresh.css')}}?v=4" />
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <style>
         #signature-pad {
@@ -52,6 +52,8 @@
     <script src="{{asset('assets/js/world-merc.js')}}"></script>
     <script src="{{asset('assets/js/polyfill.js')}}"></script>
     <script src="{{asset('assets/js/main.js')}}"></script>
+    {{-- Emplacement des scripts propres à une page (@push('scripts')). --}}
+    @stack('scripts')
 
 </body>
 
