@@ -10,6 +10,7 @@ use App\Http\Requests\RegisterRequest;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
 
 use App\Services\OrangeSmsService;
 use App\Models\UserVerificationCode;
@@ -365,9 +366,41 @@ class AuthControllerApi extends Controller
             'token' => $token,
             'id' => Auth::user()->id,
             'fullName' => Auth::user()->first_name . " " . Auth::user()->last_name,
+            'first_name' => Auth::user()->first_name,
+            'last_name' => Auth::user()->last_name,
+            'photo_url' => Auth::user()->profile_photo_path
+                ? request()->getSchemeAndHttpHost().'/storage/'.Auth::user()->profile_photo_path : null,
             'phone' => Auth::user()->telephone,
             'role_id' => Auth::user()->role_id,
             'token_type' => 'bearer',
+        ]);
+    }
+
+    public function updateProfile(Request $request)
+    {
+        $data = $request->validate([
+            'first_name' => 'required|string|max:50',
+            'last_name' => 'required|string|max:50',
+            'photo' => 'nullable|image|mimes:jpeg,png,webp|max:4096',
+        ]);
+
+        $user = Auth::user();
+        $user->first_name = trim($data['first_name']);
+        $user->last_name = trim($data['last_name']);
+        if ($request->hasFile('photo')) {
+            $oldPath = $user->profile_photo_path;
+            $user->profile_photo_path = $request->file('photo')->store('profiles', 'public');
+            if ($oldPath) Storage::disk('public')->delete($oldPath);
+        }
+        $user->save();
+
+        return response()->json([
+            'success' => true,
+            'fullName' => $user->first_name.' '.$user->last_name,
+            'first_name' => $user->first_name,
+            'last_name' => $user->last_name,
+            'photo_url' => $user->profile_photo_path
+                ? $request->getSchemeAndHttpHost().'/storage/'.$user->profile_photo_path : null,
         ]);
     }
 

@@ -51,6 +51,7 @@ class SignalementWorkflowTest extends TestCase
             'nom_responsable_mef' => 'M. Sarr',
         ])->assertSessionHasErrors('approbation');
 
+        $carPosition->update(['dommage_image' => 'constat.png']);
         $this->actingAs($staff)->patch("/dashboard/approbation/{$carPosition->id}", [
             'approbation' => 'OUI',
             'motife_approbation' => 'Dossier complet',
@@ -76,6 +77,7 @@ class SignalementWorkflowTest extends TestCase
         $staff = User::factory()->create(['role_id' => 1, 'is_enabled' => true]);
         $carPosition = CarPosition::factory()->create();
 
+        $carPosition->update(['dommage_image' => 'constat.png']);
         $this->actingAs($staff)->patch("/dashboard/approbation/{$carPosition->id}", [
             'approbation' => 'NON',
             'motife_approbation' => 'Dossier incomplet',

@@ -76,7 +76,12 @@ class SignalementWorkflowTest extends TestCase
             'nom_responsable' => 'M. Sarr',
         ], ['Authorization' => "Bearer {$staffToken}"])->assertStatus(403);
 
-        // 5. Approbation.
+        // 5. La constatation est transmise avant la décision.
+        $this->putJson("/api/enregistrerDommages/{$carPosition->id}", [
+            'signature' => 'data:image/png;base64,' . self::VALID_PNG_BASE64,
+        ], ['Authorization' => "Bearer {$staffToken}"])->assertOk();
+
+        // 6. Approbation.
         $this->putJson("/api/soumettreApprobation/{$carPosition->id}", [
             'approbation' => 'OUI',
             'motifApprobation' => 'Dossier complet',
@@ -97,11 +102,6 @@ class SignalementWorkflowTest extends TestCase
         $carPosition->refresh();
         $this->assertSame('ENLEVE', $carPosition->etat);
 
-        // 7. Dommages (signature au format data URL).
-        $this->putJson("/api/enregistrerDommages/{$carPosition->id}", [
-            'signature' => 'data:image/png;base64,' . self::VALID_PNG_BASE64,
-        ], ['Authorization' => "Bearer {$staffToken}"])->assertOk();
-
         $this->getJson("/api/voirDommages/{$carPosition->id}", ['Authorization' => "Bearer {$staffToken}"])
             ->assertOk()
             ->assertJsonStructure(['message', 'dommages']);
@@ -118,6 +118,7 @@ class SignalementWorkflowTest extends TestCase
         $staff = User::factory()->create(['telephone' => '771000003', 'role_id' => 1]);
         $carPosition = \App\Models\CarPosition::factory()->create();
         $token = $this->loginAndGetToken('771000003');
+        $carPosition->update(['dommage_image' => 'constat.png']);
 
         $this->putJson("/api/soumettreApprobation/{$carPosition->id}", [
             'approbation' => 'NON',

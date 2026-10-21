@@ -61,10 +61,33 @@ class _DepositMoneyDetailsScreenState extends State<DepositMoneyDetailsScreen> {
       final args = ModalRoute.of(context)!.settings.arguments;
 
       if (args is Map) {
-        // Reçu depuis un écran citoyen (liste "mes signalements") : les
-        // données sont déjà complètes, pas de re-fetch via l'API staff-only
-        // listerSignalement/{id} (403 pour un citoyen).
-        signalementData = Map<String, dynamic>.from(args);
+        // Actualiser depuis l’API citoyenne pour refléter la décision de l’autorité.
+        final initial = Map<String, dynamic>.from(args);
+        signalementData = initial;
+        final prefs = await SharedPreferences.getInstance();
+        final token = prefs.getString('token');
+        if (token != null) {
+          try {
+            final response = await http.get(
+              Uri.parse('${Strings.apiURI}voirSignalements'),
+              headers: {'Authorization': 'Bearer $token'},
+            );
+            if (response.statusCode == 200) {
+              final decoded = jsonDecode(response.body);
+              final items = decoded is List ? decoded
+                  : (decoded['data'] as List<dynamic>? ?? const []);
+              for (final item in items) {
+                if (item['signalementId']?.toString() ==
+                    initial['signalementId']?.toString()) {
+                  signalementData = Map<String, dynamic>.from(item);
+                  break;
+                }
+              }
+            }
+          } catch (_) {
+            // La dernière version connue reste consultable hors ligne.
+          }
+        }
         signalementDataFuture = Future.value(signalementData);
       } else {
         // Reçu depuis un écran staff (liste globale, redirection après
@@ -287,6 +310,7 @@ class _DepositMoneyDetailsScreenState extends State<DepositMoneyDetailsScreen> {
     // vraie prochaine étape) est mis en relief. Un signalement résolu
     // retrouve l'affichage à plat des 5 items, comme avant approbation.
     final grouped = _isStaff && isApproved && !isResolved;
+    final submitted = signalementData['dommages_saisis'] == true;
 
     return RefreshIndicator(
       onRefresh: fetchSignalementData,
@@ -304,12 +328,15 @@ class _DepositMoneyDetailsScreenState extends State<DepositMoneyDetailsScreen> {
             ),
             _workflowHeader(signalementData),
             _localisationButton(),
-            if (!grouped) _menuItem('Informations de base', signalementData),
+            if (!grouped && !submitted) _menuItem('Informations de base', signalementData),
             // Le workflow métier (véhicule, infraction, dommages, enlèvement)
             // est réservé au staff côté API (role:1,2,3,4) — masqué pour un
             // citoyen, qui n'a qu'une vue de suivi de son signalement.
             if (_isStaff) ...[
-              if (!isApproved) ...[
+              if (submitted) ...[
+                _submittedRecap(signalementData),
+                if (isApproved && !isResolved) _missionAssignmentCard(),
+              ] else if (!isApproved) ...[
                 _menuItem('Véhicule', signalementData),
                 _menuItem('Infraction', signalementData),
                 _menuItem('Dommages', signalementData),
@@ -324,10 +351,50 @@ class _DepositMoneyDetailsScreenState extends State<DepositMoneyDetailsScreen> {
                 _menuItem('Dommages', signalementData),
               ],
             ] else
-              _citizenStatusCard(signalementData['etat']?.toString()),
+              _citizenStatusCard(signalementData),
             const SizedBox(height: 16),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _submittedRecap(Map<String, dynamic> data) {
+    final fields = <String, String>{
+      'Plaque': data['numero_vehicule']?.toString() ?? 'Non renseignée',
+      'Véhicule': '${data['marque'] ?? ''} ${data['model'] ?? ''}'.trim(),
+      'Type': data['type']?.toString() ?? '',
+      'Catégorie': data['categorie']?.toString() ?? '',
+      'État général': data['entretien']?.toString() ?? '',
+      'Adresse': data['adresse_precise']?.toString() ?? '',
+      'Infraction': data['motif_infraction']?.toString() ?? '',
+      'Explication': data['explication_infraction']?.toString() ?? '',
+      'Pièces manquantes': data['pieces_manquantes']?.toString() ?? '',
+    };
+    final photos = (data['photos_agent'] as List<dynamic>? ?? const []);
+    return Card(
+      margin: const EdgeInsets.all(16),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const Text('Récapitulatif de la constatation',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          const Text('Transmise pour approbation · lecture seule'),
+          const SizedBox(height: 12),
+          for (final entry in fields.entries)
+            if (entry.value.isNotEmpty) Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Text('${entry.key} : ${entry.value}'),
+            ),
+          if (photos.isNotEmpty) ...[
+            const Text('Photos de l’agent', style: TextStyle(fontWeight: FontWeight.bold)),
+            Wrap(spacing: 8, children: photos.map((photo) => Image.network(
+              photo['url'].toString(), width: 80, height: 80, fit: BoxFit.cover,
+              cacheWidth: 240,
+            )).toList()),
+          ],
+          _approvalStatus(data['etat']?.toString()),
+        ]),
       ),
     );
   }
@@ -396,11 +463,15 @@ class _DepositMoneyDetailsScreenState extends State<DepositMoneyDetailsScreen> {
                 color: const Color(0xFFE8F5ED),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: const Text('📋', style: TextStyle(fontSize: 23)),
+              child: const Icon(Icons.fact_check_rounded,
+                  color: SendraTheme.green, size: 24),
             ),
             title: const Text(
               'Constatation',
-              style: TextStyle(fontWeight: FontWeight.w600, fontSize: 18),
+              style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 16,
+                  color: SendraTheme.ink),
             ),
             subtitle: const Text(
               'Informations, véhicule, infraction, dommages',
@@ -428,6 +499,8 @@ class _DepositMoneyDetailsScreenState extends State<DepositMoneyDetailsScreen> {
             : Colors.red.shade600;
     final label = status == 'ENLEVE'
         ? 'Résolu'
+        : status == 'NON RESOLU'
+            ? 'Non résolu'
         : status == 'EN COURS'
             ? 'En cours'
             : status == 'REJETE'
@@ -492,32 +565,52 @@ class _DepositMoneyDetailsScreenState extends State<DepositMoneyDetailsScreen> {
     );
   }
 
-  Widget _citizenStatusCard(String? etat) {
-    final label = switch (etat) {
-      'SIGNALE' => 'Signalement reçu, en attente de traitement',
-      'EN COURS' => 'Traitement en cours',
-      'ENLEVE' => 'Véhicule enlevé',
-      'REJETE' => 'Signalement rejeté',
-      _ => 'Statut : ${etat ?? 'inconnu'}',
-    };
-    final color = switch (etat) {
-      'ENLEVE' => Colors.green,
-      'REJETE' => Colors.red,
-      'EN COURS' => Colors.orange,
-      _ => Colors.blueGrey,
-    };
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      child: Card(
-        color: color.withOpacity(0.08),
-        child: ListTile(
-          leading: Icon(Icons.timeline, color: color),
-          title: Text(
-            label,
-            style: TextStyle(fontWeight: FontWeight.bold, color: color),
-          ),
-          subtitle: const Text(
-              'Faites glisser la page vers le bas pour actualiser le statut.'),
+  Widget _citizenStatusCard(Map<String, dynamic> data) {
+    final status = data['etat']?.toString() ?? 'SIGNALE';
+    final submitted = data['dommages_saisis'] == true;
+    final approved = data['is_approve'] == true;
+    final rejected = status == 'REJETE';
+    final steps = <String>[
+      'Signalement reçu',
+      'Constatation par un agent',
+      'Transmis pour approbation',
+      rejected ? 'Refusé par l’autorité' : 'Approuvé par l’autorité',
+      status == 'NON RESOLU' ? 'Véhicule non enlevé' : 'Enlèvement du véhicule',
+    ];
+    final reached = status == 'ENLEVE' || status == 'NON RESOLU' ? 5
+        : (approved || rejected) ? 4 : submitted ? 3
+        : status == 'EN COURS' ? 2 : 1;
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Avancement du signalement',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17)),
+            const SizedBox(height: 10),
+            for (var i = 0; i < steps.length; i++)
+              ListTile(
+                dense: true,
+                contentPadding: EdgeInsets.zero,
+                leading: Icon(
+                    status == 'NON RESOLU' && i == 4
+                        ? Icons.report_problem_outlined
+                        : i < reached ? Icons.check_circle : Icons.circle_outlined,
+                    color: status == 'NON RESOLU' && i == 4
+                        ? Colors.deepOrange
+                        : i < reached ? (rejected && i == 3 ? Colors.red : Colors.green)
+                            : Colors.grey),
+                title: Text(steps[i]),
+              ),
+            if (rejected && data['motif_approbation'] != null)
+              Text('Motif : ${data['motif_approbation']}'),
+            if (status == 'NON RESOLU')
+              Text('Motif de non-enlèvement : ${data['non_removal_reason'] ?? 'Non renseigné'}'),
+            const Text('Faites glisser vers le bas pour actualiser.',
+                style: TextStyle(color: SendraTheme.muted)),
+          ],
         ),
       ),
     );
@@ -603,25 +696,23 @@ class _DepositMoneyDetailsScreenState extends State<DepositMoneyDetailsScreen> {
             height: 44,
             alignment: Alignment.center,
             decoration: BoxDecoration(
-              color: const Color(0xFFE8F5ED),
+              color: _iconForTitle(title).$2.withValues(alpha: .12),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: Text(
-              _emojiForTitle(title),
-              style: const TextStyle(fontSize: 23),
-            ),
+            child: Icon(_iconForTitle(title).$1,
+                color: _iconForTitle(title).$2, size: 24),
           ),
           title: Text(
             title,
-            style: TextStyle(
-              fontWeight: FontWeight.w600, // Police plus lourde
-              fontSize: 18.0, // Taille du texte légèrement agrandie
-              color: Colors.black, // Couleur noire pour un meilleur contraste
+            style: const TextStyle(
+              fontWeight: FontWeight.w700,
+              fontSize: 16,
+              color: SendraTheme.ink,
             ),
           ),
-          trailing: Icon(
-            Icons.arrow_forward_ios,
-            color: Colors.grey, // Icône de navigation dans une couleur discrète
+          trailing: const Icon(
+            Icons.chevron_right_rounded,
+            color: SendraTheme.muted,
           ),
           onTap: () async {
             final signalementId = signalementData?['signalementId'];
@@ -659,13 +750,15 @@ class _DepositMoneyDetailsScreenState extends State<DepositMoneyDetailsScreen> {
     );
   }
 
-  String _emojiForTitle(String title) {
+  /// Icône et couleur de chaque étape de la constatation (remplace les
+  /// emojis, dont le rendu variait selon les téléphones).
+  (IconData, Color) _iconForTitle(String title) {
     return switch (title) {
-      'Informations de base' => '📋',
-      'Véhicule' => '🚗',
-      'Infraction' => '⚠️',
-      'Dommages' => '🛠️',
-      _ => '📌',
+      'Informations de base' => (Icons.description_rounded, const Color(0xFF1A73E8)),
+      'Véhicule' => (Icons.directions_car_rounded, SendraTheme.green),
+      'Infraction' => (Icons.gavel_rounded, const Color(0xFFE37400)),
+      'Dommages' => (Icons.car_crash_rounded, const Color(0xFFD93025)),
+      _ => (Icons.push_pin_rounded, SendraTheme.muted),
     };
   }
 

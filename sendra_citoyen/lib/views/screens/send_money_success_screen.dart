@@ -21,10 +21,8 @@ class SendMoneySuccessScreen extends StatelessWidget {
         title: const Text(
           Strings.sendMoney,
           style: TextStyle(
-            color: CustomColor.whiteColor,
-          ),
+            ),
         ),
-        backgroundColor: CustomColor.primaryColor,
       ),
       body: _bodyWidget(context),
     );

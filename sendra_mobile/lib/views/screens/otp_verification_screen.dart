@@ -88,12 +88,13 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
         backgroundColor: CustomColor.whiteColor,
         elevation: 0,
       ),
-      body: _bodyWidget(context),
+      body: SafeArea(child: _bodyWidget(context)),
     );
   }
 
   ListView _bodyWidget(BuildContext context) {
     return ListView(
+      padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom + 24),
       children: [
         _upperWidget(context),
         _imageWidget(context),
@@ -120,12 +121,19 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
   Container _otpMiddleSection(BuildContext context) {
     return Container(
       margin: EdgeInsets.symmetric(horizontal: Dimensions.marginSize),
-      child: TextFieldOtp(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Code de vérification'),
+          const SizedBox(height: 8),
+          TextFieldOtp(
         controller: controller.otpController,
         keyboardType: TextInputType.number,
         decoration: const InputDecoration(
-          labelText: 'Enter OTP',
+          labelText: 'Code de vérification',
         ),
+          ),
+        ],
       ),
     );
   }
@@ -139,11 +147,11 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.start,
         children: [
-          Text(
+          Flexible(child: Text(
             Strings.enterTheCodeSentTo,
             textAlign: TextAlign.center,
             style: CustomStyler.otpVerificationDescriptionStyle,
-          ),
+          )),
           addHorizontalSpace(6.w),
           Expanded(
             child: Text(
@@ -177,7 +185,8 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
           Image.asset(
             Strings.otpImage,
             width: double.infinity,
-            fit: BoxFit.fill,
+            height: 220.h,
+            fit: BoxFit.contain,
           ),
         ],
       ),

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\CarPosition;
+use App\Models\CarPhoto;
 use App\Support\HistoriqueSignalement;
 use App\Models\User;
 use App\Support\ImageOptimizer;
@@ -15,12 +16,14 @@ class DommagesController extends Controller
 {
     public function enregistrerDommages(Request $request, CarPosition $carPosition)
     {
+        abort_if((int) auth()->user()->role_id === 2 && !empty($carPosition->dommage_image), 403, 'Signalement transmis : modification interdite.');
         // Correction perf : aucune limite de taille sur le payload base64
         // entrant (vecteur de gonflement du stockage / requêtes lentes).
         // ~15M caractères ≈ 11 Mo décodés, largement suffisant pour une
         // signature/composite dessiné(e) sur une image de constatation.
         $request->validate([
             'signature' => 'required|string|max:15000000',
+            'pieces_manquantes' => 'nullable|string|max:2000',
         ]);
 
         // Le compte rendu de direction demande qu'un signalement envoyé pour
@@ -58,6 +61,10 @@ class DommagesController extends Controller
 
         // Mise à jour de l'enregistrement du signalement avec le nom de fichier de l'image
         $carPosition->dommage_image = $filename;
+        $carPosition->pieces_manquantes = $request->input('pieces_manquantes');
+        if ((int) auth()->user()->role_id === 2 && !$carPosition->agent_id) {
+            $carPosition->agent_id = auth()->id();
+        }
         // Enregistrer les dommages vaut envoi pour approbation : on date ce
         // passage, il sert de verrou et de repère dans l'historique.
         $carPosition->soumis_approbation_at = now();
@@ -94,6 +101,27 @@ class DommagesController extends Controller
         ], 200);
     }
 
+    public function ajouterPhoto(Request $request, CarPosition $carPosition)
+    {
+        abort_unless((int) auth()->user()->role_id === 2, 403);
+        abort_if(!empty($carPosition->dommage_image), 403, 'Constatation déjà transmise.');
+        $request->validate(['photo' => 'required|image|mimes:jpeg,png,webp|max:5120']);
+        $path = $request->file('photo')->store('signalement/agent', 'public');
+        $photo = new CarPhoto();
+        $photo->card_id = $carPosition->id;
+        $photo->filepath = $path;
+        $photo->position = 'agent_constat';
+        $photo->save();
+        if (!$carPosition->agent_id) {
+            $carPosition->agent_id = auth()->id();
+            $carPosition->save();
+        }
+        return response()->json([
+            'success' => true,
+            'url' => $request->getSchemeAndHttpHost().'/storage/'.$path,
+        ], 201);
+    }
+
     private function notifierAdministrateurs(CarPosition $carPosition): bool
     {
         // Correction : cette méthode ne loguait que les échecs — impossible
@@ -105,7 +133,7 @@ class DommagesController extends Controller
         ]);
 
         $emails = User::query()
-            ->where('role_id', 1)
+            ->whereIn('role_id', [1, 3, 4])
             ->whereNotNull('email')
             // Les comptes supprimés depuis le back-office (colonne
             // `users.deleted`) ne sont plus affiliés à SENDRA et ne doivent
@@ -118,7 +146,7 @@ class DommagesController extends Controller
             ->unique();
 
         if ($emails->isEmpty()) {
-            Log::warning('Demande d’approbation non envoyée : aucun administrateur avec e-mail.', [
+            Log::warning('Demande d’approbation non envoyée : aucune autorité ou administration avec e-mail.', [
                 'signalement_id' => $carPosition->id,
             ]);
             return false;

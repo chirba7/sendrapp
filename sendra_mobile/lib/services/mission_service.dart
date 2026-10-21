@@ -153,6 +153,10 @@ class MissionService {
   Future<Mission> validateRemoval(int missionId) =>
       _postMission('$missionId/valider-enlevement', {});
 
+  Future<Mission> markNotRemoved(int missionId, int vehicleId, String reason) =>
+      _postMission(
+          '$missionId/vehicules/$vehicleId/non-enleve', {'reason': reason});
+
   Future<Mission> checkInReception(
           int missionId, double latitude, double longitude) =>
       _postMission('$missionId/pointer-reception',

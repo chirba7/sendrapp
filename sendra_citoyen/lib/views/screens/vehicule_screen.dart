@@ -387,12 +387,7 @@ class _VehicleFormState extends State<VehicleForm> {
               SizedBox(height: 30),
               ElevatedButton.icon(
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.green[700],
-                  foregroundColor: Colors.white,
-                  padding: EdgeInsets.symmetric(vertical: 15),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
+                  minimumSize: const Size.fromHeight(54),
                 ),
                 onPressed: _updateVehicle,
                 icon: Icon(Icons.directions_car), // Ajoutez une icône ici
@@ -424,22 +419,42 @@ class _VehicleFormState extends State<VehicleForm> {
 
   Widget _kindChoice(String label, IconData icon) {
     final selected = _vehicleKind == label;
-    return ChoiceChip(
-      showCheckmark: false,
-      avatar: Icon(icon, color: selected ? SendraTheme.forest : Colors.grey),
-      label: SizedBox(
-        width: double.infinity,
-        child: Text(label, textAlign: TextAlign.center),
+    // Bouton à deux états, pleine largeur : texte toujours lisible et plus
+    // de débordement à droite de l'écran.
+    return Material(
+      color: selected ? SendraTheme.greenSoft : Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+        side: BorderSide(
+            color: selected ? SendraTheme.green : SendraTheme.border,
+            width: selected ? 1.6 : 1),
       ),
-      selected: selected,
-      onSelected: (_) => setState(() {
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
         // Change seulement la liste de marques suggérées — n'efface pas une
         // marque déjà saisie, y compris hors-liste.
-        _vehicleKind = label;
-      }),
-      selectedColor: const Color(0xFFE1F3E8),
-      side: BorderSide(
-          color: selected ? SendraTheme.green : SendraTheme.border),
+        onTap: () => setState(() => _vehicleKind = label),
+        child: SizedBox(
+          height: 50,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon,
+                  size: 22,
+                  color: selected ? SendraTheme.forest : SendraTheme.muted),
+              const SizedBox(width: 8),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                  color: selected ? SendraTheme.forest : SendraTheme.ink,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -547,7 +562,8 @@ class _VehicleFormState extends State<VehicleForm> {
   Widget _buildSectionTitle(String title) {
     return Text(
       title,
-      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+      style: const TextStyle(
+          fontSize: 17, fontWeight: FontWeight.w700, color: SendraTheme.ink),
     );
   }
 

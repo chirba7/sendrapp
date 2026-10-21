@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\CarPosition;
 use App\Models\Mission;
 use App\Models\MissionRemoval;
 use App\Models\MissionTruck;
@@ -90,6 +91,7 @@ class MissionController extends Controller
     public function storeRemoval(Request $request, Mission $mission): JsonResponse
     {
         $this->assertCheckedIn($request, $mission);
+        abort_if($mission->removal_validated_at || $mission->completed_at, 422, 'La phase d’enlèvement est déjà validée.');
         $data = $request->validate([
             'car_position_id' => ['nullable', 'integer', Rule::exists('mission_vehicle', 'car_position_id')->where('mission_id', $mission->id)],
             'mission_truck_id' => ['required', 'integer', Rule::exists('mission_trucks', 'id')->where('mission_id', $mission->id)],
@@ -101,14 +103,24 @@ class MissionController extends Controller
             'right' => ['required', 'image', 'max:10240'],
             'sheet' => ['nullable', 'image', 'max:10240'],
         ]);
-        // Une mission ponctuelle peut parfaitement emporter des véhicules déjà
-        // approuvés : le back-office permet d'en sélectionner, et l'agent doit
-        // pouvoir en profiter sur place. Le refus qui était posé ici empêchait
-        // d'enregistrer l'enlèvement après la prise des photos. Le lien reste
-        // contrôlé par la règle `exists` ci-dessus : le véhicule doit
-        // appartenir à cette mission.
+        // Une mission ponctuelle peut emporter des véhicules déjà approuvés :
+        // le back-office permet d'en sélectionner et l'agent doit pouvoir en
+        // profiter sur place. Le refus qui existait ici bloquait l'enlèvement
+        // après la prise des photos. Le lien reste contrôlé par la règle
+        // `exists` ci-dessus : le véhicule doit appartenir à cette mission.
+        if (! empty($data['car_position_id'])) {
+            abort_if($mission->removals()->where('car_position_id', $data['car_position_id'])->exists(), 422, 'Un enlèvement existe déjà pour ce véhicule.');
+        }
 
         $removal = DB::transaction(function () use ($request, $mission, $data) {
+            if (! empty($data['car_position_id'])) {
+                $mission->vehicles()->updateExistingPivot($data['car_position_id'], [
+                    'non_removal_reason' => null, 'non_removed_at' => null, 'non_removed_by' => null,
+                ]);
+                CarPosition::whereKey($data['car_position_id'])->update([
+                    'non_removal_reason' => null, 'non_removed_at' => null,
+                ]);
+            }
             $removal = MissionRemoval::create([
                 'mission_id' => $mission->id,
                 'car_position_id' => $data['car_position_id'] ?? null,
@@ -128,6 +140,32 @@ class MissionController extends Controller
 
         $mission->load($this->agentRelations($request->user()->id));
         return response()->json(['message' => 'Enlèvement enregistré.', 'data' => $this->serializeForAgent($mission)], 201);
+    }
+
+    public function markNotRemoved(Request $request, Mission $mission, int $vehicle): JsonResponse
+    {
+        $this->assertCheckedIn($request, $mission);
+        abort_if($mission->removal_validated_at || $mission->completed_at, 422, 'La phase d’enlèvement est déjà validée.');
+        abort_unless($mission->vehicles()->where('car_positions.id', $vehicle)->exists(), 404);
+        abort_if($mission->removals()->where('car_position_id', $vehicle)->exists(), 422, 'Ce véhicule a déjà été enlevé.');
+        abort_if(CarPosition::whereKey($vehicle)->whereIn('etat', ['ENLEVE', 'REJETE'])->exists(), 422, 'Ce signalement est déjà clôturé.');
+        $data = $request->validate(['reason' => ['required', 'string', 'max:500']]);
+        $reason = trim($data['reason']);
+        abort_if($reason === '', 422, 'Indiquez le motif de non-enlèvement.');
+        DB::transaction(function () use ($mission, $vehicle, $reason, $request) {
+            $at = now();
+            $mission->vehicles()->updateExistingPivot($vehicle, [
+                'non_removal_reason' => $reason,
+                'non_removed_at' => $at,
+                'non_removed_by' => $request->user()->id,
+            ]);
+            CarPosition::whereKey($vehicle)->whereNotIn('etat', ['ENLEVE', 'REJETE'])->update([
+                'non_removal_reason' => $reason,
+                'non_removed_at' => $at,
+            ]);
+        });
+        $mission->load($this->agentRelations($request->user()->id));
+        return response()->json(['message' => 'Véhicule déclaré non enlevé.', 'data' => $this->serializeForAgent($mission)]);
     }
 
     public function updateRemoval(Request $request, Mission $mission, MissionRemoval $removal): JsonResponse
@@ -183,10 +221,22 @@ class MissionController extends Controller
     public function validateRemoval(Request $request, Mission $mission): JsonResponse
     {
         $this->assertCheckedIn($request, $mission);
-        abort_if($mission->removals()->doesntExist(), 422, 'Ajoutez au moins un véhicule enlevé avant de valider.');
+        if ($mission->vehicles()->exists()) {
+            $removedIds = $mission->removals()->whereNotNull('car_position_id')->pluck('car_position_id');
+            $unresolved = $mission->vehicles()->wherePivotNull('non_removed_at')
+                ->whereNotIn('car_positions.id', $removedIds)->count();
+            abort_if($unresolved > 0, 422, "Il reste {$unresolved} véhicule(s) ciblés sans résultat. Indiquez un enlèvement ou un motif de non-enlèvement.");
+        }
+        abort_if($mission->removals()->doesntExist() && $mission->vehicles()->wherePivotNotNull('non_removed_at')->doesntExist(), 422, 'Aucun véhicule traité.');
         $missingDestinations = $mission->trucks()->whereHas('removals')->whereNull('destination_pound_name')->count();
         abort_if($missingDestinations > 0, 422, 'Précisez la fourrière de chaque camion utilisé avant de valider.');
-        $mission->update(['removal_validated_at'=>now(),'removal_validated_by'=>$request->user()->id,'status'=>'en_reception']);
+        $needsReception = $mission->reception_agent_id !== null ||
+            $mission->removals()->exists();
+        $mission->update([
+            'removal_validated_at' => now(), 'removal_validated_by' => $request->user()->id,
+            'status' => $needsReception ? 'en_reception' : 'terminee',
+            'completed_at' => $needsReception ? null : now(),
+        ]);
         $mission->load($this->agentRelations($request->user()->id));
         return response()->json(['message'=>'Phase d’enlèvement validée.','data'=>$this->serializeForAgent($mission)]);
     }
@@ -232,7 +282,9 @@ class MissionController extends Controller
     public function completeMission(Request $request, Mission $mission): JsonResponse
     {
         $this->assertReceptionReady($request,$mission);
-        abort_if($mission->removals()->doesntExist(),422,'Aucun véhicule à réceptionner.');
+        abort_if($mission->removals()->doesntExist() &&
+            $mission->vehicles()->wherePivotNotNull('non_removed_at')->doesntExist(),
+            422, 'Aucun véhicule traité.');
         $missing=$mission->removals()->whereDoesntHave('reception')->count();
         abort_if($missing>0,422,"Il reste {$missing} véhicule(s) à réceptionner.");
         $mission->update(['status'=>'terminee','completed_at'=>now()]);
@@ -246,7 +298,10 @@ class MissionController extends Controller
         $checkedIn = (bool) optional($assignment?->pivot)->checked_in_at;
         $isReceiver = $mission->reception_agent_id === request()->user()->id;
         $receptionCheckedIn = $isReceiver && (bool)$mission->reception_checked_in_at;
-        $unlocked = $checkedIn || $receptionCheckedIn;
+        // The receiver needs the outcome of every targeted vehicle as soon as
+        // the field team validates, even when there is nothing to receive.
+        $unlocked = $checkedIn || $receptionCheckedIn ||
+            ($isReceiver && (bool) $mission->removal_validated_at);
         if ($unlocked && ! $mission->relationLoaded('vehicles')) $mission->load('vehicles');
         $readyPounds = collect($mission->pounds ?? [])
             ->push($mission->receptionPound?->name)
@@ -277,6 +332,8 @@ class MissionController extends Controller
                 'id' => $vehicle->id,
                 'label' => trim(($vehicle->marque ?? '').' '.($vehicle->model ?? '')) ?: ($vehicle->title ?? 'Véhicule'),
                 'plate' => $vehicle->numero_vehicule,
+                'non_removal_reason' => $vehicle->pivot->non_removal_reason,
+                'non_removed_at' => $vehicle->pivot->non_removed_at,
             ])->values() : [],
             'removals' => $unlocked ? $mission->removals->map(fn ($removal) => [
                 'id' => $removal->id, 'car_position_id' => $removal->car_position_id,

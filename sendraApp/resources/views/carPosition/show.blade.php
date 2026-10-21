@@ -1,6 +1,18 @@
 @extends('layouts.master')
 @section('session')
+@php
+    $storageBase = rtrim(config('services.backend.storage_url'), '/');
+    $vehicleKind = $carPosition->vehicle_kind ?: (($carPosition->type_car === 'Moto' || $carPosition->categorie === 'CYCL') ? 'Moto' : 'Voiture');
+    $statusLabel = $carPosition->etat === 'ENLEVE' ? 'Enlevé' : (in_array($carPosition->etat, ['SIGNALE', 'EN COURS']) && $carPosition->non_removed_at ? 'Non résolu' : ($carPosition->etat === 'REJETE' ? 'Refusé' : ($carPosition->is_approve ? 'Approuvé' : ($carPosition->dommage_image ? 'En attente de décision' : 'Signalé'))));
+@endphp
 <style>
+    .report-hero { background:linear-gradient(135deg,#073b2a,#0b8f55); color:#fff; border-radius:22px; padding:24px; box-shadow:0 16px 38px rgba(7,59,42,.18); }
+    .report-hero .meta { color:rgba(255,255,255,.8); }
+    .report-stat { height:100%; border:1px solid #e7eee9; border-radius:18px; padding:18px; background:#fff; }
+    .report-detail { border:1px solid #e1eae5; border-radius:18px; background:#fff; padding:20px; height:100%; }
+    .report-detail dt { color:#66736c; font-size:13px; margin-top:12px; }
+    .report-detail dd { font-weight:600; margin-bottom:0; overflow-wrap:anywhere; }
+    .report-agent-photo { width:100%; height:190px; object-fit:cover; border-radius:12px; }
     .sendra-choice-grid { display:grid; grid-template-columns:repeat(2,minmax(130px,1fr)); gap:12px; max-width:520px; }
     .sendra-choice-input { position:absolute; opacity:0; pointer-events:none; }
     .sendra-choice-card { min-height:76px; border:2px solid #dce5df; border-radius:16px; display:flex; align-items:center; justify-content:center; gap:10px; cursor:pointer; font-weight:700; transition:.18s ease; }
@@ -42,6 +54,83 @@
                 </div>
             </div>
             @endif
+        </div>
+
+        <div class="report-hero mb-4">
+            <div class="row align-items-center g-3">
+                <div class="col-lg-8">
+                    <span class="badge bg-light text-dark mb-2">{{ $statusLabel }}</span>
+                    <h2 class="text-white mb-1">Signalement n° {{ $carPosition->id }}</h2>
+                    <div class="meta">{{ $carPosition->title ?: 'Véhicule signalé' }} · {{ $carPosition->created_at?->format('d/m/Y à H:i') }}</div>
+                </div>
+                <div class="col-lg-4 text-lg-end">
+                    <div class="fs-5 fw-semibold">{{ $vehicleKind }} · {{ $carPosition->marque ?: 'Marque non renseignée' }}</div>
+                    <div class="meta">{{ $carPosition->numero_vehicule ?: 'Plaque non renseignée' }}</div>
+                </div>
+            </div>
+        </div>
+        @if(in_array($carPosition->etat, ['SIGNALE', 'EN COURS']) && $carPosition->non_removed_at)
+            <div class="alert alert-warning"><strong>Véhicule non enlevé</strong> · {{ $carPosition->non_removal_reason }}<br><small>Constaté le {{ $carPosition->non_removed_at?->format('d/m/Y à H:i') }}</small></div>
+        @endif
+        <div class="row g-3 mb-4">
+            <div class="col-md-4"><div class="report-stat"><div class="text-muted small">Citoyen</div><div class="fw-bold">{{ trim(($carPosition->user?->first_name ?? '').' '.($carPosition->user?->last_name ?? '')) ?: 'Non renseigné' }}</div><small>{{ $carPosition->user?->telephone ?: 'Téléphone non renseigné' }}</small></div></div>
+            <div class="col-md-4"><div class="report-stat"><div class="text-muted small">Agent</div><div class="fw-bold">{{ trim(($carPosition->agent?->first_name ?? '').' '.($carPosition->agent?->last_name ?? '')) ?: 'Non affecté' }}</div><small>{{ $carPosition->dommage_image ? 'Constatation transmise' : 'Constatation en attente' }}</small></div></div>
+            <div class="col-md-4"><div class="report-stat"><div class="text-muted small">Décision</div><div class="fw-bold">{{ $carPosition->etat === 'REJETE' ? 'Refusée' : ($carPosition->is_approve ? 'Approuvée' : 'En attente') }}</div><small>{{ $carPosition->motife_approbation ?: 'Aucun motif renseigné' }}</small></div></div>
+        </div>
+        <div class="row g-3 mb-4">
+            <div class="col-lg-6"><div class="report-detail">
+                <h4>Informations du signalement</h4>
+                <dl class="mb-0">
+                    <dt>Description du citoyen</dt><dd>{{ $carPosition->description ?: '—' }}</dd>
+                    <dt>Ville / commune / quartier</dt><dd>{{ collect([$carPosition->commune, $carPosition->adresse_precise])->filter()->unique()->join(' · ') ?: 'Adresse non renseignée' }}</dd>
+                    <dt>Position GPS</dt><dd>@if($carPosition->latitude && $carPosition->longitude)<a href="https://www.google.com/maps/search/?api=1&query={{ $carPosition->latitude }},{{ $carPosition->longitude }}" target="_blank" rel="noopener">Voir sur la carte</a>@else Non disponible @endif</dd>
+                    <dt>Véhicule</dt><dd>{{ $vehicleKind }} · {{ $carPosition->type_car ?: 'Type non renseigné' }} · {{ $carPosition->categorie ?: 'Catégorie non renseignée' }}</dd>
+                    <dt>Plaque / marque / modèle</dt><dd>{{ $carPosition->numero_vehicule ?: '—' }} · {{ $carPosition->marque ?: '—' }} · {{ $carPosition->model ?: '—' }}</dd>
+                    <dt>Couleur</dt><dd>{{ $carPosition->couleur ?: '—' }}</dd>
+                    <dt>État général</dt><dd>{{ $carPosition->entretien ?: '—' }}</dd>
+                    <dt>Autre situation constatée</dt><dd>{{ $carPosition->autre_situation ?: '—' }}</dd>
+                    <dt>Détails du véhicule</dt><dd>{{ collect([
+                        $carPosition->defaut_controle_technique ? 'Contrôle technique' : null,
+                        $carPosition->pneumatiques_manquantes ? 'Pneumatiques manquants' : null,
+                        $carPosition->vehicule_immerge ? 'Véhicule immergé' : null,
+                        $carPosition->defauts_techniques_irreversibles ? 'Défauts techniques irréversibles' : null,
+                        $carPosition->vehicule_non_identifiable ? 'Véhicule non identifiable' : null,
+                        $carPosition->vehicule_brule ? 'Véhicule brûlé' : null,
+                    ])->filter()->join(' · ') ?: 'Aucun détail renseigné' }}</dd>
+                    <dt>Pays étranger</dt><dd>{{ $carPosition->pays_etranger ?: '—' }}</dd>
+                </dl>
+            </div></div>
+            <div class="col-lg-6"><div class="report-detail">
+                <h4>Constatation de l’agent</h4>
+                <dl class="mb-0">
+                    <dt>Motif d’infraction</dt><dd>{{ $carPosition->motif_infraction ?: '—' }}</dd>
+                    <dt>Explication</dt><dd>{{ $carPosition->explication_infraction ?: '—' }}</dd>
+                    <dt>Lieu</dt><dd>{{ $carPosition->lieu ?: '—' }}</dd>
+                    <dt>Conditions</dt><dd>{{ $carPosition->pluie ? 'Pluie' : ($carPosition->nuit ? 'Nuit' : 'Jour / non précisé') }}</dd>
+                    <dt>Pièces manquantes</dt><dd>{{ $carPosition->pieces_manquantes ?: '—' }}</dd>
+                    <dt>Dommages</dt><dd>@if($carPosition->dommage_image)<a href="{{ $storageBase.'/dommages/'.$carPosition->dommage_image }}" target="_blank" rel="noopener"><img class="report-agent-photo" style="max-width:400px;object-fit:contain;background:#f5f8f6" src="{{ $storageBase.'/dommages/'.$carPosition->dommage_image }}" alt="Schéma des dommages annoté"></a>@else Non renseignés @endif</dd>
+                </dl>
+            </div></div>
+        </div>
+        <div class="report-detail mb-4">
+            <h4 class="mb-3">Photo du citoyen</h4>
+            <div class="row g-3">
+                @forelse($photos as $citizenPhoto)
+                    <div class="col-6 col-md-3"><a href="{{ $storageBase.'/'.$citizenPhoto->filepath }}" target="_blank" rel="noopener"><img class="report-agent-photo" src="{{ $storageBase.'/'.$citizenPhoto->filepath }}" alt="Photo du citoyen {{ $loop->iteration }}"></a></div>
+                @empty
+                    <p class="text-muted mb-0">Aucune photo ajoutée par le citoyen.</p>
+                @endforelse
+            </div>
+        </div>
+        <div class="report-detail mb-4">
+            <h4 class="mb-3">Photos de l’agent</h4>
+            <div class="row g-3">
+                @forelse($agentPhotos as $agentPhoto)
+                    <div class="col-6 col-md-3"><a href="{{ $storageBase.'/'.$agentPhoto->filepath }}" target="_blank" rel="noopener"><img class="report-agent-photo" src="{{ $storageBase.'/'.$agentPhoto->filepath }}" alt="Photo de constatation {{ $loop->iteration }}"></a></div>
+                @empty
+                    <p class="text-muted mb-0">Aucune photo de constatation ajoutée.</p>
+                @endforelse
+            </div>
         </div>
 
         <div class="form-elements-wrapper">
@@ -243,7 +332,7 @@
                                                         <td colspan="4">
                                                             <div class="row justify-content-center align-items-center g-2">
                                                                 <div class="col-md-6">
-                                                                    @if (Auth::user()->role->nomRole != 'Autorite commune' || Auth::user()->role->nomRole != 'Autorite prefecture')
+                                                                    @if (in_array(Auth::user()->role_id, [1, 2]))
                                                                     <button type="submit mb-3" class="main-btn success-btn-light btn-hover">
                                                                         <i class="lni lni-checkmark"></i> Enregistrer
                                                                     </button>
@@ -306,7 +395,7 @@
                                                             <h6 class="text-sm text-medium">Numéro du véhicule</h6>
                                                         </td>
                                                         <td>
-                                                            <input type="text" class="form-control @error('numero_vehicule') is-invalid @enderror" id="numero_vehicule" placeholder="AB-0000-KO" pattern="[A-Z]{2}-\d+-[A-Z]{2}" value="{{ old('numero_vehicule', strtoupper($carPosition->numero_vehicule)) }}" name="numero_vehicule" style="text-transform:uppercase">
+                                                            <input type="text" class="form-control @error('numero_vehicule') is-invalid @enderror" id="numero_vehicule" placeholder="Plaque telle qu’elle apparaît" value="{{ old('numero_vehicule', strtoupper($carPosition->numero_vehicule)) }}" name="numero_vehicule" style="text-transform:uppercase">
                                                             @error('numero_vehicule')
                                                             <div class="invalid-feedback">{{ $message }}</div>
                                                             @enderror
@@ -527,7 +616,7 @@
                                                         <td colspan="4">
                                                             <div class="row justify-content-center align-items-center g-2">
                                                                 <div class="col-md-6">
-                                                                    @if (Auth::user()->role->nomRole != 'Autorite commune' || Auth::user()->role->nomRole != 'Autorite prefecture')
+                                                                    @if (in_array(Auth::user()->role_id, [1, 2]))
                                                                     <button type="submit mb-3" class="main-btn success-btn-light btn-hover">
                                                                         <i class="lni lni-checkmark"></i> Enregistrer
                                                                     </button>
@@ -684,7 +773,7 @@
                                     </div>
                                 </div>
                                 <div class="row mb-3">
-                                    @if (Auth::user()->role->nomRole != 'Autorite commune' || Auth::user()->role->nomRole != 'Autorite prefecture')
+                                    @if (in_array(Auth::user()->role_id, [1, 2]))
                                     <div class="col-md-6">
                                         <button type="submit mb-3" class="main-btn success-btn-light btn-hover">
                                             <i class="lni lni-checkmark"></i> Fin de Procédure
@@ -744,7 +833,7 @@
                                 </div>
                                 <div class="row justify-content-center align-items-center g-2">
                                     <div class="col-md-6">
-                                        @if (Auth::user()->role->nomRole != 'Agent')
+                                        @if (in_array(Auth::user()->role_id, [1, 3, 4]))
                                         <button type="submit mb-3" class="main-btn success-btn-light btn-hover">
                                             <i class="lni lni-checkmark"></i> Enregistrer
                                         </button>

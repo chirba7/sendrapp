@@ -34,7 +34,7 @@ Authentification avec le JWT Sendra existant, en-tête `Authorization: Bearer �
 
 - `GET /api/pointage/configuration` : `assignment` avec `site`, `open_session` éventuelle et `server_time`. Affectation inactive ou site désactivé : `assignment` vaut `null`, sans masquer la journée ouverte.
 - `GET /api/pointage/historique` : pagination Laravel de 30 journées, limitée à l’employé connecté.
-- `POST /api/pointage/pointer` : arrivée ou départ (10 requêtes/minute).
+- `POST /api/pointage/pointer` : début de travail (`arrival`), début de pause (`break_start`), fin de pause (`break_end`) ou fin de travail (`departure`) (10 requêtes/minute). Chaque type est enregistré au plus une fois par journée de service. Une pause commencée doit être terminée avant le départ.
 
 ### Téléphone autorisé et biométrie native
 
@@ -78,7 +78,7 @@ Succès HTTP 200 : `{"success": true, "session": {...}}`. Les statuts d’arriv�
 
 ## Périmètre restant
 
-L'application Flutter est dans `app_pointage_sendra`. Elle inclut l'inscription, la connexion, l'attente de validation, la liaison d'un appareil, la position précise et l'historique. Les corrections auditées d'oubli de départ, les congés/absences, pauses et exports ne sont pas implémentés. Un départ oublié reste visible « Sans départ » ; il n'est pas automatiquement inventé. Il faut compléter le parcours de régularisation avant un usage quotidien généralisé.
+L'application Flutter est dans `app_pointage_sendra`. Elle inclut l'inscription, la connexion, l'attente de validation, la liaison d'un appareil, la position précise, les quatre événements de pointage et l'historique. Les corrections auditées d'oubli de départ, les congés/absences et les exports ne sont pas implémentés. Un départ oublié reste visible « Sans départ » ; il n'est pas automatiquement inventé. Il faut compléter le parcours de régularisation avant un usage quotidien généralisé.
 
 La comparaison faciale et l'anti usurpation sont des contrôles probabilistes. Le clignement vidéo réduit le risque d'une photo fixe ; une attestation matérielle de l'appareil et une évaluation PAD spécialisée renforceraient la résistance aux injections et aux relectures.
 

@@ -24,6 +24,23 @@ class _InfractionFormState extends State<InfractionForm> {
 
   final TextEditingController _adresseController = TextEditingController();
   final TextEditingController _motifController = TextEditingController();
+  final TextEditingController _explicationController = TextEditingController();
+  // Liste de travail à remplacer par les 13 libellés officiels validés.
+  static const _motifs = <String>[
+    'Stationnement prolongé',
+    'Véhicule abandonné sur la voie publique',
+    'Véhicule gênant la circulation',
+    'Véhicule dangereux pour les usagers',
+    'Véhicule incendié',
+    'Véhicule accidenté non déplacé',
+    'Véhicule hors d’usage',
+    'Véhicule sans identification lisible',
+    'Occupation irrégulière du domaine public',
+    'Obstruction d’un accès',
+    'Risque de pollution',
+    'Atteinte à la salubrité publique',
+    'Autre motif à préciser',
+  ];
 
   String? _lieu;
   String? _meteo;
@@ -53,6 +70,7 @@ class _InfractionFormState extends State<InfractionForm> {
       setState(() {
         _adresseController.text = data['adresse_precise'] ?? '';
         _motifController.text = data['motif_infraction'] ?? '';
+        _explicationController.text = data['explication_infraction'] ?? '';
         _lieu = data['lieu'] ?? '';
         _meteo = data['pluie'] == 1
             ? 'Pluie'
@@ -86,6 +104,7 @@ class _InfractionFormState extends State<InfractionForm> {
         body: jsonEncode({
           'adresse_precise': _adresseController.text,
           'motif_infraction': _motifController.text,
+          'explication_infraction': _explicationController.text.trim(),
           'lieu': _lieu,
           'nuit': nuit,
           'pluie': pluie,
@@ -155,14 +174,32 @@ class _InfractionFormState extends State<InfractionForm> {
           ),
         ],
       ),
-      body: Padding(
+      body: SafeArea(child: Padding(
         padding: const EdgeInsets.all(25.0),
         child: Form(
           key: _formKey,
           child: ListView(
             children: [
               _buildField('Adresse précise', _adresseController),
-              _buildField('Motif de l\'infraction', _motifController),
+              DropdownButtonFormField<String>(
+                value: _motifs.contains(_motifController.text)
+                    ? _motifController.text : null,
+                isExpanded: true,
+                decoration: const InputDecoration(labelText: 'Motif de l’infraction'),
+                items: _motifs.map((motif) => DropdownMenuItem(
+                  value: motif, child: Text(motif, overflow: TextOverflow.ellipsis),
+                )).toList(),
+                onChanged: (value) => setState(() => _motifController.text = value ?? ''),
+                validator: (value) => value == null ? 'Choisissez un motif.' : null,
+              ),
+              TextFormField(
+                controller: _explicationController,
+                maxLines: 3,
+                decoration: const InputDecoration(labelText: 'Explication',
+                    hintText: 'Justifiez le motif retenu'),
+                validator: (value) => value == null || value.trim().isEmpty
+                    ? 'Expliquez le motif.' : null,
+              ),
               SizedBox(height: 20),
               const Text('Lieu',
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
@@ -219,7 +256,7 @@ class _InfractionFormState extends State<InfractionForm> {
             ],
           ),
         ),
-      ),
+      )),
     );
   }
 

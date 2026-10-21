@@ -40,6 +40,14 @@ Route::middleware([
     // 7 = Operateur : accède au tableau de bord et aux missions, pas aux comptes.
     'role:1,2,3,4,7',
 ])->group(function () {
+    Route::get('/dashboard/signalement/signales', [CarPositionController::class, 'index'])->name('signales');
+    Route::get('/dashboard/signalement/enleves', [CarPositionController::class, 'index2'])->name('enleves');
+    Route::get('/dashboard/signalement/encours', [CarPositionController::class, 'index3'])->name('encours');
+    Route::get('/dashboard/signalement/non-resolus', [CarPositionController::class, 'nonResolus'])->name('non_resolus');
+    Route::get('/dashboard/signalement/{carPosition}', [CarPositionController::class, 'show'])->name('details');
+    Route::get('/dashboard/locatlisation/{carPosition}', [CarPositionController::class, 'locatlisation'])->name('locatlisation');
+    Route::get('/signalements/{carPosition}/pdf', [CarPositionController::class, 'pdf'])->name('pdf');
+    Route::get('/signalements/{carPosition}/pdf_constation', [CarPositionController::class, 'pdf_constation'])->name('pdf_constation');
     Route::get('/dashboard', [CarPositionController::class, 'infos'])->name('dashboard');
     // Même écran que /dashboard : doit suivre les mêmes rôles.
     Route::get('/', [CarPositionController::class, 'infos']);
@@ -52,24 +60,17 @@ Route::middleware([
 ])->group(function () {
 
 
-    Route::get('/dashboard/signalement/signales', [CarPositionController::class, 'index'])->name('signales');
-    Route::get('/dashboard/signalement/enleves', [CarPositionController::class, 'index2'])->name('enleves');
-    Route::get('/dashboard/signalement/encours', [CarPositionController::class, 'index3'])->name('encours');
     Route::get('/dashboard/cartographie', [CarPositionController::class, 'maps'])->name('maps');
-    Route::get('/dashboard/signalement/{carPosition}', [CarPositionController::class, 'show'])->name('details');
-    Route::patch('/dashboard/vehicule/{carPosition}', [CarPositionController::class, 'vehicule'])->name('vehicule');
-    Route::patch('/dashboard/enlevement/{carPosition}', [CarPositionController::class, 'enlevement'])->name('enlevement');
-    Route::get('/dashboard/locatlisation/{carPosition}', [CarPositionController::class, 'locatlisation'])->name('locatlisation');
-    Route::patch('/dashboard/infraction/{carPosition}', [CarPositionController::class, 'infraction'])->name('infraction');
-    Route::get('/signalements/{carPosition}/pdf', [CarPositionController::class, 'pdf'])->name('pdf');
-    Route::get('/signalements/{carPosition}/pdf_constation', [CarPositionController::class, 'pdf_constation'])->name('pdf_constation');
+    Route::patch('/dashboard/vehicule/{carPosition}', [CarPositionController::class, 'vehicule'])->name('vehicule')->middleware('role:1,2');
+    Route::patch('/dashboard/enlevement/{carPosition}', [CarPositionController::class, 'enlevement'])->name('enlevement')->middleware('role:1,2');
+    Route::patch('/dashboard/infraction/{carPosition}', [CarPositionController::class, 'infraction'])->name('infraction')->middleware('role:1,2');
     // Route::get('/modifier/motDePasse', [UserController::class, 'modifierMotDePasse']);
 
 
     // Correction WEB-L-4 : /signature (page autonome, jamais liée depuis
     // aucun menu/vue) supprimée — dupliquait l'onglet signature déjà
     // intégré dans show.blade.php, qui utilise signature.store ci-dessous.
-    Route::post('/signature/store/{carPosition}', [CarPositionController::class, 'signaturestore'])->name('signature.store');
+    Route::post('/signature/store/{carPosition}', [CarPositionController::class, 'signaturestore'])->name('signature.store')->middleware('role:1,2');
 });
 
 // Correction ACL : l'approbation est réservée à Admin/Autorité commune/
@@ -82,6 +83,7 @@ Route::middleware([
     config('jetstream.auth_session'),
     'role:1,3,4',
 ])->group(function () {
+    Route::get('/dashboard/approbations', [CarPositionController::class, 'approbations'])->name('approbations.index');
     Route::patch('/dashboard/approbation/{carPosition}', [CarPositionController::class, 'approbation'])->name('approbation');
 });
 

@@ -210,15 +210,21 @@ class MissionDispatch {
 }
 
 class MissionVehicle {
-  const MissionVehicle({required this.id, required this.label, this.plate});
+  const MissionVehicle(
+      {required this.id,
+      required this.label,
+      this.plate,
+      this.nonRemovalReason});
   final int id;
   final String label;
   final String? plate;
+  final String? nonRemovalReason;
 
   factory MissionVehicle.fromJson(Map<String, dynamic> json) => MissionVehicle(
         id: int.tryParse('${json['id']}') ?? 0,
         label:
             '${json['label'] ?? json['marque'] ?? json['title'] ?? 'Véhicule'}',
         plate: json['plate']?.toString() ?? json['immatriculation']?.toString(),
+        nonRemovalReason: json['non_removal_reason']?.toString(),
       );
 }

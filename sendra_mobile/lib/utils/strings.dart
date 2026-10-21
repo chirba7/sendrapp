@@ -13,7 +13,7 @@ class Strings {
   static const String skip = 'Skip';
   static const String conTinue = 'ENREGISTRER';
   static const String submit = 'ENVOYER';
-  static const String okay = 'Okay';
+  static const String okay = 'Continuer';
   static const String letsGetStarted = 'LET\'S GET STARTED';
   static const String signaler = 'SIGNALER';
 
@@ -98,9 +98,9 @@ class Strings {
   static const String enterConfirmPassword = 'Confirmer le mot de passe';
 
   //?reset password congratulations screen
-  static const String resetPassCongTitle = 'Congratulations';
+  static const String resetPassCongTitle = 'Mot de passe modifié';
   static const String resetPassCongDes =
-      'Your password has been successfully changed';
+      'Votre mot de passe a été modifié avec succès.';
 
   //? sign up screen
   static const String signUpTitle = 'Inscription';

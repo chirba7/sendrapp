@@ -12,8 +12,11 @@ class ApprobationController extends Controller
     {
         $request->validate([
             'approbation' => 'required|string|in:OUI,NON',
-            'motifApprobation' => 'nullable|string|max:225',
+            'motifApprobation' => 'required_if:approbation,NON|nullable|string|max:225',
         ]);
+
+        abort_if(empty($carPosition->dommage_image), 422, 'Constatation non transmise.');
+        abort_if($carPosition->is_approve || $carPosition->etat === 'REJETE', 409, 'Décision déjà enregistrée.');
 
         // Correction API-M-1 : l'état était forcé à "EN COURS" même en cas
         // de refus, ce qui ne laissait aucune trace distincte d'un rejet.

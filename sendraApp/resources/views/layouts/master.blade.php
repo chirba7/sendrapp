@@ -1,13 +1,33 @@
 @extends('layouts.base')
+{{-- Habillage par rôle : la classe posée sur <body> fixe la couleur
+     d'accent (voir sendra-refresh.css, section V2). --}}
+@php
+    $roleId = Auth::user()->role_id;
+    $roleUi = match ($roleId) {
+        1 => ['key' => 'admin', 'label' => 'Administration', 'icon' => 'lni-cog'],
+        3 => ['key' => 'commune', 'label' => 'Autorité communale', 'icon' => 'lni-apartment'],
+        4 => ['key' => 'prefecture', 'label' => 'Autorité préfectorale', 'icon' => 'lni-library'],
+        7 => ['key' => 'operateur', 'label' => 'Opérateur', 'icon' => 'lni-delivery'],
+        default => ['key' => 'agent', 'label' => 'Agent', 'icon' => 'lni-user'],
+    };
+@endphp
+@section('body_class', 'role-'.$roleUi['key'])
 @section('contenu')
 <!-- ======== sidebar-nav start =========== -->
 <aside class="sidebar-nav-wrapper">
     <div class="navbar-logo">
         <a href="/">
-            <img src="{{asset('img/EPAVIE.png')}}" alt="logo" width="90%" height="80%" />
+            <img src="{{asset('img/sendra-original.png')}}" alt="logo" width="90%" height="80%" />
         </a>
     </div>
     <nav class="sidebar-nav ">
+        <div class="role-card">
+            <span class="role-icon"><i class="lni {{ $roleUi['icon'] }}"></i></span>
+            <div>
+                <small>Espace de travail</small>
+                <strong>{{ $roleUi['label'] }}</strong>
+            </div>
+        </div>
         <ul>
             <li class="nav-item {{request()->is('dashboard') || request()->is('/') ? 'active' : ''}}">
                 <a href="{{route('dashboard')}}">
@@ -20,7 +40,7 @@
                     <span class="text">Dashboard</span>
                 </a>
             </li>
-            <li class="nav-item nav-item-has-children {{request()->is('dashboard/signalement/signales') || request()->is('dashboard/signalement/encours') || request()->is('dashboard/signalement/enleves') ? 'active' : ''}}">
+            <li class="nav-item nav-item-has-children {{request()->is('dashboard/signalement/signales') || request()->is('dashboard/signalement/encours') || request()->is('dashboard/signalement/enleves') || request()->is('dashboard/signalement/non-resolus') ? 'active' : ''}}">
                 <a href="#0" class="collapsed" data-bs-toggle="collapse" data-bs-target="#ddmenu_2" aria-controls="ddmenu_2" aria-expanded="false" aria-label="Toggle navigation">
                     <span class="icon text-success">
                         <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -30,7 +50,7 @@
                     </span>
                     <span class="text">signalements</span>
                 </a>
-                <ul id="ddmenu_2" class="collapse dropdown-nav {{request()->is('dashboard/signalement/signales') || request()->is('dashboard/signalement/encours') || request()->is('dashboard/signalement/enleves') ? 'show' : ''}}">
+                <ul id="ddmenu_2" class="collapse dropdown-nav {{request()->is('dashboard/signalement/signales') || request()->is('dashboard/signalement/encours') || request()->is('dashboard/signalement/enleves') || request()->is('dashboard/signalement/non-resolus') ? 'show' : ''}}">
                     <li>
                         <a href="{{route('signales')}}" class="{{request()->is('dashboard/signalement/signales') ? 'active' : ''}}"> Signalés </a>
                     </li>
@@ -38,10 +58,18 @@
                         <a href="{{route('encours')}}" class="{{request()->is('dashboard/signalement/encours') ? 'active' : ''}}"> En cours </a>
                     </li>
                     <li>
+                        <a href="{{route('non_resolus')}}" class="{{request()->is('dashboard/signalement/non-resolus') ? 'active' : ''}}"> Non résolus </a>
+                    </li>
+                    <li>
                         <a href="{{route('enleves')}}" class="{{request()->is('dashboard/signalement/enleves') ? 'active' : ''}}"> Enlevés </a>
                     </li>
                 </ul>
             </li>
+            @if(in_array(Auth::user()->role_id, [1, 3, 4]))
+            <li class="nav-item {{request()->is('dashboard/approbations') ? 'active' : ''}}">
+                <a href="{{route('approbations.index')}}"><span class="icon text-success"><i class="lni lni-checkmark-circle"></i></span><span class="text">Approbations</span></a>
+            </li>
+            @endif
             <li class="nav-item {{request()->is('dashboard/cartographie') ? 'active' : ''}}">
                 <a href="{{route('maps')}}">
                     <span class="icon text-success ">
@@ -152,7 +180,7 @@
                         </div>
                         <div class="header-search d-none d-md-flex">
                             <form action="#">
-                                <input type="text" placeholder="Search..." />
+                                <input type="text" placeholder="Rechercher…" />
                                 <button><i class="lni lni-search-alt"></i></button>
                             </form>
                         </div>

@@ -33,7 +33,9 @@ class Mission extends Model
 
     public function vehicles()
     {
-        return $this->belongsToMany(CarPosition::class, 'mission_vehicle')->withTimestamps();
+        return $this->belongsToMany(CarPosition::class, 'mission_vehicle')
+            ->withPivot(['non_removal_reason', 'non_removed_at', 'non_removed_by'])
+            ->withTimestamps();
     }
 
     public function creator()

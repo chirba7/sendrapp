@@ -1,25 +1,21 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:walletium/routes/routes.dart';
-import 'package:walletium/utils/custom_color.dart';
-import 'package:walletium/utils/custom_style.dart';
-import 'package:walletium/utils/dimsensions.dart';
-import 'package:walletium/utils/size.dart';
+import 'package:walletium/utils/sendra_theme.dart';
 import 'package:walletium/utils/strings.dart';
-import '../../widgets/others/back_button_widget.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({Key? key}) : super(key: key);
 
   @override
-  _ProfileScreenState createState() => _ProfileScreenState();
+  State<ProfileScreen> createState() => _ProfileScreenState();
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
   String fullName = '';
   String phone = '';
+  String? photoUrl;
 
   @override
   void initState() {
@@ -28,131 +24,122 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> getUserData() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
+    final prefs = await SharedPreferences.getInstance();
+    if (!mounted) return;
     setState(() {
-      fullName = prefs.getString('fullName') ?? 'No name';
-      phone = prefs.getString('phone') ?? 'No phone';
+      fullName = prefs.getString('fullName') ?? 'Nom non renseigné';
+      phone = prefs.getString('phone') ?? 'Téléphone non renseigné';
+      photoUrl = prefs.getString('profilePhotoUrl');
     });
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: CustomColor.primaryBackgroundColor,
-      appBar: AppBar(
-        backgroundColor: CustomColor.primaryColor,
-        iconTheme: const IconThemeData(color: CustomColor.whiteColor),
-        title: const Text(Strings.profile),
-        elevation: 0,
-        leading: const BackButtonWidget(
-          backButtonImage: Strings.backButtonWhite,
-        ),
-      ),
-      body: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.all(20.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              SizedBox(
-                height: 20.h,
+      backgroundColor: SendraTheme.surface,
+      // Barre du haut alignée sur le reste de l'application (fond blanc).
+      appBar: AppBar(title: const Text(Strings.profile)),
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(vertical: 26, horizontal: 20),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [SendraTheme.green, SendraTheme.forest],
+                ),
+                borderRadius: BorderRadius.circular(22),
               ),
-              _profilePicture(context),
-              SizedBox(
-                height: 20.h,
+              child: Column(children: [
+                _profilePicture(),
+                const SizedBox(height: 14),
+                Text(fullName,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 21,
+                        fontWeight: FontWeight.w800)),
+                const SizedBox(height: 4),
+                Text(phone,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                        color: Colors.white.withValues(alpha: .82),
+                        fontSize: 15)),
+                const SizedBox(height: 18),
+                OutlinedButton.icon(
+                  onPressed: () async {
+                    await Get.toNamed(Routes.editProfileScreen);
+                    await getUserData();
+                  },
+                  icon: const Icon(Icons.edit_rounded, size: 20),
+                  label: const Text('Modifier mes informations'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.white,
+                    minimumSize: const Size(0, 46),
+                    side: const BorderSide(color: Colors.white70),
+                  ),
+                ),
+              ]),
+            ),
+            const SizedBox(height: 24),
+            const Padding(
+              padding: EdgeInsets.only(left: 4, bottom: 8),
+              child: Text('MON COMPTE',
+                  style: TextStyle(
+                      color: SendraTheme.muted,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 1.1)),
+            ),
+            Card(
+              child: ListTile(
+                onTap: () => Get.toNamed(Routes.changePasswordScreen),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(SendraTheme.radius)),
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                leading: Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1A73E8).withValues(alpha: .12),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.lock_rounded,
+                      color: Color(0xFF1A73E8)),
+                ),
+                title: const Text(Strings.changePassword),
+                trailing: const Icon(Icons.chevron_right_rounded,
+                    color: SendraTheme.muted),
               ),
-              _usernameAndUserId(context),
-              SizedBox(
-                height: 40.h,
-              ),
-              _containerWidget(context),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
   }
 
-  Container _profilePicture(BuildContext context) {
+  Widget _profilePicture() {
+    const fallback =
+        Icon(Icons.person_rounded, color: Colors.white, size: 54);
     return Container(
-      width: 100.h,
-      height: 100.h,
+      width: 96,
+      height: 96,
       decoration: BoxDecoration(
-        color: CustomColor.textColor,
+        color: Colors.white.withValues(alpha: .18),
         shape: BoxShape.circle,
+        border: Border.all(color: Colors.white54, width: 2),
       ),
-      child: Icon(
-        Icons.account_circle_rounded,
-        color: CustomColor.whiteColor,
-        size: 80,
-      ),
-    );
-  }
-
-  Column _usernameAndUserId(BuildContext context) {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Text(
-          fullName,
-          style: CustomStyler.profileNameStyle,
-        ),
-        Text(
-          phone,
-          style: TextStyle(color: CustomColor.textColor, fontSize: 16.sp),
-        ),
-      ],
-    );
-  }
-
-  Column _containerWidget(BuildContext context) {
-    return Column(
-      children: [
-        _optionCard(context, Icons.key, Strings.changePassword, () {
-          Get.toNamed(Routes.changePasswordScreen);
-        }),
-      ],
-    );
-  }
-
-  InkWell _optionCard(
-      BuildContext context, IconData icon, String name, VoidCallback onPressed) {
-    return InkWell(
-      onTap: onPressed,
-      child: Card(
-        elevation: 3,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(15.r),
-        ),
-        child: Padding(
-          padding: EdgeInsets.all(15.r),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: [
-                  Icon(
-                    icon,
-                    color: CustomColor.textColor,
-                    size: 30.sp,
-                  ),
-                  SizedBox(
-                    width: 20.w,
-                  ),
-                  Text(
-                    name,
-                    style: CustomStyler.editProfileStyle,
-                  ),
-                ],
-              ),
-              Icon(
-                Icons.arrow_forward_ios_sharp,
-                color: CustomColor.textColor,
-              ),
-            ],
-          ),
-        ),
-      ),
+      child: photoUrl != null && photoUrl!.isNotEmpty
+          ? ClipOval(
+              child: Image.network(photoUrl!,
+                  fit: BoxFit.cover,
+                  cacheWidth: 300,
+                  errorBuilder: (_, __, ___) => fallback))
+          : fallback,
     );
   }
 }

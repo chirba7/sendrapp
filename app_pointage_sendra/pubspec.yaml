@@ -16,7 +16,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 1.0.5+6
+version: 1.0.11+12
 
 environment:
   sdk: ^3.11.3
@@ -39,6 +39,8 @@ dependencies:
   flutter_secure_storage: ^11.2.0
   uuid: ^4.6.0
   crypto: ^3.0.7
+  local_auth: ^3.0.2
+  flutter_native_splash: ^2.4.7
 
 dev_dependencies:
   flutter_test:
@@ -63,7 +65,8 @@ flutter:
   # the material Icons class.
   uses-material-design: true
   assets:
-    - assets/sendra_pointage_logo.png
+    - assets/pointage_icon_emerald.png
+    - assets/pointage_splash_safe.png
 
   # To add assets to your application, add an assets section, like this:
   # assets:
@@ -99,14 +102,14 @@ flutter:
 flutter_launcher_icons:
   android: true
   ios: true
-  image_path: assets/pointage_icon.png
-  adaptive_icon_background: '#00A94F'
-  adaptive_icon_foreground: assets/pointage_icon.png
+  image_path: assets/pointage_icon_emerald.png
+  adaptive_icon_background: '#075B3E'
+  adaptive_icon_foreground: assets/pointage_icon_emerald.png
 
 flutter_native_splash:
-  color: '#F5FBF7'
-  image: assets/pointage_icon.png
+  color: '#075B3E'
+  image: assets/pointage_splash_safe.png
   android_12:
-    color: '#F5FBF7'
-    image: assets/pointage_icon.png
+    color: '#075B3E'
+    image: assets/pointage_splash_safe.png
 

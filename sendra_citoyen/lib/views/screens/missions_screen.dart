@@ -13,7 +13,28 @@ class MissionsScreen extends StatefulWidget {
 class _MissionsScreenState extends State<MissionsScreen> {
   final _service = MissionService();
   late Future<List<Mission>> _missions;
-  String _filter = 'all';
+  String _typeFilter = 'all';
+  String _statusFilter = 'all';
+
+  String _missionStage(Mission mission, DateTime now) {
+    if (mission.completed || mission.status == 'terminee') return 'terminee';
+    if (mission.checkedIn ||
+        mission.receptionCheckedIn ||
+        mission.status == 'en_cours' ||
+        mission.status == 'en_reception' ||
+        (mission.scheduledAt != null && mission.scheduledAt!.isBefore(now))) {
+      return 'en_cours';
+    }
+    return 'a_venir';
+  }
+
+  String _dateLabel(DateTime? date) {
+    if (date == null) return 'Date à préciser';
+    final local = date.toLocal();
+    String two(int value) => value.toString().padLeft(2, '0');
+    return '${two(local.day)}/${two(local.month)}/${local.year} à ${two(local.hour)}:${two(local.minute)}';
+  }
+
   @override
   void initState() {
     super.initState();
@@ -48,23 +69,45 @@ class _MissionsScreenState extends State<MissionsScreen> {
               return _StateMessage(
                   message: 'Vos prochaines missions apparaîtront ici.',
                   onRetry: () => setState(_reload));
+            final now = DateTime.now();
             final visible = missions
                 .where((mission) =>
-                    _filter == 'all' ||
-                    (_filter == 'programmee' && mission.isProgrammed) ||
-                    (_filter == 'directe' && !mission.isProgrammed))
-                .toList();
+                    (_typeFilter == 'all' ||
+                        (_typeFilter == 'programmee' && mission.isProgrammed) ||
+                        (_typeFilter == 'ponctuelle' &&
+                            !mission.isProgrammed)) &&
+                    (_statusFilter == 'all' ||
+                        _missionStage(mission, now) == _statusFilter))
+                .toList()
+              ..sort((a, b) {
+                if (a.scheduledAt == null) return b.scheduledAt == null ? 0 : 1;
+                if (b.scheduledAt == null) return -1;
+                final aDistance =
+                    a.scheduledAt!.difference(now).inSeconds.abs();
+                final bDistance =
+                    b.scheduledAt!.difference(now).inSeconds.abs();
+                return aDistance.compareTo(bDistance);
+              });
             return Column(children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(8, 10, 8, 4),
+                child: Row(children: [
+                  Expanded(child: _filterChip('all', 'Toutes', Icons.view_agenda_outlined,
+                      const Color(0xFF52606D))),
+                  Expanded(child: _filterChip('programmee', 'Programmées',
+                      Icons.event_available_outlined, SendraTheme.green)),
+                  Expanded(child: _filterChip('ponctuelle', 'Ponctuelles',
+                      Icons.flash_on_outlined, SendraTheme.amber)),
+                ]),
+              ),
               SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.fromLTRB(16, 10, 16, 4),
+                padding: const EdgeInsets.fromLTRB(16, 2, 16, 8),
                 child: Row(children: [
-                  _filterChip('all', 'Toutes', Icons.view_agenda_outlined,
-                      const Color(0xFF52606D)),
-                  _filterChip('programmee', 'Programmées',
-                      Icons.event_available_outlined, SendraTheme.green),
-                  _filterChip('directe', 'Directes', Icons.flash_on_outlined,
-                      SendraTheme.amber),
+                  _statusChip('all', 'Tous les statuts'),
+                  _statusChip('a_venir', 'À venir'),
+                  _statusChip('en_cours', 'En cours'),
+                  _statusChip('terminee', 'Terminées'),
                 ]),
               ),
               Expanded(
@@ -122,13 +165,17 @@ class _MissionsScreenState extends State<MissionsScreen> {
                                                               : mission
                                                                       .isProgrammed
                                                                   ? 'Programmée'
-                                                                  : 'Directe',
+                                                                  : 'Ponctuelle',
                                                       color: mission
                                                               .isProgrammed
                                                           ? SendraTheme.green
                                                           : SendraTheme.amber)
                                                 ]),
                                                 const SizedBox(height: 12),
+                                                _Info(
+                                                    Icons.event_outlined,
+                                                    _dateLabel(
+                                                        mission.scheduledAt)),
                                                 if (mission.address.isNotEmpty)
                                                   _Info(Icons.place_outlined,
                                                       mission.address),
@@ -162,14 +209,13 @@ class _MissionsScreenState extends State<MissionsScreen> {
       );
 
   Widget _filterChip(String value, String label, IconData icon, Color color) {
-    final selected = _filter == value;
+    final selected = _typeFilter == value;
     return Padding(
-      padding: const EdgeInsets.only(right: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 2),
       child: ChoiceChip(
         selected: selected,
-        onSelected: (_) => setState(() => _filter = value),
-        avatar: Icon(icon, size: 18, color: selected ? Colors.white : color),
-        label: Text(label),
+        onSelected: (_) => setState(() => _typeFilter = value),
+        label: FittedBox(fit: BoxFit.scaleDown, child: Text(label)),
         labelStyle: TextStyle(
             color: selected ? Colors.white : color,
             fontWeight: FontWeight.w700),
@@ -177,6 +223,18 @@ class _MissionsScreenState extends State<MissionsScreen> {
         backgroundColor: color.withValues(alpha: .08),
         side: BorderSide(color: color.withValues(alpha: .25)),
         showCheckmark: false,
+      ),
+    );
+  }
+
+  Widget _statusChip(String value, String label) {
+    final selected = _statusFilter == value;
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: FilterChip(
+        selected: selected,
+        onSelected: (_) => setState(() => _statusFilter = value),
+        label: Text(label),
       ),
     );
   }

@@ -4,8 +4,9 @@
     <div class="container-fluid">
         <div class="title-wrapper pt-30">
             <div class="row align-items-center">
-                <div class="col-md-6"><h2 class="text-success">Missions</h2></div>
+                <div class="col-md-6"><h2 class="text-success">{{ $history ? 'Historique des missions' : 'Missions ouvertes' }}</h2></div>
                 <div class="col-md-6 text-md-end mt-3 mt-md-0">
+                    <a href="{{ route('missions.index', $history ? [] : ['historique' => 1]) }}" class="btn btn-outline-success me-2">{{ $history ? 'Missions ouvertes' : 'Historique' }}</a>
                     <a href="{{ route('missions.create') }}" class="main-btn success-btn btn-hover">
                         <i class="lni lni-plus"></i> Créer une mission
                     </a>
@@ -50,12 +51,12 @@
                             </td>
                         </tr>
                     @empty
-                        <tr><td colspan="7" class="text-center py-5">Aucune mission créée.</td></tr>
+                        <tr><td colspan="7" class="text-center py-5">{{ $history ? 'Aucune mission clôturée.' : 'Aucune mission ouverte.' }}</td></tr>
                     @endforelse
                     </tbody>
                 </table>
             </div>
-            <div class="d-flex justify-content-end mt-4">{{ $missions->links() }}</div>
+            <div class="d-flex justify-content-end mt-4">{{ $missions->appends(['historique' => $history ? 1 : 0])->links() }}</div>
         </div>
     </div>
 </section>

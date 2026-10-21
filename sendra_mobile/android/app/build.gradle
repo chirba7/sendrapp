@@ -93,7 +93,7 @@ android {
             shrinkResources false
             debuggable true
             ndk {
-                debugSymbolLevel 'FULL'
+                debugSymbolLevel 'NONE'
             }
         }
         release {

@@ -15,9 +15,11 @@ class MissionController extends Controller
 {
     public function index()
     {
+        $history = request()->boolean('historique');
         $missions = Mission::with(['agents', 'vehicles', 'creator', 'commune', 'trucks'])
+            ->where('status', $history ? '=' : '!=', 'terminee')
             ->orderByDesc('scheduled_at')->paginate(15);
-        return view('missions.index', compact('missions'));
+        return view('missions.index', compact('missions', 'history'));
     }
 
     public function create()

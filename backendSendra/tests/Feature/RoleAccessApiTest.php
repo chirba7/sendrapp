@@ -55,13 +55,27 @@ class RoleAccessApiTest extends TestCase
         foreach ([3, 4] as $roleId) {
             $telephone = '77200000' . $roleId;
             User::factory()->create(['telephone' => $telephone, 'role_id' => $roleId]);
-            $carPosition = CarPosition::factory()->create();
+            $carPosition = CarPosition::factory()->create(['dommage_image' => 'constat.png']);
             $token = $this->loginAndGetToken($telephone);
 
             $this->putJson("/api/soumettreApprobation/{$carPosition->id}", [
                 'approbation' => 'OUI',
             ], ['Authorization' => "Bearer {$token}"])->assertOk();
         }
+    }
+
+    public function test_agent_cannot_change_a_transmitted_constatation(): void
+    {
+        User::factory()->create(['telephone' => '772000009', 'role_id' => 2]);
+        $carPosition = CarPosition::factory()->create(['dommage_image' => 'constat.png']);
+        $token = $this->loginAndGetToken('772000009');
+        $headers = ['Authorization' => "Bearer {$token}"];
+
+        $this->putJson("/api/enregistrerDommages/{$carPosition->id}", [
+            'signature' => 'data:image/png;base64,iVBORw0KGgo=',
+        ], $headers)->assertStatus(403);
+        $this->postJson("/api/constatation/{$carPosition->id}/photos", [], $headers)
+            ->assertStatus(403);
     }
 
     private function loginAndGetToken(string $telephone, string $password = 'password'): string

@@ -22,7 +22,6 @@ class _GoogleMapRouteScreenState extends State<GoogleMapRouteScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text('Itinéraire vers le signalement'),
-        backgroundColor: Colors.green,
       ),
       body: GoogleMap(
         initialCameraPosition: CameraPosition(

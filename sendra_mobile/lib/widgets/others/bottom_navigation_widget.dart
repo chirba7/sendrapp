@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:walletium/controller/bottom_navigation_controller.dart';
 import 'package:walletium/routes/routes.dart';
+import 'package:walletium/utils/app_brand.dart';
+import 'package:walletium/utils/app_prefs.dart';
 import 'package:walletium/utils/sendra_theme.dart';
 import 'package:walletium/views/screens/cartography_screen.dart';
 import 'package:walletium/views/screens/home_screen.dart';
 import 'package:walletium/views/screens/missions_screen.dart';
-import 'package:walletium/utils/session.dart';
+import 'package:walletium/widgets/others/guide_view.dart';
 
 class BottomNavigationWidget extends StatefulWidget {
   const BottomNavigationWidget({super.key});
@@ -17,95 +20,126 @@ class BottomNavigationWidget extends StatefulWidget {
 
 class _BottomNavigationWidgetState extends State<BottomNavigationWidget> {
   final _controller = Get.put(BottomNavigationController());
-  bool? _isAgent;
+
+  // Rôle lu de façon synchrone (préférences préchargées dans main) : plus
+  // d'écran de chargement intermédiaire à l'arrivée sur l'accueil.
+  late final bool _isAgent = AppPrefs.isAgent;
+
+  // Guide de bienvenue : décidé de façon synchrone, il s'affiche en plein
+  // écran dès la première connexion — avant, il était construit dans
+  // l'onglet avec une valeur par défaut « affiché » puis masqué après lecture
+  // asynchrone des préférences : on en voyait un bout puis il disparaissait.
+  late bool _showGuide =
+      !(AppPrefs.maybe?.getBool(AppBrand.guideSeenKey) ?? false);
+
+  Future<void> _closeGuide() async {
+    setState(() => _showGuide = false);
+    final prefs = await AppPrefs.init();
+    await prefs.setBool(AppBrand.guideSeenKey, true);
+  }
+
+  // Onglets construits seulement à la première visite. Avant, l'IndexedStack
+  // construisait dès l'ouverture la carte Google Maps, la géolocalisation et
+  // le chargement des missions, en plus de la liste : c'était la principale
+  // cause de lenteur à l'arrivée sur l'accueil.
+  late final List<bool> _built;
+
+  late final List<_Tab> _tabs = [
+    _Tab(
+      'Participations',
+      Icons.directions_car_outlined,
+      Icons.directions_car_rounded,
+      () => const HomeScreen(),
+    ),
+    if (_isAgent)
+      _Tab(
+        'Missions',
+        Icons.assignment_outlined,
+        Icons.assignment_rounded,
+        () => const MissionsScreen(),
+      ),
+    _Tab(
+      'Cartographie',
+      Icons.map_outlined,
+      Icons.map_rounded,
+      () => const CartographyScreen(),
+    ),
+  ];
 
   @override
   void initState() {
     super.initState();
-    _loadRole();
+    if (_controller.getIndex() >= _tabs.length) _controller.setIndex(0);
+    _built = List<bool>.filled(_tabs.length, false);
+    _built[_controller.getIndex()] = true;
   }
 
-  Future<void> _loadRole() async {
-    final isAgent = await Session.isAgent();
-    if (!mounted) return;
-    if (!isAgent && _controller.getIndex() > 1) _controller.setIndex(0);
-    setState(() => _isAgent = isAgent);
+  void _select(int index) {
+    if (index == _controller.getIndex()) return;
+    HapticFeedback.selectionClick();
+    _built[index] = true;
+    _controller.setIndex(index);
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_isAgent == null) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
-    }
-    final screens = <Widget>[
-      const HomeScreen(),
-      if (_isAgent!) const MissionsScreen(),
-      const CartographyScreen(),
-    ];
-    return Obx(
-      () => Scaffold(
-        backgroundColor: SendraTheme.surface,
-        body: IndexedStack(
-          index: _controller.getIndex(),
-          children: screens,
-        ),
-        floatingActionButton: Transform.translate(
-          offset: const Offset(0, -24),
-          child: FloatingActionButton.extended(
-            onPressed: () => Get.toNamed(Routes.depositScreen),
-            elevation: 4,
-            backgroundColor: SendraTheme.green,
-            foregroundColor: Colors.white,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(17),
-            ),
-            icon: const Icon(Icons.add_a_photo_outlined),
-            label: const Text(
-              'Signaler',
-              style: TextStyle(fontWeight: FontWeight.w700),
-            ),
-          ),
-        ),
-        floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
-        bottomNavigationBar: SafeArea(
-          top: false,
-          child: Container(
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              border: Border(top: BorderSide(color: SendraTheme.border)),
-            ),
-            child: NavigationBar(
-              height: 70,
-              selectedIndex: _controller.getIndex(),
-              onDestinationSelected: _controller.setIndex,
-              backgroundColor: Colors.white,
-              surfaceTintColor: Colors.transparent,
-              indicatorColor: const Color(0xFFE1F3E8),
-              labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
-              destinations: [
-                const NavigationDestination(
-                  icon: Icon(Icons.directions_car_outlined),
-                  selectedIcon:
-                      Icon(Icons.directions_car, color: SendraTheme.green),
-                  label: 'Participations',
-                ),
-                if (_isAgent!)
-                  const NavigationDestination(
-                    icon: Icon(Icons.assignment_outlined),
-                    selectedIcon:
-                        Icon(Icons.assignment, color: SendraTheme.green),
-                    label: 'Mission',
-                  ),
-                const NavigationDestination(
-                  icon: Icon(Icons.map_outlined),
-                  selectedIcon: Icon(Icons.map, color: SendraTheme.green),
-                  label: 'Cartographie',
-                ),
-              ],
-            ),
-          ),
-        ),
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SendraTheme.overlayLight,
+      child: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 300),
+        child: _showGuide
+            ? GuideView(key: const ValueKey('guide'), onDone: _closeGuide)
+            : KeyedSubtree(key: const ValueKey('app'), child: _buildApp()),
       ),
     );
   }
+
+  Widget _buildApp() {
+    return Obx(() {
+        final index = _controller.getIndex();
+        return Scaffold(
+          backgroundColor: SendraTheme.surface,
+          body: IndexedStack(
+            index: index,
+            children: [
+              for (var i = 0; i < _tabs.length; i++)
+                _built[i] ? _tabs[i].builder() : const SizedBox.shrink(),
+            ],
+          ),
+          floatingActionButton: FloatingActionButton.extended(
+            heroTag: 'signaler',
+            onPressed: () => Get.toNamed(Routes.depositScreen),
+            icon: const Icon(Icons.add_a_photo_rounded),
+            label: const Text('Signaler'),
+          ),
+          floatingActionButtonLocation:
+              FloatingActionButtonLocation.centerFloat,
+          bottomNavigationBar: DecoratedBox(
+            decoration: const BoxDecoration(
+              border: Border(top: BorderSide(color: SendraTheme.border)),
+            ),
+            child: NavigationBar(
+              selectedIndex: index,
+              onDestinationSelected: _select,
+              destinations: [
+                for (final tab in _tabs)
+                  NavigationDestination(
+                    icon: Icon(tab.icon),
+                    selectedIcon: Icon(tab.selectedIcon),
+                    label: tab.label,
+                  ),
+              ],
+            ),
+          ),
+        );
+    });
+  }
+}
+
+class _Tab {
+  _Tab(this.label, this.icon, this.selectedIcon, this.builder);
+  final String label;
+  final IconData icon;
+  final IconData selectedIcon;
+  final Widget Function() builder;
 }

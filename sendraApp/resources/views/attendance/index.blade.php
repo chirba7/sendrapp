@@ -10,17 +10,19 @@
         <div class="col-md-3"><label for="status" class="form-label">Statut</label><select id="status" name="status" class="form-select"><option value="">Tous les statuts</option>@foreach($statuses + ['incomplete'=>'Sans départ'] as $key => $label)<option value="{{$key}}" @selected(request('status') === $key)>{{$label}}</option>@endforeach</select></div>
         <div class="col-md-3"><button class="btn btn-success">Afficher</button></div>
     </div></form>
-    <div class="card-style table-responsive"><table class="table"><thead><tr><th>Employé / site</th><th>Service prévu</th><th>Arrivée</th><th>Statut</th><th>Départ</th><th>Départ anticipé</th></tr></thead><tbody>
+    <div class="card-style table-responsive"><table class="table"><thead><tr><th>Employé / site</th><th>Service prévu</th><th>Début de travail</th><th>Statut</th><th>Début de pause</th><th>Fin de pause</th><th>Fin de travail</th><th>Départ anticipé</th></tr></thead><tbody>
     @forelse($sessions as $session)
     <tr>
         <td>{{$session->user->first_name}} {{$session->user->last_name}}<br><small>{{$session->schedule_snapshot['name']}}</small></td>
         <td>{{$session->scheduled_start->setTimezone($session->timezone)->format('d/m H:i')}} – {{$session->scheduled_end->setTimezone($session->timezone)->format('d/m H:i')}}<br><small>{{$session->timezone}}</small></td>
         <td>{{$session->arrived_at->setTimezone($session->timezone)->format('d/m H:i:s')}}<br><small>Distance : {{$session->arrival_position['distance_meters']}} m</small></td>
         <td><span class="badge {{$session->arrival_status === 'late' ? 'bg-warning text-dark' : 'bg-success'}}">{{$statuses[$session->arrival_status]}}</span>@if($session->late_minutes > 0)<br><small>Écart réel : {{$session->late_minutes}} min</small>@endif</td>
+        <td>{{$session->break_started_at?->setTimezone($session->timezone)->format('d/m H:i:s') ?? '—'}}</td>
+        <td>{{$session->break_ended_at?->setTimezone($session->timezone)->format('d/m H:i:s') ?? '—'}}</td>
         <td>@if($session->departed_at){{$session->departed_at->setTimezone($session->timezone)->format('d/m H:i:s')}}@else<span class="text-muted">Sans départ</span>@endif</td>
         <td>{{$session->early_departure_minutes ? $session->early_departure_minutes.' min' : '—'}}</td>
     </tr>
-    @empty<tr><td colspan="6">Aucun pointage pour ces critères. L’absence d’un pointage ne constitue pas à elle seule une absence validée.</td></tr>@endforelse
+    @empty<tr><td colspan="8">Aucun pointage pour ces critères. L’absence d’un pointage ne constitue pas à elle seule une absence validée.</td></tr>@endforelse
     </tbody></table>{{$sessions->links()}}</div>
 </div></section>
 @endsection

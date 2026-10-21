@@ -15,6 +15,8 @@ class TextFieldOtp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final availableWidth = MediaQuery.sizeOf(context).width - 48;
+    final fieldWidth = ((availableWidth - 60) / 6).clamp(32.0, 50.0);
     return PinCodeTextField(
       controller: controller,
       appContext: context,
@@ -30,7 +32,7 @@ class TextFieldOtp extends StatelessWidget {
         activeColor: CustomColor.gray,
         inactiveColor: CustomColor.gray,
         fieldHeight: 52,
-        fieldWidth: 50,
+        fieldWidth: fieldWidth,
         activeFillColor: Colors.transparent,
       ),
       onChanged: (String value) {},

@@ -75,10 +75,8 @@ class _InfractionListPageState extends State<InfractionListPage> {
       appBar: AppBar(
         title: Text(
           'Liste des Infractions',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          style: TextStyle(fontWeight: FontWeight.bold),
         ),
-        backgroundColor: Colors.green[700],
-        iconTheme: IconThemeData(color: Colors.white),
       ),
       body: _isLoading
           ? Center(

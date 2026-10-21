@@ -59,7 +59,9 @@ class ResultatEnvoi {
 class PendingSignalement {
   final String uuid;
   final String titre;
+  final String description;
   final String commune;
+  final String adressePrecise;
   final double? latitude;
   final double? longitude;
   final List<PhotoSignalement> photos;
@@ -68,7 +70,9 @@ class PendingSignalement {
   PendingSignalement({
     required this.uuid,
     required this.titre,
+    required this.description,
     required this.commune,
+    required this.adressePrecise,
     required this.latitude,
     required this.longitude,
     required this.photos,
@@ -78,7 +82,9 @@ class PendingSignalement {
   Map<String, dynamic> toJson() => {
         'uuid': uuid,
         'titre': titre,
+        'description': description,
         'commune': commune,
+        'adresse_precise': adressePrecise,
         'latitude': latitude,
         'longitude': longitude,
         'createdAt': createdAt,
@@ -89,11 +95,14 @@ class PendingSignalement {
       PendingSignalement(
         uuid: json['uuid'] as String,
         titre: json['titre'] as String? ?? '',
+        description: json['description'] as String? ?? '',
         commune: json['commune'] as String? ?? '',
+        adressePrecise: json['adresse_precise'] as String? ?? '',
         latitude: (json['latitude'] as num?)?.toDouble(),
         longitude: (json['longitude'] as num?)?.toDouble(),
         createdAt: json['createdAt'] as String? ?? '',
         photos: (json['photos'] as List<dynamic>? ?? [])
+            .take(1)
             .map((e) => PhotoSignalement.fromJson(e as Map<String, dynamic>))
             .toList(),
       );
@@ -192,7 +201,9 @@ class OfflineSignalementService {
             },
             body: jsonEncode({
               'titre': s.titre,
+              'description': s.description,
               'commune': s.commune,
+              'adresse_precise': s.adressePrecise,
               'latitude': s.latitude,
               'longitude': s.longitude,
               'uuid': s.uuid,
@@ -257,15 +268,20 @@ class OfflineSignalementService {
           .timeout(const Duration(seconds: 10));
       if (lieux.isEmpty) return s;
       final lieu = lieux.first;
-      final commune = (lieu.subLocality?.isNotEmpty ?? false)
-          ? lieu.subLocality!
-          : (lieu.locality ?? '');
+      final commune = lieu.locality ?? lieu.subAdministrativeArea ?? '';
       if (commune.isEmpty) return s;
+      final adresse = [lieu.street, lieu.subLocality, commune]
+          .where((part) => part != null && part.trim().isNotEmpty)
+          .map((part) => part!.trim())
+          .toSet()
+          .join(', ');
 
       final complete = PendingSignalement(
         uuid: s.uuid,
         titre: s.titre,
+        description: s.description,
         commune: commune,
+        adressePrecise: s.adressePrecise.isNotEmpty ? s.adressePrecise : adresse,
         latitude: s.latitude,
         longitude: s.longitude,
         photos: s.photos,

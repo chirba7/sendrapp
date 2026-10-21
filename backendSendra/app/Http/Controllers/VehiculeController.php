@@ -32,10 +32,10 @@ class VehiculeController extends Controller
      */
     public function update(UpdateCarPositionRequest $request, CarPosition $carPosition)
 {
-        // Le compte rendu de direction demande qu'un signalement envoyé pour
-        // approbation ne soit plus modifiable par l'agent : le verrou est posé
-        // ici, côté serveur, et pas seulement masqué dans l'application.
-        if ($carPosition->soumis_approbation_at) {
+        // Un signalement envoyé pour approbation n'est plus modifiable par
+        // l'agent (compte rendu de direction, § 04). Restreint au rôle Agent :
+        // un superviseur doit pouvoir corriger une donnée après coup.
+        if ((int) auth()->user()->role_id === 2 && $carPosition->soumis_approbation_at) {
             return response()->json([
                 'success' => false,
                 'message' => 'Ce signalement a été envoyé pour approbation : il n\'est plus modifiable.',
@@ -50,6 +50,7 @@ class VehiculeController extends Controller
         'numero_vehicule' => $request->numero_vehicule ?? $carPosition->numero_vehicule,
         'marque' => $request->marque ?? $carPosition->marque,
         'type_car' => $request->type ?? $carPosition->type_car,
+        'vehicle_kind' => $request->input('vehicle_kind', $carPosition->vehicle_kind),
         'model' => $request->model ?? $carPosition->model,
         'categorie' => $request->categorie ?? $carPosition->categorie,
         'couleur' => $request->couleur ?? $carPosition->couleur,
@@ -74,6 +75,9 @@ class VehiculeController extends Controller
     }
 
     // Mise à jour du modèle
+    if ((int) auth()->user()->role_id === 2 && !$carPosition->agent_id) {
+        $fieldsToUpdate['agent_id'] = auth()->id();
+    }
     $carPosition->update($fieldsToUpdate);
 
     return response()->json([

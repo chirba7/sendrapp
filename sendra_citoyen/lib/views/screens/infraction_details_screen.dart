@@ -12,13 +12,10 @@ class InfractionDetailPage extends StatelessWidget {
         title: Text(
           'Détails de l\'infraction',
           style: TextStyle(
-            color: Colors.white,
             fontSize: 20,
             fontWeight: FontWeight.w600,
           ),
         ),
-        backgroundColor: Colors.green[700],
-        iconTheme: IconThemeData(color: Colors.white),
         elevation: 6,
       ),
       body: SingleChildScrollView(

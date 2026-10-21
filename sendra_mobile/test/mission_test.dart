@@ -78,4 +78,31 @@ void main() {
     expect(mission.removals.single.received, isTrue);
     expect(mission.dispatches.single.poundName, 'Fourrière A');
   });
+
+  test('le réceptionniste voit un véhicule non enlevé sans enlèvement', () {
+    final mission = Mission.fromJson({
+      'id': 21,
+      'type': 'programmee',
+      'status': 'en_reception',
+      'is_receiver': true,
+      'removal_validated': true,
+      'reception_checked_in': false,
+      'vehicles': [
+        {
+          'id': 42,
+          'label': 'Renault Clio',
+          'plate': 'DK-1234-AA',
+          'non_removal_reason': 'Véhicule absent sur place',
+        },
+      ],
+      'removals': [],
+    });
+
+    expect(mission.isReceiver, isTrue);
+    expect(mission.removalValidated, isTrue);
+    expect(mission.completed, isFalse);
+    expect(mission.removals, isEmpty);
+    expect(
+        mission.vehicles.single.nonRemovalReason, 'Véhicule absent sur place');
+  });
 }

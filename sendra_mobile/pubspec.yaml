@@ -75,6 +75,20 @@ flutter:
     - assets/images/bg/
     - assets/images/people/
     - assets/images/country/
+
+  # Police Inter embarquée (plus de téléchargement à l'exécution).
+  fonts:
+    - family: Inter
+      fonts:
+        - asset: assets/fonts/Inter-Regular.ttf
+        - asset: assets/fonts/Inter-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/Inter-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/Inter-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/Inter-ExtraBold.ttf
+          weight: 800
     
 
   # To add assets to your application, add an assets section, like this:

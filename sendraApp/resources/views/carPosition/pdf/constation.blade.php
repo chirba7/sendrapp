@@ -160,9 +160,17 @@
                 <th>ENTRETIEN:</th>
                 <td>{{$carPosition->entretien}}</td>
                 <th>AGENT:</th>
-                <td>{{$carPosition->agent->first_name}} {{$carPosition->agent->last_name}}</td>
+                <td>{{ $carPosition->agent?->first_name }} {{ $carPosition->agent?->last_name }}</td>
             </tr>
         </table>
+        <p><strong>Explication :</strong> {{ $carPosition->explication_infraction ?: 'Non renseignée' }}</p>
+        <p><strong>Pièces manquantes :</strong> {{ $carPosition->pieces_manquantes ?: 'Aucune précisée' }}</p>
+        <p><strong>État de l’approbation :</strong>
+            {{ $carPosition->etat === 'REJETE' ? 'Refusé' : ($carPosition->is_approve ? 'Approuvé' : 'En attente') }}
+            @if($carPosition->motife_approbation) — {{ $carPosition->motife_approbation }} @endif
+        </p>
+        <p><strong>Photos du citoyen :</strong> {{ $carPosition->photo->where('position', '!=', 'agent_constat')->count() }} ·
+           <strong>Photos de l’agent :</strong> {{ $carPosition->photo->where('position', 'agent_constat')->count() }}</p>
 
         <div class="footer">
             PROCEDURES D'INFRACTIONS: FICHE DE SIGNALAMENT AU STATIONNEMENT

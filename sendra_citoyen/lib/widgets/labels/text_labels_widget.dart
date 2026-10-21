@@ -25,7 +25,7 @@ class TextLabelsWidget extends StatelessWidget {
             child: Text(
               textLabels,
               style: TextStyle(
-                  color: textColor, fontSize: 18, fontWeight: FontWeight.w700),
+                  color: textColor, fontSize: 16, fontWeight: FontWeight.w700),
             ),
           )
         ],

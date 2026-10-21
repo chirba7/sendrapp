@@ -20,6 +20,7 @@
             <div class="auth-cover-wrapper bg-success-100">
                 <div class="auth-cover">
                     <div class="title text-center">
+                        <span class="auth-logo"><img src="{{asset('img/EPAVIE.png')}}" alt="epaVie" height="70"></span>
                         <h1 class="text-success mb-10">Bienvenue</h1>
                         <p class="text-medium">
                             Connectez-vous à votre compte existant pour continuer.
@@ -59,7 +60,7 @@
                             <div class="col-12">
                                 <div class="input-style-1">
                                     <label>Mot de passe</label>
-                                    <input type="password" name="password" class="form-control" placeholder="Password">
+                                    <input type="password" name="password" class="form-control" placeholder="Votre mot de passe">
                                     @error('password')
                                     <div class="text-danger">{{ $message }}</div>
                                     @enderror

@@ -25,10 +25,10 @@ class InfractionController extends Controller
 
    public function update(InfractionRequest $request, CarPosition $carPosition)
  {
-        // Le compte rendu de direction demande qu'un signalement envoyé pour
-        // approbation ne soit plus modifiable par l'agent : le verrou est posé
-        // ici, côté serveur, et pas seulement masqué dans l'application.
-        if ($carPosition->soumis_approbation_at) {
+        // Un signalement envoyé pour approbation n'est plus modifiable par
+        // l'agent (§ 04 du compte rendu). Restreint au rôle Agent : un
+        // superviseur doit pouvoir corriger après coup.
+        if ((int) auth()->user()->role_id === 2 && $carPosition->soumis_approbation_at) {
             return response()->json([
                 'success' => false,
                 'message' => 'Ce signalement a été envoyé pour approbation : il n\'est plus modifiable.',
@@ -39,8 +39,12 @@ class InfractionController extends Controller
     // Mise à jour des champs simples
     $carPosition->adresse_precise = $request->input('adresse_precise');
     $carPosition->motif_infraction = $request->input('motif_infraction');
-    // Zone de texte justifiant le motif choisi dans la liste.
+    // Zone de texte justifiant le motif choisi : on conserve la valeur
+    // existante si le client ne l'envoie pas, pour ne pas l'effacer.
     $carPosition->explication_infraction = $request->input('explication_infraction', $carPosition->explication_infraction);
+    if ((int) auth()->user()->role_id === 2 && !$carPosition->agent_id) {
+        $carPosition->agent_id = auth()->id();
+    }
 
     // Correction API-H-4 : la colonne `lieu` est NOT NULL en base ; ne
     // l'assigner que si le client l'a réellement envoyé, sinon `input()`

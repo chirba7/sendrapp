@@ -17,6 +17,7 @@ class InfractionResource extends JsonResource
         return [
             'adresse_precise' => $this->adresse_precise,
             'motif_infraction' => $this->motif_infraction,
+            'explication_infraction' => $this->explication_infraction,
             'lieu' => $this->lieu,
             'nuit' => $this->nuit,
             'pluie' => $this->pluie,

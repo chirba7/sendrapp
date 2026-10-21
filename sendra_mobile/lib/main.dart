@@ -3,48 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:walletium/routes/routes.dart';
 import 'package:walletium/services/offline_signalement_service.dart';
 import 'firebase_options.dart';
+import 'utils/app_prefs.dart';
 import 'utils/sendra_theme.dart';
-
-// Observer pour les routes
-class RouteObserverMiddleware extends GetMiddleware {
-  @override
-  RouteSettings? redirect(String? route) {
-    return null; // Ne pas rediriger, juste observer
-  }
-
-  @override
-  GetPageBuilder? onPageBuildStart(GetPageBuilder? page) {
-    saveLastRoute(Get.currentRoute);
-    return page;
-  }
-}
-
-Future<void> saveLastRoute(String route) async {
-  if (route != Routes.signInScreen) {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('lastRoute', route);
-  }
-}
-
-Future<String> getInitialRoute() async {
-  final prefs = await SharedPreferences.getInstance();
-  final token = prefs.getString('token');
-  final lastRoute = prefs.getString('lastRoute');
-
-  if (token != null && token.isNotEmpty) {
-    if (lastRoute != null &&
-        lastRoute.isNotEmpty &&
-        lastRoute != Routes.signInScreen) {
-      return lastRoute;
-    }
-    return Routes.bottomNavigationScreen;
-  }
-  return Routes.signInScreen;
-}
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -53,52 +16,57 @@ void main() async {
     DeviceOrientation.portraitDown,
     DeviceOrientation.portraitUp,
   ]);
+  SystemChrome.setSystemUIOverlayStyle(SendraTheme.overlayGreen);
 
-  SystemChrome.setSystemUIOverlayStyle(
-      const SystemUiOverlayStyle(statusBarColor: Colors.transparent));
+  // Firebase et les préférences sont chargés en parallèle : le splash natif
+  // reste affiché pendant ce temps, sans écran blanc intermédiaire.
+  await Future.wait([
+    Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform),
+    AppPrefs.init(),
+  ]);
 
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+  runApp(const MyApp());
 
   // Renvoie les signalements créés hors ligne dès qu'une connexion est
-  // disponible, et à chaque retour de réseau ensuite.
-  OfflineSignalementService.instance.demarrerSynchroAuto();
-
-  runApp(const MyApp(initialRoute: Routes.splashScreen));
+  // disponible — démarré après le premier rendu pour ne pas le retarder.
+  WidgetsBinding.instance.addPostFrameCallback(
+    (_) => OfflineSignalementService.instance.demarrerSynchroAuto(),
+  );
 }
 
 class MyApp extends StatelessWidget {
-  final String initialRoute;
-
-  const MyApp({Key? key, required this.initialRoute}) : super(key: key);
+  const MyApp({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     return ScreenUtilInit(
       designSize: const Size(414, 896),
+      minTextAdapt: true,
       builder: (_, child) => GetMaterialApp(
         debugShowCheckedModeBanner: false,
+        title: 'epaVie',
         theme: SendraTheme.light,
-        initialRoute: initialRoute,
+        initialRoute: Routes.splashScreen,
         getPages: Routes.list,
-        navigatorObservers: [
-          GetObserver(
-            (route) {
-              if (route != null &&
-                  route.isBottomSheet != true &&
-                  route.isDialog != true) {
-                saveLastRoute(route.current);
-              }
-            },
-          ),
-        ],
-        navigatorKey: Get.key,
+        // Transition unique, courte et fluide pour toutes les pages.
+        defaultTransition: Transition.cupertino,
+        transitionDuration: const Duration(milliseconds: 280),
+        // Remarque : l'ancien GetObserver écrivait la route courante dans
+        // SharedPreferences à CHAQUE navigation (écriture disque sur le
+        // thread UI) alors que cette valeur n'était plus jamais relue.
         builder: (context, widget) {
-          ScreenUtil.init(context);
+          // Respecte la taille de texte du téléphone, dans une plage qui
+          // ne casse pas les mises en page.
+          final mq = MediaQuery.of(context);
           return MediaQuery(
-              data: MediaQuery.of(context).copyWith(textScaleFactor: 1.0),
-              child: widget!);
+            data: mq.copyWith(
+              textScaler: mq.textScaler.clamp(
+                minScaleFactor: 0.9,
+                maxScaleFactor: 1.15,
+              ),
+            ),
+            child: widget!,
+          );
         },
       ),
     );

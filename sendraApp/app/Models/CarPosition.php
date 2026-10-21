@@ -27,7 +27,11 @@ class CarPosition extends Model
         'vehicule_immerge', 'defauts_techniques_irreversibles',
         'vehicule_non_identifiable', 'vehicule_brule', 'chassis_non_reparable',
         'sticker', 'nuit', 'pluie', 'dommage_image',
+        'vehicle_kind', 'explication_infraction', 'pieces_manquantes',
+        'non_removal_reason', 'non_removed_at',
     ];
+
+    protected $casts = ['non_removed_at' => 'datetime'];
 
     public function photo()
     {

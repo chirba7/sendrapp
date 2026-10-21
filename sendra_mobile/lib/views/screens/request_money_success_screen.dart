@@ -20,10 +20,8 @@ class RequestMoneySuccessScreen extends StatelessWidget {
         title: const Text(
           Strings.requestMoney,
           style: TextStyle(
-            color: CustomColor.whiteColor,
-          ),
+            ),
         ),
-        backgroundColor: CustomColor.primaryColor,
       ),
       body: _bodyWidget(context),
     );

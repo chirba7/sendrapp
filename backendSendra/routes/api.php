@@ -68,6 +68,7 @@ Route::middleware('jwt.auth')->group(function () {
     Route::post('/logout', [AuthControllerApi::class, 'logout']);
     Route::post('/refresh', [AuthControllerApi::class, 'refresh']);
     Route::post('/me', [AuthControllerApi::class, 'me']);
+    Route::post('/profile', [AuthControllerApi::class, 'updateProfile']);
     Route::post('/delete-user', [AuthControllerApi::class, 'deleteUser']);
     Route::put('/change-password', [AuthControllerApi::class, 'changePassword']);
 
@@ -100,6 +101,7 @@ Route::middleware('jwt.auth')->group(function () {
 
         // Dommages routes
         Route::put('/enregistrerDommages/{carPosition}', [DommagesController::class, 'enregistrerDommages']);
+        Route::post('/constatation/{carPosition}/photos', [DommagesController::class, 'ajouterPhoto']);
         Route::get('/voirDommages/{vehicleId}', [DommagesController::class, 'voirDommages']);
 
         // Statistiques
@@ -112,6 +114,7 @@ Route::middleware('jwt.auth')->group(function () {
         Route::post('/missions/{mission}/pointer', [MissionController::class, 'checkIn'])
             ->middleware('throttle:10,1');
         Route::post('/missions/{mission}/enlevements', [MissionController::class, 'storeRemoval']);
+        Route::post('/missions/{mission}/vehicules/{vehicle}/non-enleve', [MissionController::class, 'markNotRemoved']);
         Route::post('/missions/{mission}/enlevements/{removal}/modifier', [MissionController::class, 'updateRemoval']);
         Route::post('/missions/{mission}/camions/{truck}/destination', [MissionController::class, 'storeTruckDestination']);
         Route::post('/missions/{mission}/valider-enlevement', [MissionController::class, 'validateRemoval']);
