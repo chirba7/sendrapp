@@ -17,7 +17,7 @@
     <link rel="stylesheet" href="{{asset('assets/css/main.css')}}" />
     {{-- Rafraîchissement visuel : surcharges de main.css, chargées après lui.
          Retirer cette ligne restaure l'apparence précédente. --}}
-    <link rel="stylesheet" href="{{asset('assets/css/sendra-refresh.css')}}?v=1" />
+    <link rel="stylesheet" href="{{asset('assets/css/sendra-refresh.css')}}?v=2" />
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <style>
         #signature-pad {
@@ -33,7 +33,7 @@
     </style>
 </head>
 
-<body>
+<body class="@yield('body_class')">
     <!-- ======== Preloader =========== -->
     <div id="preloader">
         <div class="spinner"></div>

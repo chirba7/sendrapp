@@ -17,8 +17,6 @@ class WalletScreen extends StatelessWidget {
       backgroundColor: CustomColor.primaryBackgroundColor,
       drawer: const DrawerScreen(),
       appBar: AppBar(
-        backgroundColor: CustomColor.primaryColor,
-        iconTheme: const IconThemeData(color: CustomColor.whiteColor),
         title: const Text(Strings.wallet),
         elevation: 0,
       ),

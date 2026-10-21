@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\AttendanceAssignment;
 use App\Models\AttendanceSession;
 use App\Services\AttendanceService;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Crypt;
@@ -24,7 +25,9 @@ class AttendanceController extends Controller
         return response()->json([
             'assignment' => AttendanceAssignment::with('site')->where('user_id', $request->user()->id)
                 ->where('active', true)->whereHas('site', fn ($q) => $q->where('active', true))->first(),
-            'open_session' => AttendanceSession::with('site')->where('user_id', $request->user()->id)->whereNull('departed_at')->first(),
+            'open_session' => AttendanceSession::with('site')->where('user_id', $request->user()->id)
+                ->whereNull('departed_at')->orderByDesc('arrived_at')->get()
+                ->first(fn ($session) => $session->isCurrentAt(CarbonImmutable::now('UTC'))),
             'server_time' => now('UTC')->toIso8601String(),
         ]);
     }
@@ -39,7 +42,7 @@ class AttendanceController extends Controller
     {
         $this->authorizeEmployee($request);
         $data = $request->validate([
-            'request_id' => ['required', 'uuid'], 'type' => ['required', 'in:arrival,departure'],
+            'request_id' => ['required', 'uuid'], 'type' => ['required', 'in:arrival,departure,break_start,break_end'],
             'device_id' => ['required', 'uuid'], 'challenge_id' => ['required', 'uuid'],
             'device_signature' => ['required', 'regex:/^[0-9a-f]{64}$/'],
             'site_id' => ['required', 'integer', 'exists:attendance_sites,id'],
@@ -67,8 +70,13 @@ class AttendanceController extends Controller
             if ($challenge->consumed_at) {
                 $previous = AttendanceSession::where('user_id', $request->user()->id)
                     ->where(fn ($query) => $query->where('arrival_request_id', $data['request_id'])
-                        ->orWhere('departure_request_id', $data['request_id']))->first();
-                abort_unless($previous && $previous->attendance_site_id == $data['site_id'],
+                        ->orWhere('departure_request_id', $data['request_id'])
+                        ->orWhere('break_start_request_id', $data['request_id'])
+                        ->orWhere('break_end_request_id', $data['request_id']))->first();
+                $column = ['arrival' => 'arrival_request_id', 'departure' => 'departure_request_id',
+                    'break_start' => 'break_start_request_id', 'break_end' => 'break_end_request_id'][$data['type']];
+                abort_unless($previous && $previous->attendance_site_id == $data['site_id']
+                    && $previous->{$column} === $data['request_id'],
                     403, 'Défi du téléphone déjà utilisé.');
                 return response()->json(['success' => true, 'session' => $previous]);
             }

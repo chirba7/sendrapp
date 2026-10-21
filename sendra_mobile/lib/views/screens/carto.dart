@@ -38,13 +38,12 @@ class NavigationScreen extends StatelessWidget {
         title: Text(
           'Navigation vers l\'épave',
           style: TextStyle(
-            color: Colors.white, // Couleur du texte en blanc
+            // Couleur du texte en blanc
             fontWeight: FontWeight.bold,
             fontSize: 22,
           ),
         ),
-        backgroundColor: Colors.green[800], // Couleur personnalisée de la barre d'app
-        iconTheme: IconThemeData(color: Colors.white),
+        // Couleur personnalisée de la barre d'app
         elevation: 8, // Ombre légère sous la barre d'app
       ),
       body: Padding(

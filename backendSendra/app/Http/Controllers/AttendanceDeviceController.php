@@ -41,7 +41,7 @@ class AttendanceDeviceController extends Controller
     {
         $data = $request->validate([
             'device_id' => ['required', 'uuid'], 'request_id' => ['required', 'uuid'],
-            'purpose' => ['required', 'in:arrival,departure'],
+            'purpose' => ['required', 'in:arrival,departure,break_start,break_end'],
         ]);
         abort_unless($request->user()->is_enabled && !$request->user()->deleted
             && $request->user()->attendanceEnrollment()->where('status', 'approved')->exists(),

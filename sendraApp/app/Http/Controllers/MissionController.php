@@ -15,9 +15,11 @@ class MissionController extends Controller
 {
     public function index()
     {
+        $history = request()->boolean('historique');
         $missions = Mission::with(['agents', 'vehicles', 'creator', 'commune', 'trucks'])
+            ->where('status', $history ? '=' : '!=', 'terminee')
             ->orderByDesc('scheduled_at')->paginate(15);
-        return view('missions.index', compact('missions'));
+        return view('missions.index', compact('missions', 'history'));
     }
 
     public function create()
@@ -142,7 +144,7 @@ class MissionController extends Controller
             ->all();
 
         $mission->fill([
-            'title' => $data['title'] ?: ($commune ? 'Mission '.$commune->nomCommune : 'Mission directe'),
+            'title' => $data['title'] ?: ($commune ? 'Mission '.$commune->nomCommune : 'Mission ponctuelle'),
             'commune_id' => $commune?->id,
             'type' => $data['type'],
             'status' => $mission->status ?: 'planifiee',

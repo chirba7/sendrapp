@@ -26,6 +26,7 @@ class InfractionRequest extends FormRequest
         return [
             'adresse_precise' => 'required|string|max:255',
             'motif_infraction' => 'required|string|max:255',
+            'explication_infraction' => 'nullable|string|max:2000',
             // Correction API-H-4 : la colonne DB est NOT NULL (avec défaut
             // 'PUBLIC') — 'nullable' autorisait un `null` explicite envoyé
             // par le client et faisait planter l'insertion SQL. 'sometimes'

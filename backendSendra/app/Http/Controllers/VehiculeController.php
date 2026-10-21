@@ -32,6 +32,7 @@ class VehiculeController extends Controller
      */
     public function update(UpdateCarPositionRequest $request, CarPosition $carPosition)
 {
+    abort_if((int) auth()->user()->role_id === 2 && !empty($carPosition->dommage_image), 403, 'Signalement transmis : modification interdite.');
     // Validation incluse dans UpdateCarPositionRequest
 
     // Mise à jour des champs principaux
@@ -39,6 +40,7 @@ class VehiculeController extends Controller
         'numero_vehicule' => $request->numero_vehicule ?? $carPosition->numero_vehicule,
         'marque' => $request->marque ?? $carPosition->marque,
         'type_car' => $request->type ?? $carPosition->type_car,
+        'vehicle_kind' => $request->input('vehicle_kind', $carPosition->vehicle_kind),
         'model' => $request->model ?? $carPosition->model,
         'categorie' => $request->categorie ?? $carPosition->categorie,
         'couleur' => $request->couleur ?? $carPosition->couleur,
@@ -63,6 +65,9 @@ class VehiculeController extends Controller
     }
 
     // Mise à jour du modèle
+    if ((int) auth()->user()->role_id === 2 && !$carPosition->agent_id) {
+        $fieldsToUpdate['agent_id'] = auth()->id();
+    }
     $carPosition->update($fieldsToUpdate);
 
     return response()->json([

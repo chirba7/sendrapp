@@ -37,9 +37,20 @@ use Illuminate\Support\Facades\Route;
 Route::middleware([
     'auth:sanctum', 'notArchived', 'isActived',
     config('jetstream.auth_session'),
-    'role:1,2,3,4',
+    // 7 = Operateur : accède au tableau de bord et aux missions, pas aux comptes.
+    'role:1,2,3,4,7',
 ])->group(function () {
+    Route::get('/dashboard/signalement/signales', [CarPositionController::class, 'index'])->name('signales');
+    Route::get('/dashboard/signalement/enleves', [CarPositionController::class, 'index2'])->name('enleves');
+    Route::get('/dashboard/signalement/encours', [CarPositionController::class, 'index3'])->name('encours');
+    Route::get('/dashboard/signalement/non-resolus', [CarPositionController::class, 'nonResolus'])->name('non_resolus');
+    Route::get('/dashboard/signalement/{carPosition}', [CarPositionController::class, 'show'])->name('details');
+    Route::get('/dashboard/locatlisation/{carPosition}', [CarPositionController::class, 'locatlisation'])->name('locatlisation');
+    Route::get('/signalements/{carPosition}/pdf', [CarPositionController::class, 'pdf'])->name('pdf');
+    Route::get('/signalements/{carPosition}/pdf_constation', [CarPositionController::class, 'pdf_constation'])->name('pdf_constation');
     Route::get('/dashboard', [CarPositionController::class, 'infos'])->name('dashboard');
+    // Même écran que /dashboard : doit suivre les mêmes rôles.
+    Route::get('/', [CarPositionController::class, 'infos']);
 });
 
 Route::middleware([
@@ -47,29 +58,19 @@ Route::middleware([
     config('jetstream.auth_session'),
     'role:1,2,3,4',
 ])->group(function () {
-    Route::get('/',  [CarPositionController::class, 'infos']);
 
-    Route::patch('/update/profil', [UserController::class, 'update'])->name('update.profil');
-    Route::patch('/update/pass', [UserController::class, 'updatepass'])->name('update.pass');
 
-    Route::get('/dashboard/signalement/signales', [CarPositionController::class, 'index'])->name('signales');
-    Route::get('/dashboard/signalement/enleves', [CarPositionController::class, 'index2'])->name('enleves');
-    Route::get('/dashboard/signalement/encours', [CarPositionController::class, 'index3'])->name('encours');
     Route::get('/dashboard/cartographie', [CarPositionController::class, 'maps'])->name('maps');
-    Route::get('/dashboard/signalement/{carPosition}', [CarPositionController::class, 'show'])->name('details');
-    Route::patch('/dashboard/vehicule/{carPosition}', [CarPositionController::class, 'vehicule'])->name('vehicule');
-    Route::patch('/dashboard/enlevement/{carPosition}', [CarPositionController::class, 'enlevement'])->name('enlevement');
-    Route::get('/dashboard/locatlisation/{carPosition}', [CarPositionController::class, 'locatlisation'])->name('locatlisation');
-    Route::patch('/dashboard/infraction/{carPosition}', [CarPositionController::class, 'infraction'])->name('infraction');
-    Route::get('/signalements/{carPosition}/pdf', [CarPositionController::class, 'pdf'])->name('pdf');
-    Route::get('/signalements/{carPosition}/pdf_constation', [CarPositionController::class, 'pdf_constation'])->name('pdf_constation');
+    Route::patch('/dashboard/vehicule/{carPosition}', [CarPositionController::class, 'vehicule'])->name('vehicule')->middleware('role:1,2');
+    Route::patch('/dashboard/enlevement/{carPosition}', [CarPositionController::class, 'enlevement'])->name('enlevement')->middleware('role:1,2');
+    Route::patch('/dashboard/infraction/{carPosition}', [CarPositionController::class, 'infraction'])->name('infraction')->middleware('role:1,2');
     // Route::get('/modifier/motDePasse', [UserController::class, 'modifierMotDePasse']);
 
 
     // Correction WEB-L-4 : /signature (page autonome, jamais liée depuis
     // aucun menu/vue) supprimée — dupliquait l'onglet signature déjà
     // intégré dans show.blade.php, qui utilise signature.store ci-dessous.
-    Route::post('/signature/store/{carPosition}', [CarPositionController::class, 'signaturestore'])->name('signature.store');
+    Route::post('/signature/store/{carPosition}', [CarPositionController::class, 'signaturestore'])->name('signature.store')->middleware('role:1,2');
 });
 
 // Correction ACL : l'approbation est réservée à Admin/Autorité commune/
@@ -82,6 +83,7 @@ Route::middleware([
     config('jetstream.auth_session'),
     'role:1,3,4',
 ])->group(function () {
+    Route::get('/dashboard/approbations', [CarPositionController::class, 'approbations'])->name('approbations.index');
     Route::patch('/dashboard/approbation/{carPosition}', [CarPositionController::class, 'approbation'])->name('approbation');
 });
 
@@ -98,6 +100,7 @@ Route::middleware([
     Route::get('/dashboard/comptes/agents', [UserController::class, 'agents'])->name('agents');
     Route::get('/dashboard/comptes/autorites', [UserController::class, 'autorites'])->name('autorites');
     Route::get('/dashboard/comptes/utilisateurs', [UserController::class, 'utilisateurs'])->name('utilisateurs');
+    Route::get('/dashboard/comptes/operateurs', [UserController::class, 'operateurs'])->name('operateurs');
     // Correction WEB-M-1 : route déclarée avant le wildcard {user} ci-dessous,
     // sinon "citoyens" serait interprété comme un id de compte.
     Route::get('/dashboard/comptes/citoyens', [UserController::class, 'citoyens'])->name('citoyens');
@@ -126,13 +129,6 @@ Route::middleware([
             'edit'=>'pounds.edit','update'=>'pounds.update','destroy'=>'pounds.destroy',
         ]);
 
-    Route::get('/dashboard/missions', [MissionController::class, 'index'])->name('missions.index');
-    Route::get('/dashboard/missions/creer', [MissionController::class, 'create'])->name('missions.create');
-    Route::post('/dashboard/missions', [MissionController::class, 'store'])->name('missions.store');
-    Route::get('/dashboard/missions/{mission}', [MissionController::class, 'show'])->name('missions.show');
-    Route::get('/dashboard/missions/{mission}/modifier', [MissionController::class, 'edit'])->name('missions.edit');
-    Route::put('/dashboard/missions/{mission}', [MissionController::class, 'update'])->name('missions.update');
-    Route::delete('/dashboard/missions/{mission}', [MissionController::class, 'destroy'])->name('missions.destroy');
 
     Route::get('/dashboard/comptes/{user}', [UserController::class, 'show'])->name('modifier');
     Route::patch('/dashboard/comptes/{user}', [UserController::class, 'modifier'])->name('modifier.compte');
@@ -163,10 +159,41 @@ Route::middleware([
 Route::middleware([
     'auth:sanctum', 'notArchived',
     config('jetstream.auth_session'),
-    'role:1,2,3,4',
+    // 7 = Operateur : c'est la page de changement de mot de passe imposé à la
+    // première connexion. Sans lui, tout compte Operateur tombe en 403 juste
+    // après s'être connecté, sans aucun moyen d'aller plus loin.
+    'role:1,2,3,4,7',
 ])->group(function () {
     Route::get('/modifier/motDePasse', [UserController::class, 'modifierMotDePasse']);
     Route::patch('/motDePasse', [UserController::class, 'modifierMotDePasse2'])->name('motDePasse');
 });
 
 // mame.bousso@sendra.sn
+
+// Son propre profil et son mot de passe : accessibles à tout compte du staff,
+// y compris l'Operateur, qui n'a pas accès au reste de ce groupe.
+Route::middleware([
+    'auth:sanctum', 'notArchived',
+    config('jetstream.auth_session'),
+    'role:1,2,3,4,7',
+])->group(function () {
+    Route::patch('/update/profil', [UserController::class, 'update'])->name('update.profil');
+    Route::patch('/update/pass', [UserController::class, 'updatepass'])->name('update.pass');
+});
+
+// Missions : Admin et Operateur. Le compte rendu de direction confie la
+// création des missions à l'Operateur ; le reste de son périmètre est à
+// préciser, d'où un groupe dédié plutôt qu'un ajout au groupe Admin.
+Route::middleware([
+    'auth:sanctum', 'notArchived', 'isActived',
+    config('jetstream.auth_session'),
+    'role:1,7',
+])->group(function () {
+    Route::get('/dashboard/missions', [MissionController::class, 'index'])->name('missions.index');
+    Route::get('/dashboard/missions/creer', [MissionController::class, 'create'])->name('missions.create');
+    Route::post('/dashboard/missions', [MissionController::class, 'store'])->name('missions.store');
+    Route::get('/dashboard/missions/{mission}', [MissionController::class, 'show'])->name('missions.show');
+    Route::get('/dashboard/missions/{mission}/modifier', [MissionController::class, 'edit'])->name('missions.edit');
+    Route::put('/dashboard/missions/{mission}', [MissionController::class, 'update'])->name('missions.update');
+    Route::delete('/dashboard/missions/{mission}', [MissionController::class, 'destroy'])->name('missions.destroy');
+});

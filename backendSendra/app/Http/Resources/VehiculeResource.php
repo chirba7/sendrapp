@@ -18,6 +18,7 @@ class VehiculeResource extends JsonResource
             'numero' => $this->numero_vehicule ? $this->numero_vehicule : null,
             'marque' => $this->marque ? $this->marque : null,
             'type' => $this->type_car ? $this->type_car : null,
+            'vehicle_kind' => $this->vehicle_kind,
             'model' => $this->model ? $this->model : null,
             'categorie' => $this->categorie ? $this->categorie : null,
             'couleur' => $this->couleur ? $this->couleur : null,

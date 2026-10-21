@@ -2,12 +2,30 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
-import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../utils/app_prefs.dart';
 import '../../utils/sendra_theme.dart';
-import '../../utils/session.dart';
 import '../../utils/strings.dart';
+
+/// Données de la carte gardées en mémoire pour toute la session.
+///
+/// Avant : à chaque affichage, l'écran attendait le GPS (jusqu'à 12 s) avant
+/// même de créer la carte, puis retéléchargeait tous les signalements —
+/// d'où l'impression que la carte « recharge à chaque fois ». Désormais la
+/// carte s'affiche tout de suite à la dernière position connue, avec les
+/// marqueurs déjà chargés ; la mise à jour se fait en arrière-plan.
+class _MapCache {
+  static Set<Marker> markers = const {};
+  static DateTime? fetchedAt;
+  static LatLng? userPosition;
+  static CameraPosition? camera;
+
+  static bool get isFresh =>
+      fetchedAt != null &&
+      DateTime.now().difference(fetchedAt!) < const Duration(minutes: 3);
+}
 
 class CartographyScreen extends StatefulWidget {
   const CartographyScreen({super.key});
@@ -16,19 +34,25 @@ class CartographyScreen extends StatefulWidget {
   State<CartographyScreen> createState() => _CartographyScreenState();
 }
 
-class _CartographyScreenState extends State<CartographyScreen> {
+class _CartographyScreenState extends State<CartographyScreen>
+    with AutomaticKeepAliveClientMixin {
   static const LatLng _senegalCenter = LatLng(14.4974, -14.4524);
 
   final TextEditingController _searchController = TextEditingController();
   GoogleMapController? _mapController;
-  Set<Marker> _markers = const {};
-  bool _isLoading = true;
+  LatLng? _userPosition = _MapCache.userPosition;
+  Set<Marker> _markers = _MapCache.markers;
+  bool _isLoading = !_MapCache.isFresh;
   String? _errorMessage;
+
+  @override
+  bool get wantKeepAlive => true;
 
   @override
   void initState() {
     super.initState();
-    _loadSignalements();
+    if (!_MapCache.isFresh) _loadSignalements();
+    _locateUser(recenter: _MapCache.camera == null);
   }
 
   @override
@@ -36,6 +60,50 @@ class _CartographyScreenState extends State<CartographyScreen> {
     _searchController.dispose();
     _mapController?.dispose();
     super.dispose();
+  }
+
+  Future<bool> _ensurePermission() async {
+    if (!await Geolocator.isLocationServiceEnabled()) return false;
+    var permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+    }
+    return permission != LocationPermission.denied &&
+        permission != LocationPermission.deniedForever;
+  }
+
+  void _setUserPosition(LatLng p) {
+    _MapCache.userPosition = p;
+    if (mounted) setState(() => _userPosition = p);
+  }
+
+  /// Position : d'abord la dernière connue (instantané), puis la position
+  /// précise en arrière-plan. La carte n'attend jamais le GPS.
+  Future<void> _locateUser({bool recenter = true, bool userAction = false}) async {
+    try {
+      if (!await _ensurePermission()) throw Exception();
+      final last = await Geolocator.getLastKnownPosition();
+      if (last != null) {
+        final p = LatLng(last.latitude, last.longitude);
+        _setUserPosition(p);
+        if (recenter) {
+          _mapController?.animateCamera(CameraUpdate.newLatLngZoom(p, 15));
+        }
+      }
+      final pos = await Geolocator.getCurrentPosition()
+          .timeout(const Duration(seconds: 12));
+      final p = LatLng(pos.latitude, pos.longitude);
+      _setUserPosition(p);
+      if (recenter || userAction) {
+        await _mapController?.animateCamera(CameraUpdate.newLatLngZoom(p, 15));
+      }
+    } catch (_) {
+      if (!mounted || !userAction) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text(
+            'Position indisponible. Activez la localisation pour recentrer la carte.'),
+      ));
+    }
   }
 
   Future<void> _loadSignalements() async {
@@ -46,10 +114,10 @@ class _CartographyScreenState extends State<CartographyScreen> {
       });
     }
     try {
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = await AppPrefs.init();
       final token = prefs.getString('token') ?? '';
       final endpoint =
-          await Session.isStaff() ? 'listerSignalements' : 'voirSignalements';
+          AppPrefs.isStaff ? 'listerSignalements' : 'voirSignalements';
       final response = await http.get(
         Uri.parse('${Strings.apiURI}$endpoint'),
         headers: {'Authorization': 'Bearer $token'},
@@ -83,6 +151,8 @@ class _CartographyScreenState extends State<CartographyScreen> {
           ),
         );
       }
+      _MapCache.markers = markers;
+      _MapCache.fetchedAt = DateTime.now();
       if (!mounted) return;
       setState(() {
         _markers = markers;
@@ -104,6 +174,7 @@ class _CartographyScreenState extends State<CartographyScreen> {
       };
 
   Future<void> _search() async {
+    FocusScope.of(context).unfocus();
     final query = _searchController.text.trim().toLowerCase();
     if (query.isEmpty) return;
     final matching = _markers.where((marker) {
@@ -123,149 +194,122 @@ class _CartographyScreenState extends State<CartographyScreen> {
     );
   }
 
+  CameraPosition get _initialCamera =>
+      _MapCache.camera ??
+      CameraPosition(
+        target: _userPosition ?? _senegalCenter,
+        zoom: _userPosition == null ? 6.5 : 15,
+      );
+
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     return Scaffold(
-      body: SafeArea(
-        bottom: false,
-        child: Column(
-          children: [
-            Container(
-              color: Colors.white,
-              padding: const EdgeInsets.fromLTRB(20, 14, 12, 14),
-              child: Row(
-                children: [
-                  const Expanded(
-                    child: Text(
-                      'Cartographie',
-                      style: TextStyle(
-                        color: SendraTheme.ink,
-                        fontSize: 25,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
+      appBar: AppBar(
+        centerTitle: false,
+        title: const Text('Cartographie'),
+        actions: [
+          IconButton(
+            tooltip: 'Actualiser',
+            onPressed: _isLoading ? null : _loadSignalements,
+            icon: _isLoading
+                ? const SizedBox.square(
+                    dimension: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2.2),
+                  )
+                : const Icon(Icons.refresh_rounded),
+          ),
+          const SizedBox(width: 4),
+        ],
+      ),
+      body: Stack(
+        children: [
+          // La carte est créée immédiatement, une seule fois.
+          RepaintBoundary(
+            child: GoogleMap(
+              initialCameraPosition: _initialCamera,
+              onMapCreated: (controller) => _mapController = controller,
+              onCameraMove: (position) => _MapCache.camera = position,
+              markers: _markers,
+              myLocationEnabled: _userPosition != null,
+              myLocationButtonEnabled: false,
+              zoomControlsEnabled: false,
+              mapToolbarEnabled: false,
+              compassEnabled: false,
+              buildingsEnabled: false,
+              padding: const EdgeInsets.only(top: 76, bottom: 90),
+            ),
+          ),
+          Positioned(
+            top: 12,
+            left: 16,
+            right: 16,
+            child: Material(
+              elevation: 2,
+              shadowColor: Colors.black26,
+              borderRadius: BorderRadius.circular(16),
+              child: TextField(
+                controller: _searchController,
+                textInputAction: TextInputAction.search,
+                onSubmitted: (_) => _search(),
+                decoration: InputDecoration(
+                  hintText: 'Rechercher un lieu ou une commune…',
+                  prefixIcon: const Icon(Icons.search_rounded),
+                  suffixIcon: IconButton(
+                    onPressed: _search,
+                    icon: const Icon(Icons.arrow_forward_rounded),
                   ),
-                  IconButton.filledTonal(
-                    tooltip: 'Actualiser',
-                    onPressed: _isLoading ? null : _loadSignalements,
-                    icon: const Icon(Icons.refresh_rounded),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide.none,
                   ),
-                ],
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
               ),
             ),
-            Expanded(
-              child: Stack(
-                children: [
-                  GoogleMap(
-                    initialCameraPosition: const CameraPosition(
-                      target: _senegalCenter,
-                      zoom: 6.5,
-                    ),
-                    onMapCreated: (controller) => _mapController = controller,
-                    markers: _markers,
-                    myLocationButtonEnabled: false,
-                    zoomControlsEnabled: false,
-                    mapToolbarEnabled: false,
-                    padding: const EdgeInsets.only(top: 92, bottom: 90),
-                  ),
-                  Positioned(
-                    top: 14,
-                    left: 16,
-                    right: 16,
-                    child: Material(
-                      elevation: 3,
-                      shadowColor: Colors.black26,
-                      borderRadius: BorderRadius.circular(16),
-                      child: TextField(
-                        controller: _searchController,
-                        textInputAction: TextInputAction.search,
-                        onSubmitted: (_) => _search(),
-                        decoration: InputDecoration(
-                          hintText: 'Rechercher un lieu ou une commune…',
-                          prefixIcon: const Icon(Icons.search_rounded),
-                          suffixIcon: IconButton(
-                            onPressed: _search,
-                            icon: const Icon(Icons.arrow_forward_rounded),
-                          ),
-                        ),
+          ),
+          Positioned(
+            right: 16,
+            bottom: 96,
+            child: FloatingActionButton.small(
+              heroTag: 'map-center',
+              onPressed: () => _locateUser(userAction: true),
+              backgroundColor: Colors.white,
+              foregroundColor: SendraTheme.green,
+              child: const Icon(Icons.my_location_rounded),
+            ),
+          ),
+          Positioned(
+            left: 16,
+            bottom: 96,
+            child: _legend(),
+          ),
+          if (!_isLoading && _errorMessage != null)
+            Positioned(
+              left: 24,
+              right: 24,
+              top: 84,
+              child: Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    children: [
+                      Text(_errorMessage!, textAlign: TextAlign.center),
+                      const SizedBox(height: 10),
+                      TextButton.icon(
+                        onPressed: _loadSignalements,
+                        icon: const Icon(Icons.refresh_rounded),
+                        label: const Text('Réessayer'),
                       ),
-                    ),
+                    ],
                   ),
-                  Positioned(
-                    right: 16,
-                    bottom: 92,
-                    child: FloatingActionButton.small(
-                      heroTag: 'map-center',
-                      onPressed: () => _mapController?.animateCamera(
-                        CameraUpdate.newLatLngZoom(_senegalCenter, 6.5),
-                      ),
-                      backgroundColor: Colors.white,
-                      foregroundColor: SendraTheme.green,
-                      child: const Icon(Icons.my_location_rounded),
-                    ),
-                  ),
-                  Positioned(
-                    left: 16,
-                    bottom: 92,
-                    child: _legend(),
-                  ),
-                  if (_isLoading)
-                    const Center(
-                      child: Card(
-                        child: Padding(
-                          padding: EdgeInsets.symmetric(
-                            horizontal: 22,
-                            vertical: 18,
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              SizedBox.square(
-                                dimension: 22,
-                                child:
-                                    CircularProgressIndicator(strokeWidth: 2.5),
-                              ),
-                              SizedBox(width: 12),
-                              Text('Chargement de la carte…'),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  if (!_isLoading &&
-                      (_errorMessage != null || _markers.isEmpty))
-                    Positioned(
-                      left: 24,
-                      right: 24,
-                      top: 90,
-                      child: Card(
-                        child: Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: Column(
-                            children: [
-                              Text(
-                                _errorMessage ??
-                                    'Aucun signalement récent à afficher.',
-                                textAlign: TextAlign.center,
-                              ),
-                              if (_errorMessage != null) ...[
-                                const SizedBox(height: 10),
-                                TextButton.icon(
-                                  onPressed: _loadSignalements,
-                                  icon: const Icon(Icons.refresh_rounded),
-                                  label: const Text('Réessayer'),
-                                ),
-                              ],
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                ],
+                ),
               ),
             ),
-          ],
-        ),
+        ],
       ),
     );
   }
@@ -277,12 +321,14 @@ class _CartographyScreenState extends State<CartographyScreen> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Container(
-                width: 9,
-                height: 9,
+                width: 10,
+                height: 10,
                 decoration: BoxDecoration(color: color, shape: BoxShape.circle),
               ),
-              const SizedBox(width: 7),
-              Text(label, style: const TextStyle(fontSize: 11)),
+              const SizedBox(width: 8),
+              Text(label,
+                  style: const TextStyle(
+                      fontSize: 12, fontWeight: FontWeight.w500)),
             ],
           ),
         );
@@ -292,9 +338,9 @@ class _CartographyScreenState extends State<CartographyScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            item(Colors.red, 'Signalé'),
-            item(Colors.orange, 'En cours'),
-            item(Colors.green, 'Résolu'),
+            item(SendraTheme.statusSignale, 'Signalé'),
+            item(SendraTheme.statusEnCours, 'En cours'),
+            item(SendraTheme.statusResolu, 'Résolu'),
           ],
         ),
       ),

@@ -12,6 +12,7 @@ import '../../controller/sign_in_controller.dart';
 import '../../routes/routes.dart';
 import '../../utils/session.dart';
 import '../../utils/strings.dart';
+import '../../widgets/others/auth_widgets.dart';
 
 class SignInScreen extends StatefulWidget {
   const SignInScreen({super.key});
@@ -52,9 +53,19 @@ class _SignInScreenState extends State<SignInScreen> {
     String id,
     String token,
     int? roleId,
+    String firstName,
+    String lastName,
+    String? photoUrl,
   ) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('fullName', fullName);
+    await prefs.setString('firstName', firstName);
+    await prefs.setString('lastName', lastName);
+    if (photoUrl != null) {
+      await prefs.setString('profilePhotoUrl', photoUrl);
+    } else {
+      await prefs.remove('profilePhotoUrl');
+    }
     await prefs.setString('phone', phone);
     await prefs.setString('userId', id);
     await prefs.setString('token', token);
@@ -97,9 +108,12 @@ class _SignInScreenState extends State<SignInScreen> {
           await _saveUserData(
             jsonResponse['fullName'].toString(),
             phone,
-            jsonResponse['userId'].toString(),
+            jsonResponse['id'].toString(),
             jsonResponse['token'].toString(),
             roleId,
+            jsonResponse['first_name']?.toString() ?? '',
+            jsonResponse['last_name']?.toString() ?? '',
+            jsonResponse['photo_url']?.toString(),
           );
           if (!mounted) return;
           setState(() => _isLoading = false);
@@ -209,8 +223,8 @@ class _SignInScreenState extends State<SignInScreen> {
                               textAlign: TextAlign.center,
                               style: TextStyle(
                                 color: _ink,
-                                fontSize: 30,
-                                height: 1.15,
+                                fontSize: 26,
+                                height: 1.2,
                                 fontWeight: FontWeight.w800,
                               ),
                             ),
@@ -386,29 +400,6 @@ class _SignInScreenState extends State<SignInScreen> {
                               ],
                             ),
                             const Spacer(),
-                            const SizedBox(height: 26),
-                            const Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(
-                                  Icons.verified_user_outlined,
-                                  color: _green,
-                                  size: 19,
-                                ),
-                                SizedBox(width: 8),
-                                Flexible(
-                                  child: Text(
-                                    'Espace citoyen',
-                                    textAlign: TextAlign.center,
-                                    style: TextStyle(
-                                      color: _muted,
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
                           ],
                         ),
                       ),
@@ -423,35 +414,8 @@ class _SignInScreenState extends State<SignInScreen> {
     );
   }
 
-  Widget _brand() {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(18, 22, 18, 20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: const Color(0xFFE1EBE5)),
-        boxShadow: [BoxShadow(color: _forest.withValues(alpha: .08),
-          blurRadius: 24, offset: const Offset(0, 10))],
-      ),
-      child: Column(children: [
-        Image.asset('assets/images/logo.png', height: 92, width: 270,
-          fit: BoxFit.contain),
-        const SizedBox(height: 8),
-        const Text('Sénégalaise de Déconstruction et de Recyclage Automobile',
-          textAlign: TextAlign.center,
-          style: TextStyle(color: _muted, fontSize: 10.5)),
-        const SizedBox(height: 14),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 6),
-          decoration: BoxDecoration(color: const Color(0xFFE1F3E8),
-            borderRadius: BorderRadius.circular(99)),
-          child: const Text('ESPACE CITOYEN', style: TextStyle(
-            color: _forest, fontSize: 11, fontWeight: FontWeight.w800,
-            letterSpacing: 1.1)),
-        ),
-      ]),
-    );
-  }
+  // Même carte logo que les écrans d'inscription.
+  Widget _brand() => const AuthBrand();
 
   Widget _label(String text) {
     return Text(

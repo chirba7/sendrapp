@@ -20,10 +20,8 @@ class WithdrawMoneySuccessScreen extends StatelessWidget {
         title: const Text(
           Strings.withdrawMoney,
           style: TextStyle(
-            color: CustomColor.whiteColor,
-          ),
+            ),
         ),
-        backgroundColor: CustomColor.primaryColor,
       ),
       body: _bodyWidget(context),
     );

@@ -7,12 +7,25 @@
             <div class="row align-items-center">
                 <div class="col-md-6">
                     <div class="title tesu">
-                        <h2 class="text-success">Dashboard</h2>
+                        <h2 class="text-success">@if(Auth::user()->role_id == 1)Administration @elseif(Auth::user()->role_id == 3) Autorité communale @elseif(Auth::user()->role_id == 4) Autorité préfectorale @elseif(Auth::user()->role_id == 7) Espace Opérateur @else Espace Agent @endif</h2>
+                        <p class="text-muted mb-0">{{ Auth::user()->role->nomRole }} · Bonjour {{ Auth::user()->first_name }}</p>
                     </div>
                 </div>
             </div>
             <!-- end row -->
         </div>
+        @if(in_array(Auth::user()->role_id, [1, 3, 4]))
+        <div class="card-style mb-30 role-banner">
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+                <div><h5>Décisions à prendre</h5><p class="mb-0">{{ $approbationsEnAttente }} signalement(s) transmis pour approbation.</p></div>
+                <a href="{{ route('approbations.index') }}" class="main-btn success-btn btn-hover">Ouvrir la file d’approbation</a>
+            </div>
+        </div>
+        @elseif(Auth::user()->role_id == 2)
+        <div class="card-style mb-30 role-banner">
+            <h5>Suivi des signalements</h5><p class="mb-0">Consultez les dossiers et leurs constatations depuis le menu Signalements.</p>
+        </div>
+        @endif
         <!-- ========== title-wrapper end ========== -->
         <div class="row">
             <div class="col-xl-3 col-lg-4 col-sm-6">
@@ -58,6 +71,12 @@
                         <h3 class="text-bold mb-10">{{$enleves}}</h3>
                     </div>
                 </div>
+            </div>
+            <div class="col-xl-3 col-lg-4 col-sm-6">
+                <a href="{{ route('non_resolus') }}" class="text-decoration-none text-dark"><div class="icon-card mb-30">
+                    <div class="icon orange"><i class="lni lni-warning"></i></div>
+                    <div class="content"><h6 class="mb-10">Non résolus</h6><h3 class="text-bold mb-10">{{ $nonResolus }}</h3></div>
+                </div></a>
             </div>
         </div>
 
@@ -123,20 +142,22 @@
                                     <td>
                                         <p class="text-sm">{{$signalement->created_at->format('d F Y \à H\hi')}}</p>
                                     </td>
-                                    @if ($signalement->etat == "SIGNALE")
+                                    @if (in_array($signalement->etat, ['SIGNALE', 'EN COURS']) && $signalement->non_removed_at)
+                                    <td><span class="status-btn warning-btn">NON RÉSOLU</span></td>
+                                    @elseif ($signalement->etat == "SIGNALE")
                                     <td>
                                         <span class="status-btn close-btn">{{$signalement->etat}}</span>
                                     </td>
-                                    @endif
-                                    @if ($signalement->etat == "EN COURS")
+                                    @elseif ($signalement->etat == "EN COURS")
                                     <td>
                                         <span class="status-btn warning-btn">{{$signalement->etat}}</span>
                                     </td>
-                                    @endif
-                                    @if ($signalement->etat == "ENLEVE")
+                                    @elseif ($signalement->etat == "ENLEVE")
                                     <td>
                                         <span class="status-btn success-btn">{{$signalement->etat}}</span>
                                     </td>
+                                    @else
+                                    <td><span class="status-btn">{{ $signalement->etat }}</span></td>
                                     @endif
                                     <td>
                                         <div class="action justify-content-center">

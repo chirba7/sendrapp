@@ -28,6 +28,7 @@ class UpdateCarPositionRequest extends FormRequest
             'numero_vehicule' => 'required|string|max:255',
             'marque' => 'required|string|max:255',
             'type' => 'required|string|max:255',
+            'vehicle_kind' => 'nullable|string|in:Voiture,Moto',
             'model' => 'required|string|max:255',
             'categorie' => 'required|string|max:255',
             'couleur' => 'required|string|max:255',

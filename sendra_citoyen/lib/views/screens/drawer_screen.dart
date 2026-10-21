@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
-import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import '../../routes/routes.dart';
+import '../../utils/app_brand.dart';
+import '../../utils/app_prefs.dart';
 import '../../utils/custom_color.dart';
+import '../../utils/sendra_theme.dart';
 import '../../utils/strings.dart';
 
 class DrawerScreen extends StatelessWidget {
@@ -14,87 +16,59 @@ class DrawerScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final width = MediaQuery.sizeOf(context).width;
     return Drawer(
+      width: width < 360 ? width * .86 : 312,
       backgroundColor: Colors.white,
+      clipBehavior: Clip.antiAlias,
       child: Column(
         children: [
           _buildHeader(context),
           Expanded(
-            child: Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.grey.withOpacity(0.1),
-                    spreadRadius: 1,
-                    blurRadius: 10,
-                    offset: Offset(0, -5),
-                  ),
-                ],
-              ),
-              child: ListView(
-                padding: EdgeInsets.zero,
-                physics: BouncingScrollPhysics(),
-                children: [
-                  SizedBox(height: 15),
-                  _buildSection(
-                    context,
-                    "INFORMATIONS",
-                    [
-                      MenuItemData(
-                        title: Strings.aboutUs,
-                        icon: FontAwesomeIcons.circleInfo,
-                        onTap: () => Get.toNamed(Routes.aboutUsScreen),
-                        gradient: LinearGradient(
-                          colors: [
-                            Colors.amber.shade700,
-                            Colors.amber.shade600
-                          ],
-                        ),
-                      ),
-                      MenuItemData(
-                        title: "Politique de confidentialité",
-                        icon: Icons.privacy_tip_rounded,
-                        onTap: () => _launchPrivacyPolicy(context),
-                        gradient: LinearGradient(
-                          colors: [
-                            Colors.purple.shade700,
-                            Colors.purple.shade600
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  _buildSection(
-                    context,
-                    "COMPTE & PROFIL",
-                    [
-                      MenuItemData(
-                        title: Strings.profile,
-                        icon: Icons.person_rounded,
-                        onTap: () => Get.toNamed(Routes.profileScreen),
-                        gradient: LinearGradient(
-                          colors: [Colors.blue.shade700, Colors.blue.shade600],
-                        ),
-                      ),
-                      MenuItemData(
-                        title: "Supprimer le compte",
-                        icon: Icons.delete_forever_rounded,
-                        onTap: () => _showDeleteAccountConfirmation(context),
-                        gradient: LinearGradient(
-                          colors: [Colors.red.shade800, Colors.red.shade600],
-                        ),
-                      ),
-                    ],
-                  ),
-                  SizedBox(height: 30),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    child: Divider(color: Colors.grey.shade300, thickness: 1.0),
-                  ),
-                  _buildLogoutButton(context),
-                ],
-              ),
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+              children: [
+                _buildSection(
+                  context,
+                  "Informations",
+                  [
+                    MenuItemData(
+                      title: Strings.aboutUs,
+                      icon: Icons.info_rounded,
+                      color: const Color(0xFFE08A00),
+                      onTap: () => _go(context, Routes.aboutUsScreen),
+                    ),
+                    MenuItemData(
+                      title: "Politique de confidentialité",
+                      icon: Icons.shield_rounded,
+                      color: const Color(0xFF7B3FC4),
+                      onTap: () => _launchPrivacyPolicy(context),
+                    ),
+                  ],
+                ),
+                _buildSection(
+                  context,
+                  "Compte & profil",
+                  [
+                    MenuItemData(
+                      title: Strings.profile,
+                      icon: Icons.person_rounded,
+                      color: const Color(0xFF1A73E8),
+                      onTap: () => _go(context, Routes.profileScreen),
+                    ),
+                    MenuItemData(
+                      title: "Supprimer le compte",
+                      icon: Icons.delete_forever_rounded,
+                      color: const Color(0xFFD93025),
+                      onTap: () => _showDeleteAccountConfirmation(context),
+                    ),
+                  ],
+                ),
+                const Divider(height: 24),
+                // Placé dans la liste (et non tout en bas) : il n'est plus
+                // masqué par le bouton flottant « Signaler ».
+                _buildLogoutButton(context),
+              ],
             ),
           ),
         ],
@@ -102,64 +76,124 @@ class DrawerScreen extends StatelessWidget {
     );
   }
 
+  /// Ferme le menu puis ouvre la page : évite de revenir sur un menu ouvert.
+  void _go(BuildContext context, String route) {
+    Navigator.of(context).pop();
+    Get.toNamed(route);
+  }
+
   Widget _buildHeader(BuildContext context) {
+    final prefs = AppPrefs.maybe;
+    final fullName = prefs?.getString('fullName') ?? '';
+    final phone = prefs?.getString('phone') ?? '';
     return Container(
-      height: MediaQuery.of(context).size.height * 0.22,
-      decoration: BoxDecoration(
+      width: double.infinity,
+      decoration: const BoxDecoration(
         gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            CustomColor.primaryColor.withOpacity(0.9),
-            CustomColor.primaryColor.withOpacity(0.7),
-          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [SendraTheme.green, SendraTheme.forest],
         ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 10,
-            spreadRadius: 1,
-          ),
-        ],
       ),
       child: Stack(
         children: [
           // Motif de cercles décoratifs
           Positioned(
-            top: -20,
-            right: -20,
-            child: Container(
-              width: 100,
-              height: 100,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.white.withOpacity(0.1),
-              ),
-            ),
+            top: -40,
+            right: -40,
+            child: _circle(140, .08),
           ),
           Positioned(
-            bottom: -30,
+            bottom: -50,
             left: -30,
-            child: Container(
-              width: 120,
-              height: 120,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.white.withOpacity(0.1),
-              ),
-            ),
+            child: _circle(120, .06),
           ),
-          // Logo centré
-          Center(
-            child: Container(
-              margin: const EdgeInsets.symmetric(horizontal: 28),
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-              decoration: BoxDecoration(color: Colors.white,
-                borderRadius: BorderRadius.circular(18)),
-              child: Image.asset(
-                'assets/images/logo.png',
-                height: 96,
-                fit: BoxFit.contain,
+          SafeArea(
+            bottom: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 22, 20, 20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Logo posé directement sur le vert, sans cadre blanc.
+                  if (AppBrand.drawerLogo != null)
+                    Image.asset(
+                      AppBrand.drawerLogo!,
+                      height: 52,
+                      fit: BoxFit.contain,
+                      alignment: Alignment.centerLeft,
+                      filterQuality: FilterQuality.medium,
+                    )
+                  else
+                    Row(
+                      children: [
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: Image.asset(AppBrand.appIcon,
+                              width: 48, height: 48),
+                        ),
+                        const SizedBox(width: 12),
+                        const Text(
+                          AppBrand.name,
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 26,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: -.3,
+                          ),
+                        ),
+                      ],
+                    ),
+                  if (fullName.isNotEmpty || phone.isNotEmpty) ...[
+                    const SizedBox(height: 18),
+                    Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 20,
+                          backgroundColor: Colors.white.withValues(alpha: .18),
+                          child: Text(
+                            fullName.isNotEmpty
+                                ? fullName.trim()[0].toUpperCase()
+                                : '?',
+                            style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 17),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              if (fullName.isNotEmpty)
+                                Text(
+                                  fullName,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 15.5,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              if (phone.isNotEmpty)
+                                Text(
+                                  phone,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    color: Colors.white.withValues(alpha: .8),
+                                    fontSize: 13,
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ],
               ),
             ),
           ),
@@ -168,80 +202,76 @@ class DrawerScreen extends StatelessWidget {
     );
   }
 
+  Widget _circle(double size, double opacity) => Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: Colors.white.withValues(alpha: opacity),
+        ),
+      );
+
   Widget _buildSection(
       BuildContext context, String title, List<MenuItemData> items) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 10.0),
-          child: Text(
-            title,
-            style: TextStyle(
-              color: Colors.grey.shade600,
-              fontSize: 12,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 1.2,
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 10, 12, 6),
+            child: Text(
+              title.toUpperCase(),
+              style: const TextStyle(
+                color: SendraTheme.muted,
+                fontSize: 11.5,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 1.1,
+              ),
             ),
           ),
-        ),
-        ...items.map((item) => _buildMenuItem(context, item)).toList(),
-        SizedBox(height: 15),
-      ],
+          ...items.map((item) => _buildMenuItem(context, item)),
+        ],
+      ),
     );
   }
 
   Widget _buildMenuItem(BuildContext context, MenuItemData item) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 15.0, vertical: 5.0),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: item.onTap,
-          borderRadius: BorderRadius.circular(12),
-          splashColor: Colors.grey.withOpacity(0.1),
-          highlightColor: Colors.grey.withOpacity(0.05),
-          child: Container(
-            padding: EdgeInsets.symmetric(horizontal: 8.0, vertical: 12.0),
-            child: Row(
-              children: [
-                Container(
-                  padding: EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    gradient: item.gradient,
-                    borderRadius: BorderRadius.circular(10),
-                    boxShadow: [
-                      BoxShadow(
-                        color: item.gradient.colors.first.withOpacity(0.4),
-                        blurRadius: 5,
-                        offset: Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: Icon(
-                    item.icon,
-                    color: Colors.white,
-                    size: 20,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: item.onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: item.color.withValues(alpha: .12),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(item.icon, color: item.color, size: 22),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Text(
+                  item.title,
+                  style: const TextStyle(
+                    color: SendraTheme.ink,
+                    fontSize: 15.5,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
-                SizedBox(width: 15),
-                Expanded(
-                  child: Text(
-                    item.title,
-                    style: TextStyle(
-                      color: Colors.grey.shade800,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-                Icon(
-                  Icons.arrow_forward_ios,
-                  color: Colors.grey.shade400,
-                  size: 16,
-                ),
-              ],
-            ),
+              ),
+              const Icon(
+                Icons.chevron_right_rounded,
+                color: SendraTheme.muted,
+                size: 22,
+              ),
+            ],
           ),
         ),
       ),
@@ -250,44 +280,17 @@ class DrawerScreen extends StatelessWidget {
 
   Widget _buildLogoutButton(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 30.0, vertical: 10.0),
-      child: GestureDetector(
-        onTap: () => _showLogoutConfirmation(context),
-        child: Container(
-          padding: EdgeInsets.symmetric(vertical: 15),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [Colors.red.shade700, Colors.redAccent.shade400],
-            ),
-            borderRadius: BorderRadius.circular(10),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.red.shade200.withOpacity(0.5),
-                blurRadius: 8,
-                spreadRadius: 1,
-                offset: Offset(0, 3),
-              ),
-            ],
+      padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+      child: SizedBox(
+        width: double.infinity,
+        child: FilledButton.icon(
+          onPressed: () => _showLogoutConfirmation(context),
+          style: FilledButton.styleFrom(
+            backgroundColor: SendraTheme.green,
+            foregroundColor: Colors.white,
           ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.power_settings_new_rounded,
-                color: Colors.white,
-              ),
-              SizedBox(width: 10),
-              Text(
-                Strings.signOut,
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: 0.5,
-                ),
-              ),
-            ],
-          ),
+          icon: const Icon(Icons.logout_rounded, size: 20),
+          label: const Text(Strings.signOut),
         ),
       ),
     );
@@ -407,7 +410,7 @@ class DrawerScreen extends StatelessWidget {
           ],
         ),
         backgroundColor: CustomColor.primaryColor,
-        duration: Duration(milliseconds: 1200),
+        duration: Duration(milliseconds: 900),
         snackPosition: SnackPosition.TOP,
         margin: EdgeInsets.all(10),
         borderRadius: 8,
@@ -424,17 +427,16 @@ class DrawerScreen extends StatelessWidget {
     await prefs.remove('lastRoute');
     await prefs.remove('role_id');
 
-    // Petite pause pour l'animation
-    await Future.delayed(Duration(milliseconds: 800));
 
     // Rediriger vers l'écran de connexion
     Get.offAllNamed(Routes.signInScreen);
   }
 
   Future<void> _launchPrivacyPolicy(BuildContext context) async {
-    var loadingDialogVisible = true;
-    // Effet de transition avant le lancement
-    showDialog(
+    // Plus de boîte d'attente artificielle (700 ms) : le navigateur s'ouvre
+    // directement.
+    var loadingDialogVisible = false;
+    if (loadingDialogVisible) showDialog(
       context: context,
       barrierDismissible: false,
       builder: (BuildContext context) {
@@ -477,8 +479,6 @@ class DrawerScreen extends StatelessWidget {
     final Uri url = Uri.parse(
         'https://www.privacypolicies.com/live/12076de3-e527-407e-b179-24c0007dde47');
     try {
-      await Future.delayed(
-          Duration(milliseconds: 700)); // Pause pour l'animation
       if (context.mounted && loadingDialogVisible) {
         Navigator.of(context, rootNavigator: true).pop();
         loadingDialogVisible = false;
@@ -891,12 +891,14 @@ class MenuItemData {
   final String title;
   final IconData icon;
   final VoidCallback onTap;
-  final LinearGradient gradient;
+  final LinearGradient? gradient;
+  final Color color;
 
   const MenuItemData({
     required this.title,
     required this.icon,
     required this.onTap,
-    required this.gradient,
+    this.gradient,
+    this.color = SendraTheme.green,
   });
 }

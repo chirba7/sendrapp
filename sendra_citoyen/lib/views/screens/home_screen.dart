@@ -1,525 +1,224 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'package:shared_preferences/shared_preferences.dart';
 
-import '../../utils/session.dart';
+import '../../utils/app_brand.dart';
+import '../../utils/app_prefs.dart';
 import '../../utils/strings.dart';
 import '../../utils/sendra_theme.dart';
+import '../../widgets/others/guide_view.dart';
 import '../screens/drawer_screen.dart';
 
+/// Accueil : liste des signalements.
+///
+/// Corrections de performance par rapport à l'ancienne version :
+/// - la liste est réellement paresseuse (SliverList) : seules les cartes
+///   visibles sont construites, au lieu de TOUTES les cartes à chaque image
+///   (ListView shrinkWrap dans un SingleChildScrollView) ;
+/// - plus de setState à chaque pixel de défilement (l'indicateur maison
+///   reconstruisait tout l'écran pendant le scroll) ;
+/// - les photos sont décodées à la taille de la vignette (cacheWidth) et non
+///   en pleine résolution ;
+/// - la réponse du serveur n'est plus imprimée en entier dans la console ;
+/// - les compteurs par statut sont calculés une fois par chargement.
 class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
 
   @override
-  _HomeScreenState createState() => _HomeScreenState();
-}
-
-class Slide {
-  final String title;
-  final String description;
-  final IconData icon;
-
-  Slide({required this.title, required this.description, required this.icon});
+  State<HomeScreen> createState() => _HomeScreenState();
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  List<dynamic> allSignalements = [];
-  bool _isLoading = false;
-  bool _hasNextPage = false;
-  bool _allSlidesSeen = false;
-  bool _isInitialLoading = true;
+  final _scroll = ScrollController();
+
+  List<dynamic> _items = [];
+  Map<String, int> _counts = const {};
+  bool _initialLoading = true;
+  bool _loadingMore = false;
   String? _loadError;
-  String _selectedStatusFilter = 'TOUS';
+  String _filter = 'TOUS';
+  String _nextPageUrl = '';
+  String _token = '';
+  late final bool _isStaff = AppPrefs.isStaff;
 
-  List<dynamic> get _filteredSignalements {
-    if (_selectedStatusFilter == 'TOUS') return allSignalements;
-    return allSignalements
-        .where((signalement) => signalement['etat'] == _selectedStatusFilter)
-        .toList();
-  }
 
-  // Déclarez une variable pour suivre l'index de la diapositive actuelle
-  int _currentPageIndex = 0;
+  static const _filters = <({String value, String label})>[
+    (value: 'TOUS', label: 'Tous'),
+    (value: 'SIGNALE', label: 'Signalés'),
+    (value: 'EN COURS', label: 'En cours'),
+    (value: 'ENLEVE', label: 'Résolus'),
+    (value: 'NON RESOLU', label: 'Non résolus'),
+  ];
 
-  // Fonction pour mettre à jour l'index de la diapositive actuelle
-  void _updateCurrentPageIndex(int index) {
-    setState(() {
-      _currentPageIndex = index;
-      if (_currentPageIndex == slides.length - 1) {
-        _allSlidesSeen = true;
-      } else {
-        _allSlidesSeen = false;
-      }
-    });
-  }
-
-  late SharedPreferences _prefs;
-  bool _showSlides = true;
-  bool _showScrollIndicator = true; // Définition de la variable ici
-  double _scrollIndicatorPosition =
-      0; // Position initiale de l'indicateur de défilement
-  bool _scrolling =
-      false; // Variable pour indiquer si le défilement est en cours
-  double _lastScrollIndicatorPosition =
-      0.0; // Dernière position de l'indicateur
-
-  late String nextPageUrl;
-  String token = '';
+  List<dynamic> get _filtered => _filter == 'TOUS'
+      ? _items
+      : _items.where((s) => s['etat'] == _filter).toList(growable: false);
 
   @override
   void initState() {
     super.initState();
-    _initPrefs();
+    _scroll.addListener(_onScroll);
     _fetchData();
-    getUserData();
-  }
-
-  Future<void> _initPrefs() async {
-    _prefs = await SharedPreferences.getInstance();
-    final bool hasSeenSlides = _prefs.getBool('hasSeenSlides') ?? false;
-    setState(() {
-      _showSlides = !hasSeenSlides;
-    });
-  }
-
-  // Correction : _isInitialLoading n'était remis à false que dans le
-  // catch — un chargement RÉUSSI (même avec une liste vide, ex. total: 0)
-  // laissait le spinner "Chargement des signalements..." tourner
-  // indéfiniment. Le `finally` garantit qu'il se referme dans tous les cas.
-  Future<void> _fetchData() async {
-    setState(() {
-      _isInitialLoading = true;
-      _loadError = null;
-    });
-
-    try {
-      List<dynamic> fetchedSignalements = await fetchSignalements();
-      setState(() {
-        allSignalements = fetchedSignalements;
-      });
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _loadError =
-              'Impossible de joindre le serveur. Vérifiez le Wi-Fi puis réessayez.';
-        });
-      }
-    } finally {
-      setState(() {
-        _isInitialLoading = false;
-      });
-    }
-  }
-
-  Future<void> getUserData() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    setState(() {
-      token = prefs.getString('token') ?? 'No name';
-    });
-  }
-
-  Future<List<dynamic>> fetchSignalements() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    String token = prefs.getString('token') ?? '';
-
-    // Le staff (Admin/Agent/Autorités) voit tous les signalements
-    // (listerSignalements, paginé) ; un citoyen ne voit que les siens
-    // (voirSignalements, non paginé) — endpoints réservés côté backend
-    // (role:1,2,3,4 vs auto-scopé au user connecté).
-    final isStaff = await Session.isStaff();
-    final endpoint = isStaff ? 'listerSignalements' : 'voirSignalements';
-    final url = Uri.parse(Strings.apiURI + endpoint);
-    print('URL de la requête liste signalements: $url');
-
-    final response = await http.get(
-      url,
-      headers: {
-        "Content-Type": "application/json",
-        'Authorization': 'Bearer ' + token,
-      },
-    );
-
-    print('Statut de la réponse liste signalements: ${response.statusCode}');
-    print('Réponse du serveur liste signalements: ${response.body}');
-
-    if (response.statusCode == 200) {
-      final decoded = jsonDecode(response.body);
-      // voirSignalements (citoyen) renvoie un tableau JSON brut ([...]) —
-      // pas encapsulé dans {"data": ...} contrairement à listerSignalements
-      // (staff, paginé), car le contrôleur ne passe pas par toResponse().
-      if (decoded is List) {
-        setState(() {
-          _hasNextPage = false;
-          nextPageUrl = '';
-        });
-        return decoded;
-      }
-      setState(() {
-        _hasNextPage = decoded['links']?['next'] != null;
-        nextPageUrl = decoded['links']?['next'] ?? '';
-      });
-      return decoded['data'];
-    } else if (response.statusCode == 401) {
-      // Un 401 isolé ne doit pas effacer la session persistée de l'agent.
-      // Seule l'action explicite Déconnexion supprime les données locales.
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Connexion momentanément impossible. Réessayez.'),
-          backgroundColor: Colors.orange,
-          duration: Duration(seconds: 3),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-      throw Exception('Authentification momentanément indisponible');
-    } else {
-      throw Exception('Error fetching signalements: ${response.statusCode}');
-    }
   }
 
   @override
-  Widget build(BuildContext context) {
-    return _showSlides ? _buildIntroSlides() : _buildHomeScreen();
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
   }
 
-  final List<Slide> slides = [
-    Slide(
-      title: "Bienvenue sur l'application",
-      description:
-          "Découvrez les fonctionnalités et les informations importantes sur notre application.",
-      icon: Icons.mobile_screen_share,
-    ),
-    Slide(
-      title: "Localisation",
-      description:
-          "Découvrez comment localiser facilement les véhicules sur la carte.",
-      icon: Icons.map,
-    ),
-    Slide(
-      title: "Informations de base",
-      description:
-          "Accédez aux informations de base concernant chaque signalement.",
-      icon: Icons.library_books,
-    ),
-    Slide(
-      title: "Véhicule",
-      description:
-          "Ajoutez les détails relatifs au véhicule concerné par le signalement.",
-      icon: Icons.directions_car,
-    ),
-    Slide(
-      title: "Infraction",
-      description:
-          "Indiquez les infractions associées au signalement pour un traitement approprié.",
-      icon: Icons.report_problem,
-    ),
-    Slide(
-      title: "Dommages",
-      description: "Dessinez les dommages en utilisant notre outil de dessin.",
-      icon: Icons.draw,
-    ),
-    Slide(
-      title: "Approbation",
-      description:
-          "Soumettez les signalements pour approbation après vérification.",
-      icon: Icons.check_circle,
-    ),
-    Slide(
-      title: "Missions",
-      description:
-          "Réalisez les enlèvements depuis les missions qui vous sont affectées.",
-      icon: Icons.assignment_turned_in,
-    ),
-  ];
-
-  Widget _buildIntroSlides() {
-    return Scaffold(
-      body: Stack(
-        children: [
-          PageView.builder(
-            itemCount: slides.length,
-            onPageChanged: _updateCurrentPageIndex,
-            itemBuilder: (context, index) {
-              final slide = slides[index];
-              return _buildSlide(slide);
-            },
-          ),
-          Positioned(
-            bottom: 40,
-            right: 20,
-            child: ElevatedButton(
-              onPressed: _closeSlides,
-              child: Text(
-                'Commencer',
-                style: TextStyle(
-                  fontSize: 18,
-                  color: Color(0xFF1B5E20), // Vert foncé
-                ),
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.white, // Blanc
-                padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  side: BorderSide(
-                      color: Color(0xFF1B5E20)), // Bordure vert foncé
-                ),
-              ),
-            ),
-          ),
-          Positioned(
-            bottom: 110,
-            left: 0,
-            right: 0,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: _buildPageIndicators(),
-            ),
-          ),
-        ],
-      ),
-    );
+  void _onScroll() {
+    final p = _scroll.position;
+    if (p.extentAfter < 500) _loadMore();
   }
 
-  Widget _buildSlide(Slide slide) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.5),
-            spreadRadius: 5,
-            blurRadius: 7,
-            offset: Offset(0, 3),
-          ),
-        ],
-      ),
-      margin: EdgeInsets.all(20),
-      padding: EdgeInsets.all(20),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            slide.icon,
-            size: 100,
-            color: Color(0xFF1B5E20), // Vert foncé
-          ),
-          SizedBox(height: 20),
-          Text(
-            slide.title,
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF1B5E20), // Vert foncé
-            ),
-            textAlign: TextAlign.center,
-          ),
-          SizedBox(height: 10),
-          Container(
-            margin: EdgeInsets.symmetric(horizontal: 20),
-            child: Text(
-              slide.description,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                  fontSize: 16, color: Color(0xFF1B5E20)), // Vert foncé
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // Fonction pour construire les indicateurs de pagination
-  List<Widget> _buildPageIndicators() {
-    List<Widget> indicators = [];
-    for (int i = 0; i < slides.length; i++) {
-      indicators.add(
-        Container(
-          width: 10,
-          height: 10,
-          margin: EdgeInsets.symmetric(horizontal: 5),
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: _currentPageIndex == i
-                ? Colors.green
-                : Colors
-                    .grey, // Couleur différente pour la diapositive actuelle
-          ),
-        ),
-      );
+  void _recount() {
+    final counts = <String, int>{'TOUS': _items.length};
+    for (final s in _items) {
+      final etat = s['etat']?.toString() ?? '';
+      counts[etat] = (counts[etat] ?? 0) + 1;
     }
-    return indicators;
+    _counts = counts;
   }
 
-  Future<void> _closeSlides() async {
-    if (_allSlidesSeen) {
-      await _prefs.setBool('hasSeenSlides', true);
-      setState(() {
-        _showSlides = false;
-      });
-    } else {
-      // Affichez un message à l'utilisateur pour lui indiquer de voir tous les slides.
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-              'Veuillez parcourir tous les slides avant de continuer.',
-              style: TextStyle(color: Colors.white)),
-          backgroundColor: Colors.black, // Couleur de fond de la SnackBar
-          elevation: 8, // Élévation pour ajouter une ombre
-          behavior: SnackBarBehavior.floating, // Centrer le SnackBar
-          shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10)), // Coins arrondis
-        ),
-      );
-    }
-  }
-
-  void _showSlidesAgain() async {
-    await _prefs.setBool('hasSeenSlides', false);
+  Future<void> _fetchData() async {
     setState(() {
-      _showSlides = true;
+      _initialLoading = _items.isEmpty;
+      _loadError = null;
     });
+    try {
+      final data = await _fetchSignalements();
+      if (!mounted) return;
+      setState(() {
+        _items = data;
+        _recount();
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _loadError =
+          'Impossible de joindre le serveur. Vérifiez votre connexion puis réessayez.');
+    } finally {
+      if (mounted) setState(() => _initialLoading = false);
+    }
   }
 
-  Widget _buildHomeScreen() {
+  Future<List<dynamic>> _fetchSignalements() async {
+    final prefs = await AppPrefs.init();
+    _token = prefs.getString('token') ?? '';
+
+    // Le staff (Admin/Agent/Autorités) voit tous les signalements
+    // (listerSignalements, paginé) ; un citoyen ne voit que les siens
+    // (voirSignalements, non paginé).
+    final endpoint = _isStaff ? 'listerSignalements' : 'voirSignalements';
+    final url = Uri.parse(Strings.apiURI + endpoint);
+    final response = await http.get(url, headers: _headers);
+    if (kDebugMode) {
+      debugPrint('GET $url -> ${response.statusCode}');
+    }
+
+    if (response.statusCode == 200) {
+      final decoded = jsonDecode(response.body);
+      // voirSignalements (citoyen) renvoie un tableau JSON brut ;
+      // listerSignalements (staff) renvoie {"data": [...], "links": {...}}.
+      if (decoded is List) {
+        _nextPageUrl = '';
+        return decoded;
+      }
+      _nextPageUrl = decoded['links']?['next'] ?? '';
+      return List<dynamic>.from(decoded['data'] ?? const []);
+    }
+    if (response.statusCode == 401 && mounted) {
+      // Un 401 isolé ne doit pas effacer la session persistée de l'agent.
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Connexion momentanément impossible. Réessayez.'),
+        backgroundColor: SendraTheme.statusEnCours,
+      ));
+    }
+    throw Exception('Erreur ${response.statusCode}');
+  }
+
+  Map<String, String> get _headers => {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $_token',
+      };
+
+  Future<void> _loadMore() async {
+    if (_loadingMore || _nextPageUrl.isEmpty) return;
+    setState(() => _loadingMore = true);
+    try {
+      final response =
+          await http.get(Uri.parse(_nextPageUrl), headers: _headers);
+      if (response.statusCode != 200) throw Exception();
+      final data = jsonDecode(response.body);
+      if (!mounted) return;
+      setState(() {
+        _items = [..._items, ...List<dynamic>.from(data['data'] ?? const [])];
+        _nextPageUrl = data['links']?['next'] ?? '';
+        _recount();
+      });
+    } catch (_) {
+      // On réessaiera au prochain défilement.
+    } finally {
+      if (mounted) setState(() => _loadingMore = false);
+    }
+  }
+
+  /// Réouvre le guide de prise en main en plein écran.
+  void _openGuide() => Navigator.of(context, rootNavigator: true).push(
+        MaterialPageRoute<void>(
+          fullscreenDialog: true,
+          builder: (ctx) => GuideView(onDone: () => Navigator.of(ctx).pop()),
+        ),
+      );
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: SendraTheme.surface,
       drawer: const DrawerScreen(),
       appBar: AppBar(
-        backgroundColor: Colors.white,
-        surfaceTintColor: Colors.transparent,
-        iconTheme: const IconThemeData(color: SendraTheme.ink),
-        centerTitle: true,
-        title: Image.asset('assets/images/logo.png', width: 156,
-          height: 42, fit: BoxFit.contain),
-        elevation: 0,
+        toolbarHeight: 60,
+        title: ClipRRect(
+          borderRadius: BorderRadius.circular(AppBrand.isPro ? 8 : 0),
+          child: Image.asset(
+            AppBrand.appBarLogo,
+            height: AppBrand.isPro ? 36 : 40,
+            fit: BoxFit.contain,
+            filterQuality: FilterQuality.medium,
+          ),
+        ),
+        actions: [
+          IconButton(
+            tooltip: 'Guide',
+            icon: const Icon(Icons.help_outline_rounded),
+            onPressed: _openGuide,
+          ),
+          const SizedBox(width: 4),
+        ],
       ),
-      body: NotificationListener<ScrollNotification>(
-        onNotification: (scrollNotification) {
-          if (scrollNotification is ScrollStartNotification) {
-            setState(() {
-              _scrolling = true;
-            });
-          } else if (scrollNotification is ScrollEndNotification) {
-            setState(() {
-              _scrolling = false;
-            });
-            if (scrollNotification.metrics.pixels ==
-                scrollNotification.metrics.maxScrollExtent) {
-              _loadMoreSignalements();
-            }
-          } else if (scrollNotification is ScrollUpdateNotification) {
-            setState(() {
-              _scrollIndicatorPosition = scrollNotification.metrics.pixels;
-            });
-          }
-          return true;
-        },
-        child: Stack(
-          children: [
-            RefreshIndicator(
-              onRefresh: () async {
-                // Réinitialiser les données et rafraîchir
-                setState(() {
-                  allSignalements = [];
-                  _hasNextPage = false;
-                });
-                await _fetchData();
-              },
-              color:
-                  Colors.green.shade900, // Couleur du loader assortie à l'app
-              backgroundColor: Colors.white,
-              child: SingleChildScrollView(
-                physics: BouncingScrollPhysics(
-                    parent: AlwaysScrollableScrollPhysics()),
-                child: Column(
-                  children: [
-                    if (allSignalements.isNotEmpty)
-                      _transactionHistoryWidget(context, _filteredSignalements),
-                    if (allSignalements.isEmpty)
-                      Container(
-                        height: MediaQuery.of(context).size.height * 0.7,
-                        child: Center(
-                          child: _isInitialLoading
-                              ? Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    CircularProgressIndicator(
-                                      valueColor: AlwaysStoppedAnimation<Color>(
-                                          Colors.green.shade900),
-                                    ),
-                                    SizedBox(height: 20),
-                                    Text(
-                                      'Chargement des signalements...',
-                                      style: TextStyle(
-                                        fontSize: 16,
-                                        color: Colors.grey[600],
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                    ),
-                                  ],
-                                )
-                              : Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Text(
-                                      _loadError ??
-                                          'Aucun signalement récent disponible',
-                                      textAlign: TextAlign.center,
-                                      style: TextStyle(
-                                        fontSize: 16,
-                                        color: _loadError == null
-                                            ? Colors.grey[600]
-                                            : Colors.red[700],
-                                      ),
-                                    ),
-                                    if (_loadError != null) ...[
-                                      const SizedBox(height: 16),
-                                      ElevatedButton.icon(
-                                        onPressed: _fetchData,
-                                        icon: const Icon(Icons.refresh),
-                                        label: const Text('Réessayer'),
-                                      ),
-                                    ],
-                                  ],
-                                ),
+      body: RefreshIndicator(
+        color: SendraTheme.green,
+        onRefresh: _fetchData,
+        child: CustomScrollView(
+          controller: _scroll,
+          physics: const AlwaysScrollableScrollPhysics(),
+          slivers: [
+            SliverToBoxAdapter(child: _header()),
+            SliverToBoxAdapter(child: _filterBar()),
+            ..._content(),
+            SliverToBoxAdapter(
+              child: SizedBox(
+                height: 120,
+                child: _loadingMore
+                    ? const Center(
+                        child: SizedBox.square(
+                          dimension: 24,
+                          child: CircularProgressIndicator(strokeWidth: 2.4),
                         ),
-                      ),
-                  ],
-                ),
-              ),
-            ),
-            if (_isLoading)
-              const Center(
-                child: CircularProgressIndicator(),
-              ),
-            Positioned(
-              top: 0,
-              bottom: 0,
-              right: 0,
-              child: Visibility(
-                visible: _showScrollIndicator,
-                child: Container(
-                  width: 4.0,
-                  height: MediaQuery.of(context).size.height,
-                  decoration: BoxDecoration(
-                    color: Colors.white60.withOpacity(0.7),
-                    borderRadius: BorderRadius.circular(10.0),
-                  ),
-                  child: Align(
-                    alignment: Alignment(1, _calculateIndicatorPosition()),
-                    child: Container(
-                      width: 4.0,
-                      height: 40.0,
-                      decoration: BoxDecoration(
-                        color: Colors.grey,
-                        borderRadius: BorderRadius.circular(2.0),
-                      ),
-                    ),
-                  ),
-                ),
+                      )
+                    : null,
               ),
             ),
           ],
@@ -528,467 +227,413 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget contentBox(context) {
-    return Stack(
-      children: <Widget>[
-        Container(
-          padding: EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            shape: BoxShape.rectangle,
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(10),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black,
-                offset: Offset(0, 10),
-                blurRadius: 10,
-              ),
-            ],
+  Widget _header() {
+    final n = _items.length;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            _isStaff ? 'Signalements à proximité' : 'Mes signalements',
+            style: Theme.of(context).textTheme.headlineSmall,
           ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: <Widget>[
-              Text(
-                'Information',
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w600,
+          const SizedBox(height: 4),
+          Text(
+            _initialLoading
+                ? 'Chargement…'
+                : '$n dossier${n > 1 ? 's' : ''} disponible${n > 1 ? 's' : ''}',
+            style: const TextStyle(color: SendraTheme.muted, fontSize: 14),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Filtres en une ligne défilante : l'ancienne grille 2×3 occupait la
+  /// moitié de l'écran et repoussait la liste hors de vue.
+  Widget _filterBar() {
+    return SizedBox(
+      height: 64,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
+        itemCount: _filters.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        itemBuilder: (context, i) {
+          final f = _filters[i];
+          final selected = _filter == f.value;
+          final color = f.value == 'TOUS'
+              ? SendraTheme.green
+              : SendraTheme.status(f.value).color;
+          final count = _counts[f.value] ?? 0;
+          return Material(
+            color: selected ? color : Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: BorderSide(color: selected ? color : SendraTheme.border),
+            ),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(12),
+              onTap: () => setState(() => _filter = f.value),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 14),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (f.value != 'TOUS') ...[
+                      Container(
+                        width: 8,
+                        height: 8,
+                        decoration: BoxDecoration(
+                          color: selected ? Colors.white : color,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                    ],
+                    Text(
+                      f.label,
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: selected ? Colors.white : SendraTheme.ink,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 7, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: selected
+                            ? Colors.white.withValues(alpha: .22)
+                            : color.withValues(alpha: .10),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        '$count',
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w700,
+                          color: selected ? Colors.white : color,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              SizedBox(height: 15),
-              Text(
-                'Les signalements restent disponibles dans la liste. Touchez un dossier pour consulter ses détails.',
-                style: TextStyle(fontSize: 16),
-                textAlign: TextAlign.center,
-              ),
-              SizedBox(height: 22),
-              Align(
-                alignment: Alignment.bottomCenter,
-                child: TextButton(
-                  onPressed: () {
-                    Navigator.of(context).pop();
-                  },
-                  child: Text(
-                    'OK',
-                    style: TextStyle(fontSize: 18),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  List<Widget> _content() {
+    if (_initialLoading) {
+      return [
+        SliverPadding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          sliver: SliverList.builder(
+            itemCount: 5,
+            itemBuilder: (_, __) => const _SkeletonCard(),
+          ),
+        ),
+      ];
+    }
+    if (_items.isEmpty || _filtered.isEmpty) {
+      final error = _items.isEmpty ? _loadError : null;
+      return [
+        SliverToBoxAdapter(
+          child: _EmptyState(
+            icon: error != null
+                ? Icons.wifi_off_rounded
+                : Icons.inbox_outlined,
+            message: error ??
+                (_items.isEmpty
+                    ? 'Aucun signalement pour le moment.'
+                    : 'Aucun signalement dans cette catégorie.'),
+            onRetry: error != null ? _fetchData : null,
+          ),
+        ),
+      ];
+    }
+    final list = _filtered;
+    return [
+      SliverPadding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        sliver: SliverList.builder(
+          itemCount: list.length,
+          itemBuilder: (context, i) => _SignalementCard(
+            key: ValueKey(list[i]['id'] ?? i),
+            data: list[i],
+            onTap: () => Navigator.pushNamed(
+              context,
+              '/depositMoneyDetailsScreen',
+              arguments: list[i],
+            ),
+          ),
+        ),
+      ),
+    ];
+  }
+}
+
+// ───────────────────────────── Carte d'un signalement ─────────────────────
+
+class _SignalementCard extends StatelessWidget {
+  const _SignalementCard({super.key, required this.data, required this.onTap});
+
+  final dynamic data;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final status = SendraTheme.status(data['etat']?.toString());
+    final imageUrl = data['image_url']?.toString();
+    final title = (data['titre'] ?? '').toString();
+    final commune = (data['commune'] ?? '').toString();
+    final date = (data['formatted_date'] ?? '').toString();
+    final width = MediaQuery.sizeOf(context).width;
+    final thumb = width < 360 ? 84.0 : 100.0;
+    final dpr = MediaQuery.devicePixelRatioOf(context);
+
+    return RepaintBoundary(
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: 12),
+        child: Material(
+          color: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(SendraTheme.radius),
+            side: const BorderSide(color: SendraTheme.border),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: onTap,
+            child: Padding(
+              padding: const EdgeInsets.all(10),
+              child: Row(
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: SizedBox.square(
+                      dimension: thumb,
+                      child: imageUrl == null || imageUrl.isEmpty
+                          ? const _ThumbPlaceholder()
+                          : Image.network(
+                              imageUrl,
+                              fit: BoxFit.cover,
+                              cacheWidth: (thumb * dpr).round(),
+                              gaplessPlayback: true,
+                              frameBuilder: (_, child, frame, sync) =>
+                                  sync || frame != null
+                                      ? child
+                                      : const _ThumbPlaceholder(),
+                              errorBuilder: (_, __, ___) =>
+                                  const _ThumbPlaceholder(),
+                            ),
+                    ),
                   ),
-                ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _StatusPill(
+                            color: status.color,
+                            label: status.label,
+                            icon: status.icon),
+                        const SizedBox(height: 8),
+                        Text(
+                          title.isEmpty ? 'Sans titre' : title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: SendraTheme.ink,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        if (commune.isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          _InfoLine(
+                              icon: Icons.place_outlined, text: commune),
+                        ],
+                        if (date.isNotEmpty) ...[
+                          const SizedBox(height: 3),
+                          _InfoLine(
+                              icon: Icons.schedule_rounded, text: date),
+                        ],
+                      ],
+                    ),
+                  ),
+                  const Icon(Icons.chevron_right_rounded,
+                      color: SendraTheme.muted),
+                ],
               ),
-            ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _StatusPill extends StatelessWidget {
+  const _StatusPill(
+      {required this.color, required this.label, required this.icon});
+  final Color color;
+  final String label;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: .10),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: color),
+          const SizedBox(width: 5),
+          Text(
+            label,
+            style: TextStyle(
+              color: color,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _InfoLine extends StatelessWidget {
+  const _InfoLine({required this.icon, required this.text});
+  final IconData icon;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icon, size: 15, color: SendraTheme.muted),
+        const SizedBox(width: 5),
+        Expanded(
+          child: Text(
+            text,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(color: SendraTheme.muted, fontSize: 13.5),
           ),
         ),
       ],
     );
   }
+}
 
-  // Correction : quand la liste est vide (0 signalement), totalHeight
-  // valait 0 -> division par zéro -> NaN -> Alignment(1, NaN) plantait le
-  // rendu à CHAQUE frame (RRect argument contained a NaN value), d'où le
-  // ralentissement massif observé pendant le chargement/liste vide.
-  double _calculateIndicatorPosition() {
-    double totalHeight = _getListTotalHeight();
-    if (totalHeight <= 0) {
-      return -1.0;
-    }
+class _ThumbPlaceholder extends StatelessWidget {
+  const _ThumbPlaceholder();
 
-    double position;
-    if (_scrolling) {
-      double scrollPosition = _scrollIndicatorPosition.clamp(0.0, totalHeight);
-      position = scrollPosition / totalHeight;
-    } else {
-      position = _scrollIndicatorPosition / totalHeight;
-    }
-    return position.clamp(-1.0, 1.0);
+  @override
+  Widget build(BuildContext context) {
+    return const ColoredBox(
+      color: Color(0xFFEAF1ED),
+      child: Center(
+        child: Icon(Icons.directions_car_outlined,
+            color: SendraTheme.muted, size: 28),
+      ),
+    );
   }
+}
 
-  double _getListTotalHeight() {
-    double totalHeight = 0;
-    for (dynamic signalement in allSignalements) {
-      totalHeight += 120;
-    }
-    return totalHeight;
-  }
+class _SkeletonCard extends StatelessWidget {
+  const _SkeletonCard();
 
-  void _loadMoreSignalements() async {
-    if (!_isLoading && _hasNextPage) {
-      setState(() {
-        _isLoading = true;
-      });
-
-      try {
-        final response = await http.get(Uri.parse(nextPageUrl), headers: {
-          "Content-Type": "application/json",
-          'Authorization': 'Bearer ' + token,
-        });
-
-        if (response.statusCode == 200) {
-          final data = jsonDecode(response.body);
-          setState(() {
-            allSignalements.addAll(data['data']);
-            _hasNextPage = data['links']['next'] != null;
-            nextPageUrl = data['links']['next'] ?? '';
-            _isLoading = false;
-          });
-        } else {
-          throw Exception('Error fetching more signalements');
-        }
-      } catch (e) {
-        setState(() {
-          _isLoading = false;
-        });
-        // Handle error
-      }
-    }
-  }
-
-  Container _transactionHistoryWidget(
-      BuildContext context, List<dynamic> signalements) {
+  @override
+  Widget build(BuildContext context) {
+    Widget bar(double w, double h) => Container(
+          width: w,
+          height: h,
+          decoration: BoxDecoration(
+            color: const Color(0xFFECF1EE),
+            borderRadius: BorderRadius.circular(6),
+          ),
+        );
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 20, 16, 120),
-      color: SendraTheme.surface,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(SendraTheme.radius),
+        border: Border.all(color: SendraTheme.border),
+      ),
+      child: Row(
         children: [
-          const Text(
-            'Signalements à proximité',
-            style: TextStyle(
-              color: SendraTheme.ink,
-              fontSize: 23,
-              fontWeight: FontWeight.w800,
+          bar(96, 96),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                bar(70, 18),
+                const SizedBox(height: 10),
+                bar(double.infinity, 16),
+                const SizedBox(height: 8),
+                bar(120, 13),
+              ],
             ),
           ),
-          const SizedBox(height: 4),
-          Text(
-            '${allSignalements.length} dossier${allSignalements.length > 1 ? 's' : ''} disponible${allSignalements.length > 1 ? 's' : ''}',
-            style: const TextStyle(color: SendraTheme.muted, fontSize: 13),
-          ),
-          _statusFilterWidget(),
-          const SizedBox(height: 6),
-          _transactionHistoryListWidget(context, signalements),
         ],
       ),
     );
   }
+}
 
-  Widget _statusFilterWidget() {
-    final filters =
-        <({String value, String label, IconData icon, Color color})>[
-      (
-        value: 'TOUS',
-        label: 'Tous',
-        icon: Icons.view_list_rounded,
-        color: Colors.blueGrey,
-      ),
-      (
-        value: 'SIGNALE',
-        label: 'Signalés',
-        icon: Icons.report_outlined,
-        color: Colors.red,
-      ),
-      (
-        value: 'EN COURS',
-        label: 'En cours',
-        icon: Icons.pending_actions_outlined,
-        color: Colors.orange,
-      ),
-      (
-        value: 'ENLEVE',
-        label: 'Résolus',
-        icon: Icons.check_circle_outline,
-        color: Colors.green,
-      ),
-    ];
+class _EmptyState extends StatelessWidget {
+  const _EmptyState({required this.icon, required this.message, this.onRetry});
+  final IconData icon;
+  final String message;
+  final VoidCallback? onRetry;
 
-    int countFor(String value) => value == 'TOUS'
-        ? allSignalements.length
-        : allSignalements.where((item) => item['etat'] == value).length;
-
-    return Container(
-      width: double.infinity,
-      margin: const EdgeInsets.fromLTRB(0, 18, 0, 16),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF5F8F6),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFDCE8DF)),
-      ),
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(32, 48, 32, 0),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Filtrer par statut',
-              style: TextStyle(fontWeight: FontWeight.w700)),
-          const SizedBox(height: 10),
-          GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
-              childAspectRatio: 2.25,
-              crossAxisSpacing: 10,
-              mainAxisSpacing: 10,
+          Container(
+            width: 72,
+            height: 72,
+            decoration: const BoxDecoration(
+              color: SendraTheme.greenSoft,
+              shape: BoxShape.circle,
             ),
-            itemCount: filters.length,
-            itemBuilder: (context, index) {
-              final filter = filters[index];
-              final selected = _selectedStatusFilter == filter.value;
-              return InkWell(
-                onTap: () => setState(() {
-                  _selectedStatusFilter = filter.value;
-                }),
-                borderRadius: BorderRadius.circular(14),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 180),
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  decoration: BoxDecoration(
-                    color: selected ? filter.color : Colors.white,
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(
-                      color: selected ? filter.color : const Color(0xFFDCE3DE),
-                    ),
-                    boxShadow: selected
-                        ? [
-                            BoxShadow(
-                              color: filter.color.withValues(alpha: 0.22),
-                              blurRadius: 8,
-                              offset: const Offset(0, 3),
-                            ),
-                          ]
-                        : null,
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        filter.icon,
-                        color: selected ? Colors.white : filter.color,
-                        size: 24,
-                      ),
-                      const SizedBox(width: 9),
-                      Expanded(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              filter.label,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                color: selected
-                                    ? Colors.white
-                                    : const Color(0xFF26332B),
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            Text(
-                              '${countFor(filter.value)}',
-                              style: TextStyle(
-                                color: selected ? Colors.white : filter.color,
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            },
+            child: Icon(icon, size: 34, color: SendraTheme.green),
           ),
-          if (_filteredSignalements.isEmpty) ...[
-            const SizedBox(height: 14),
-            const Center(
-              child: Text(
-                'Aucun signalement dans cette catégorie.',
-                style: TextStyle(color: Colors.grey),
-              ),
+          const SizedBox(height: 16),
+          Text(
+            message,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+                color: SendraTheme.muted, fontSize: 15, height: 1.45),
+          ),
+          if (onRetry != null) ...[
+            const SizedBox(height: 18),
+            OutlinedButton.icon(
+              onPressed: onRetry,
+              icon: const Icon(Icons.refresh_rounded),
+              label: const Text('Réessayer'),
             ),
           ],
         ],
       ),
     );
   }
-
-  Widget _transactionHistoryListWidget(
-      BuildContext context, List<dynamic> signalements) {
-    return ListView.builder(
-      shrinkWrap: true,
-      physics: NeverScrollableScrollPhysics(),
-      scrollDirection: Axis.vertical,
-      itemCount: signalements.length,
-      itemBuilder: (BuildContext context, int index) {
-        final signalement = signalements[index];
-
-        IconData iconData;
-        Color iconColor;
-        switch (signalement['etat']) {
-          case 'SIGNALE':
-            iconData = Icons.visibility;
-            iconColor = Colors.red;
-            break;
-          case 'EN COURS':
-            iconData = Icons.visibility;
-            iconColor = Colors.orange;
-            break;
-          case 'ENLEVE':
-            iconData = Icons.visibility;
-            iconColor = Colors.green;
-            break;
-          default:
-            iconData = Icons.info;
-            iconColor = Colors.black;
-        }
-        return GestureDetector(
-          onTap: () {
-            Navigator.pushNamed(
-              context,
-              '/depositMoneyDetailsScreen',
-              arguments: signalement,
-            );
-          },
-          child: SizedBox(
-            height: 126,
-            child: Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(17),
-                  border: Border.all(color: SendraTheme.border),
-                ),
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    final compact = constraints.maxWidth < 350;
-                    return Row(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        Container(
-                          width: compact ? 82 : 104,
-                          height: double.infinity,
-                          margin: const EdgeInsets.all(7),
-                          child: signalement['image_url'] != null
-                              ? ClipRRect(
-                                  borderRadius: BorderRadius.circular(12),
-                                  child: Image.network(
-                                    signalement['image_url'],
-                                    fit: BoxFit.cover,
-                                    errorBuilder: (_, __, ___) =>
-                                        const ColoredBox(
-                                      color: Color(0xFFEAF1ED),
-                                      child: Icon(Icons.directions_car_outlined,
-                                          color: SendraTheme.muted),
-                                    ),
-                                  ),
-                                )
-                              : const ColoredBox(
-                                  color: Color(0xFFEAF1ED),
-                                  child: Icon(Icons.directions_car_outlined,
-                                      color: SendraTheme.muted),
-                                ),
-                        ),
-                        Expanded(
-                          child: Padding(
-                            padding: const EdgeInsets.all(8.0),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Text(
-                                  signalement['titre'] ?? '',
-                                  style: const TextStyle(
-                                    color: Colors.black,
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                  overflow: TextOverflow.ellipsis,
-                                  maxLines: 1,
-                                ),
-                                const SizedBox(height: 5),
-                                Text(
-                                  signalement['commune'] ?? '',
-                                  style: TextStyle(
-                                    color: Colors.grey[800],
-                                    fontSize: 13,
-                                  ),
-                                  overflow: TextOverflow.ellipsis,
-                                  maxLines: 1,
-                                ),
-                                const SizedBox(height: 5),
-                                Row(
-                                  children: [
-                                    Icon(
-                                      Icons.calendar_today,
-                                      color: Colors.grey[600],
-                                      size: 16,
-                                    ),
-                                    const SizedBox(width: 5),
-                                    Expanded(
-                                      child: Text(
-                                        signalement['formatted_date']
-                                                ?.toString() ??
-                                            '',
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: const TextStyle(
-                                          color: Colors.blueGrey,
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.w500,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                        Container(
-                          margin: EdgeInsets.only(right: compact ? 6 : 10),
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: iconColor.withValues(alpha: .10),
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                iconData,
-                                color: iconColor,
-                                size: 17,
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                signalement['etat'] == 'SIGNALE'
-                                    ? 'Signalé'
-                                    : signalement['etat'] == 'EN COURS'
-                                        ? 'En cours'
-                                        : signalement['etat'] == 'ENLEVE'
-                                            ? 'Résolu'
-                                            : signalement['etat'] == 'REJETE'
-                                                ? 'Rejeté'
-                                                : 'Inconnu',
-                                style: TextStyle(
-                                  color: iconColor,
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    );
-                  },
-                ),
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
 }
+

@@ -1,9 +1,22 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
+import '../../utils/app_brand.dart';
 import '../../utils/sendra_theme.dart';
 
+/// Splash animé.
+///
+/// Il démarre EXACTEMENT dans l'état du splash natif Android (même fond
+/// vert #075C32, même icône, même taille, au centre) : le passage du natif
+/// au Flutter est donc invisible. L'icône monte ensuite légèrement pendant
+/// que le nom de l'application apparaît. Seules des animations de
+/// transformation/opacité sont utilisées (pas d'ombre, pas de flou) pour
+/// rester à 60 i/s même sur les téléphones d'entrée de gamme.
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
+
+  /// Taille de l'icône dans le splash natif (288 dp × 50 %).
+  static const double nativeIconSize = 144;
 
   @override
   State<SplashScreen> createState() => _SplashScreenState();
@@ -11,153 +24,199 @@ class SplashScreen extends StatefulWidget {
 
 class _SplashScreenState extends State<SplashScreen>
     with SingleTickerProviderStateMixin {
-  late final AnimationController _animationController;
-  late final Animation<double> _fade;
-  late final Animation<double> _scale;
+  late final AnimationController _c = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 950),
+  );
+
+  late final Animation<double> _iconMove = CurvedAnimation(
+    parent: _c,
+    curve: const Interval(0, .65, curve: Curves.easeOutCubic),
+  );
+  late final Animation<double> _textIn = CurvedAnimation(
+    parent: _c,
+    curve: const Interval(.3, .9, curve: Curves.easeOutCubic),
+  );
+  late final Animation<double> _footerIn = CurvedAnimation(
+    parent: _c,
+    curve: const Interval(.6, 1, curve: Curves.easeOut),
+  );
 
   @override
   void initState() {
     super.initState();
-    _animationController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 950),
-    );
-    _fade = CurvedAnimation(
-      parent: _animationController,
-      curve: Curves.easeOut,
-    );
-    _scale = Tween<double>(begin: .88, end: 1).animate(
-      CurvedAnimation(parent: _animationController, curve: Curves.easeOutBack),
-    );
-    _animationController.forward();
+    // Petite pause pour que la première image soit identique au natif.
+    Future<void>.delayed(const Duration(milliseconds: 120), () {
+      if (mounted) _c.forward();
+    });
   }
 
   @override
   void dispose() {
-    _animationController.dispose();
+    _c.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: SendraTheme.forest,
-      body: Stack(
-        fit: StackFit.expand,
-        children: [
-          const DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [Color(0xFF064F2D), Color(0xFF07883F)],
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SendraTheme.overlayGreen,
+      child: Scaffold(
+        backgroundColor: SendraTheme.forest,
+        body: Stack(
+          fit: StackFit.expand,
+          children: [
+            // Décor discret, qui apparaît en fondu.
+            FadeTransition(
+              opacity: _footerIn,
+              child: const Stack(children: [
+                Positioned(
+                  top: -90,
+                  right: -70,
+                  child: _SplashCircle(size: 260, opacity: .06),
+                ),
+                Positioned(
+                  bottom: -130,
+                  left: -105,
+                  child: _SplashCircle(size: 330, opacity: .05),
+                ),
+              ]),
+            ),
+            // Icône + nom, centrés comme le splash natif.
+            Center(
+              child: AnimatedBuilder(
+                animation: _c,
+                builder: (context, _) {
+                  final t = _iconMove.value;
+                  final text = _textIn.value;
+                  return Transform.translate(
+                    offset: Offset(0, -64 * t),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Transform.scale(
+                          scale: 1 - .18 * t,
+                          child: Image.asset(
+                            AppBrand.appIcon,
+                            width: SplashScreen.nativeIconSize,
+                            height: SplashScreen.nativeIconSize,
+                            filterQuality: FilterQuality.medium,
+                            gaplessPlayback: true,
+                          ),
+                        ),
+                        // La hauteur du texte est réservée dès le départ
+                        // (Opacity), l'icône reste donc parfaitement centrée.
+                        Opacity(
+                          opacity: text,
+                          child: Transform.translate(
+                            offset: Offset(0, 14 * (1 - text)),
+                            child: const _BrandText(),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
               ),
             ),
-          ),
-          const Positioned(
-            top: -90,
-            right: -70,
-            child: _SplashCircle(size: 260, opacity: .08),
-          ),
-          const Positioned(
-            bottom: -130,
-            left: -105,
-            child: _SplashCircle(size: 330, opacity: .07),
-          ),
-          Positioned(
-            right: -34,
-            bottom: 120,
-            child: Transform.rotate(
-              angle: -.18,
-              child: Icon(
-                Icons.recycling_rounded,
-                size: 185,
-                color: Colors.white.withValues(alpha: .055),
-              ),
-            ),
-          ),
-          SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(28, 32, 28, 26),
-              child: Column(
-                children: [
-                  const Spacer(flex: 3),
-                  FadeTransition(
-                    opacity: _fade,
-                    child: ScaleTransition(
-                      scale: _scale,
-                      child: Container(
-                        width: double.infinity,
-                        constraints: const BoxConstraints(maxWidth: 330),
-                        padding: const EdgeInsets.fromLTRB(24, 28, 24, 24),
-                        decoration: BoxDecoration(
+            // Indicateur de chargement en bas.
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: SafeArea(
+                top: false,
+                child: Padding(
+                  padding: const EdgeInsets.only(bottom: 36),
+                  child: FadeTransition(
+                    opacity: _footerIn,
+                    child: const Center(
+                      child: SizedBox.square(
+                        dimension: 22,
+                        child: CircularProgressIndicator(
                           color: Colors.white,
-                          borderRadius: BorderRadius.circular(28),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: .16),
-                              blurRadius: 35,
-                              offset: const Offset(0, 16),
-                            ),
-                          ],
-                        ),
-                        child: Column(
-                          children: [
-                            Image.asset(
-                              'assets/images/logo.png',
-                              height: 108,
-                              fit: BoxFit.contain,
-                            ),
-                            const SizedBox(height: 12),
-                            const Text(
-                              'Sénégalaise de Déconstruction\net de Recyclage Automobile',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                color: SendraTheme.muted,
-                                fontSize: 11.5,
-                                height: 1.45,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ],
+                          strokeWidth: 2.2,
                         ),
                       ),
                     ),
                   ),
-                  const SizedBox(height: 28),
-                  FadeTransition(
-                    opacity: _fade,
-                    child: const Text(
-                      'Agir pour un environnement plus sûr',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                  const Spacer(flex: 4),
-                  const SizedBox.square(
-                    dimension: 24,
-                    child: CircularProgressIndicator(
-                      color: Colors.white,
-                      strokeWidth: 2.3,
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  Text(
-                    'Chargement…',
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _BrandText extends StatelessWidget {
+  const _BrandText();
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 0,
+      child: OverflowBox(
+        maxHeight: 120,
+        alignment: Alignment.topCenter,
+        child: Padding(
+          padding: const EdgeInsets.only(top: 14),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  const Text(
+                    AppBrand.name,
                     style: TextStyle(
-                      color: Colors.white.withValues(alpha: .78),
-                      fontSize: 12,
+                      fontFamily: SendraTheme.fontFamily,
+                      color: Colors.white,
+                      fontSize: 34,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -.5,
+                      height: 1.1,
                     ),
                   ),
+                  if (AppBrand.badge.isNotEmpty) ...[
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 9, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF111111),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: const Text(
+                        AppBrand.badge,
+                        style: TextStyle(
+                          fontFamily: SendraTheme.fontFamily,
+                          color: Colors.white,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 1.4,
+                        ),
+                      ),
+                    ),
+                  ],
                 ],
               ),
-            ),
+              const SizedBox(height: 8),
+              Text(
+                AppBrand.tagline,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontFamily: SendraTheme.fontFamily,
+                  color: Colors.white.withValues(alpha: .82),
+                  fontSize: 15,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -177,7 +236,6 @@ class _SplashCircle extends StatelessWidget {
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         color: Colors.white.withValues(alpha: opacity),
-        border: Border.all(color: Colors.white.withValues(alpha: opacity)),
       ),
     );
   }

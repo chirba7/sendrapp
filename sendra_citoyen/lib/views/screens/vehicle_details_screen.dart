@@ -12,12 +12,9 @@ class VehicleDetailsScreen extends StatelessWidget {
         title: Text(
           'Détails du Véhicule',
           style: TextStyle(
-            color: Colors.white,
             fontWeight: FontWeight.bold, // Ajout de la propriété fontWeight pour le gras
           ),
         ),
-        backgroundColor: Colors.green[700],
-        iconTheme: IconThemeData(color: Colors.white),
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),

@@ -25,9 +25,14 @@ class InfractionController extends Controller
 
    public function update(InfractionRequest $request, CarPosition $carPosition)
  {
+        abort_if((int) auth()->user()->role_id === 2 && !empty($carPosition->dommage_image), 403, 'Signalement transmis : modification interdite.');
     // Mise à jour des champs simples
     $carPosition->adresse_precise = $request->input('adresse_precise');
     $carPosition->motif_infraction = $request->input('motif_infraction');
+    $carPosition->explication_infraction = $request->input('explication_infraction');
+    if ((int) auth()->user()->role_id === 2 && !$carPosition->agent_id) {
+        $carPosition->agent_id = auth()->id();
+    }
 
     // Correction API-H-4 : la colonne `lieu` est NOT NULL en base ; ne
     // l'assigner que si le client l'a réellement envoyé, sinon `input()`

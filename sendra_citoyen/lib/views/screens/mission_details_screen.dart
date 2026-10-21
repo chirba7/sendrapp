@@ -130,7 +130,7 @@ class _MissionDetailsScreenState extends State<MissionDetailsScreen> {
                     Icons.assignment_outlined,
                     _mission.isProgrammed
                         ? 'Mission programmée'
-                        : 'Mission directe'),
+                        : 'Mission ponctuelle'),
                 if (_mission.address.isNotEmpty)
                   _line(Icons.place_outlined, _mission.address),
                 if ((_mission.providerName ?? '').isNotEmpty)

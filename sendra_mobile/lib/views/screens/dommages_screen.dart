@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
+import 'package:image_picker/image_picker.dart';
 
 import 'package:walletium/routes/routes.dart';
 import 'package:walletium/utils/strings.dart';
@@ -22,6 +23,7 @@ class DommagesScreen extends StatefulWidget {
 
 class _DommagesScreenState extends State<DommagesScreen> {
   final List<Offset?> _points = [];
+  final TextEditingController _missingPartsController = TextEditingController();
   Map<String, dynamic>? signalementDetails;
   ui.Image? _image;
   late double _imageWidth;
@@ -29,6 +31,8 @@ class _DommagesScreenState extends State<DommagesScreen> {
   String _vehicleKind = 'Voiture';
   bool _drawingEnabled = false;
   bool _isSaving = false;
+  bool _uploadingPhoto = false;
+  final List<String> _agentPhotoUrls = [];
   Size _canvasSize = Size.zero;
   // Correction : quand un signalement a déjà des dommages enregistrés,
   // _loadImageFromApi() charge cette image existante (déjà un composite
@@ -43,7 +47,8 @@ class _DommagesScreenState extends State<DommagesScreen> {
     super.initState();
     print('DommagesScreen initialized');
 
-    fetchSignalementDetails(widget.signalementId);
+    _loadVehicleKind()
+        .then((_) => fetchSignalementDetails(widget.signalementId));
     // Correction perf : l'écran attendait deux appels réseau séquentiels
     // (voirDommages puis le téléchargement de l'image) avant d'afficher
     // quoi que ce soit — y compris dans le cas le plus fréquent où aucun
@@ -57,8 +62,17 @@ class _DommagesScreenState extends State<DommagesScreen> {
     _loadImageFromApi(widget.signalementId);
   }
 
+  Future<void> _loadVehicleKind() async {
+    final prefs = await SharedPreferences.getInstance();
+    final saved = prefs.getString('vehicleKind_${widget.signalementId}');
+    if (mounted && (saved == 'Moto' || saved == 'Voiture')) {
+      setState(() => _vehicleKind = saved!);
+    }
+  }
+
   @override
   void dispose() {
+    _missingPartsController.dispose();
     SystemChrome.setPreferredOrientations([
       DeviceOrientation.portraitUp,
       DeviceOrientation.portraitDown,
@@ -90,6 +104,19 @@ class _DommagesScreenState extends State<DommagesScreen> {
         if (dataList.isNotEmpty) {
           setState(() {
             signalementDetails = dataList[0];
+            final details = dataList[0] as Map<String, dynamic>;
+            final kind = details['vehicle_kind']?.toString();
+            if (kind == 'Moto' || kind == 'Voiture') {
+              _vehicleKind = kind!;
+            } else if (details['type']?.toString().toLowerCase() == 'moto' ||
+                details['categorie']?.toString().toUpperCase() == 'CYCL') {
+              _vehicleKind = 'Moto';
+            }
+            _agentPhotoUrls
+              ..clear()
+              ..addAll(
+                  (dataList[0]['photos_agent'] as List<dynamic>? ?? const [])
+                      .map((photo) => photo['url'].toString()));
           });
         } else {
           throw Exception('Aucune donnée n\'a été trouvée pour ce signalement');
@@ -168,8 +195,9 @@ class _DommagesScreenState extends State<DommagesScreen> {
 
 // Fonction utilitaire pour récupérer l'image depuis une URL
   Future<Uint8List> _fetchImageFromUrl(String imageUrl) async {
-    final response =
-        await http.get(Uri.parse(imageUrl)).timeout(const Duration(seconds: 15));
+    final response = await http
+        .get(Uri.parse(imageUrl))
+        .timeout(const Duration(seconds: 15));
     if (response.statusCode == 200) {
       return response.bodyBytes;
     } else {
@@ -250,6 +278,7 @@ class _DommagesScreenState extends State<DommagesScreen> {
 
     final body = jsonEncode({
       'signature': 'data:image/png;base64,' + base64Image,
+      'pieces_manquantes': _missingPartsController.text.trim(),
     });
 
     http.Response response;
@@ -280,33 +309,97 @@ class _DommagesScreenState extends State<DommagesScreen> {
     }
 
     if (response.statusCode == 200) {
-      final jsonResponse = jsonDecode(response.body);
-      print('Réponse après enregistrement: ${jsonResponse.toString()}');
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(jsonResponse['message']),
-        duration: Duration(seconds: 1),
-      ));
-
-      Future.delayed(Duration(seconds: 1), () {
-        if (mounted) {
-          // Dommages peut être ouvert depuis la page Infraction. Un simple
-          // pop ramenait donc l'agent vers le formulaire précédent. La
-          // constatation est recréée ici afin de recharger immédiatement le
-          // statut de la demande d'approbation.
-          Navigator.pushNamedAndRemoveUntil(
-            context,
-            Routes.depositMoneyDetailsScreen,
-            ModalRoute.withName(Routes.bottomNavigationScreen),
-            arguments: widget.signalementId,
-          );
-        }
-      });
+      if (!mounted) return;
+      setState(() => _isSaving = false);
+      await showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        builder: (dialogContext) => PopScope(
+            canPop: false,
+            child: AlertDialog(
+              title: const Text('Signalement transmis'),
+              content: const Text(
+                'La constatation a été envoyée pour approbation. Elle est maintenant consultable en récapitulatif et ne peut plus être modifiée par l’agent.',
+              ),
+              actions: [
+                FilledButton(
+                  onPressed: () {
+                    Navigator.of(dialogContext).pop();
+                    Navigator.pushNamedAndRemoveUntil(
+                      context,
+                      Routes.depositMoneyDetailsScreen,
+                      ModalRoute.withName(Routes.bottomNavigationScreen),
+                      arguments: widget.signalementId,
+                    );
+                  },
+                  child: const Text('Quitter'),
+                ),
+              ],
+            )),
+      );
     } else {
       print('Erreur lors de l\'enregistrement du dessin');
       ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Échec de l\'enregistrement des dommages')));
     }
     if (mounted) setState(() => _isSaving = false);
+  }
+
+  Future<void> _addAgentPhoto(ImageSource source) async {
+    XFile? picked;
+    try {
+      picked = await ImagePicker().pickImage(
+        source: source,
+        imageQuality: 65,
+        maxWidth: 1280,
+        maxHeight: 1280,
+        requestFullMetadata: false,
+      );
+    } catch (_) {
+      if (mounted)
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content:
+                  Text('Impossible d’ouvrir l’appareil photo ou les images.')),
+        );
+      return;
+    }
+    if (picked == null || !mounted) return;
+    setState(() => _uploadingPhoto = true);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('token');
+      final request = http.MultipartRequest(
+          'POST',
+          Uri.parse(
+            '${Strings.apiURI}constatation/${widget.signalementId}/photos',
+          ));
+      request.headers['Authorization'] = 'Bearer $token';
+      request.files
+          .add(await http.MultipartFile.fromPath('photo', picked.path));
+      final response = await http.Response.fromStream(
+        await request.send().timeout(const Duration(seconds: 30)),
+      );
+      if (response.statusCode == 404) {
+        throw Exception(
+            'L’envoi de photos n’est pas encore disponible sur le serveur.');
+      }
+      if (response.statusCode != 201) {
+        throw Exception(
+            'Échec de l’envoi de la photo (${response.statusCode}).');
+      }
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      if (mounted) setState(() => _agentPhotoUrls.add(data['url'] as String));
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content: Text(error.toString().replaceFirst('Exception: ', ''))),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _uploadingPhoto = false);
+    }
   }
 
   Rect _sourceRectFor(ui.Image image) {
@@ -340,6 +433,8 @@ class _DommagesScreenState extends State<DommagesScreen> {
       body: SafeArea(
         top: false,
         child: SingleChildScrollView(
+          physics:
+              _drawingEnabled ? const NeverScrollableScrollPhysics() : null,
           padding: const EdgeInsets.only(bottom: 12),
           child: Column(
             children: [
@@ -364,23 +459,92 @@ class _DommagesScreenState extends State<DommagesScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Type de véhicule',
+                    Chip(
+                      avatar: Icon(_vehicleKind == 'Moto'
+                          ? Icons.two_wheeler_rounded
+                          : Icons.directions_car_rounded),
+                      label: Text('Véhicule à annoter : $_vehicleKind'),
+                    ),
+                    const SizedBox(height: 12),
+                    const Text('Photos de l’agent',
                         style: TextStyle(fontWeight: FontWeight.w700)),
-                    const SizedBox(height: 9),
-                    Row(
-                      children: [
-                        _vehicleChoice('Voiture', Icons.directions_car_rounded),
-                        const SizedBox(width: 10),
-                        _vehicleChoice('Moto', Icons.two_wheeler_rounded),
-                      ],
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      width: double.infinity,
+                      child: Card(
+                      child: Padding(
+                        padding: const EdgeInsets.all(14),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            const Text('Ajouter une photo de constatation',
+                                style: TextStyle(color: SendraTheme.muted)),
+                            const SizedBox(height: 10),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                OutlinedButton.icon(
+                                  onPressed: _uploadingPhoto
+                                      ? null
+                                      : () =>
+                                          _addAgentPhoto(ImageSource.camera),
+                                  icon: const Icon(Icons.photo_camera_outlined),
+                                  label: const Text('Prendre une photo'),
+                                ),
+                                const SizedBox(height: 10),
+                                OutlinedButton.icon(
+                                  onPressed: _uploadingPhoto
+                                      ? null
+                                      : () =>
+                                          _addAgentPhoto(ImageSource.gallery),
+                                  icon:
+                                      const Icon(Icons.photo_library_outlined),
+                                  label: const Text('Importer une photo'),
+                                ),
+                              ],
+                            ),
+                            if (_uploadingPhoto)
+                              const LinearProgressIndicator(),
+                          ],
+                        ),
+                      ),
+                    ),
+                    ),
+                    if (_agentPhotoUrls.isNotEmpty)
+                      Wrap(
+                          spacing: 8,
+                          children: _agentPhotoUrls
+                              .map(
+                                (url) => Image.network(url,
+                                    width: 72, height: 72, fit: BoxFit.cover,
+                                    cacheWidth: 216),
+                              )
+                              .toList()),
+                    const SizedBox(height: 12),
+                    const Text(
+                        'Légende : X = bris  ·  O = enfoncement  ·  V = rayure',
+                        style: TextStyle(fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: _missingPartsController,
+                      maxLines: 2,
+                      maxLength: 2000,
+                      decoration: const InputDecoration(
+                        labelText: 'Pièces manquantes',
+                        hintText:
+                            'Décrivez les pièces absentes du véhicule ou de la moto',
+                        border: OutlineInputBorder(),
+                      ),
                     ),
                     const SizedBox(height: 14),
                     Row(
                       children: [
-                        const Expanded(
+                        Expanded(
                           child: Text(
-                            'Touchez « Annoter », puis dessinez sur les zones endommagées.',
-                            style: TextStyle(
+                            _drawingEnabled
+                                ? 'Dessin actif : tracez sur le véhicule. Désactivez pour faire défiler la page.'
+                                : 'Touchez « Annoter », puis tracez sur le véhicule.',
+                            style: const TextStyle(
                                 color: SendraTheme.muted, fontSize: 12),
                           ),
                         ),
@@ -428,12 +592,19 @@ class _DommagesScreenState extends State<DommagesScreen> {
                             clipBehavior: Clip.antiAlias,
                             child: GestureDetector(
                               behavior: HitTestBehavior.opaque,
+                              onPanStart: _drawingEnabled
+                                  ? (details) => setState(
+                                      () => _points.add(details.localPosition))
+                                  : null,
                               onPanUpdate: _drawingEnabled
                                   ? (details) => setState(
                                       () => _points.add(details.localPosition))
                                   : null,
                               onPanEnd: _drawingEnabled
-                                  ? (_) => _points.add(null)
+                                  ? (_) => setState(() => _points.add(null))
+                                  : null,
+                              onPanCancel: _drawingEnabled
+                                  ? () => setState(() => _points.add(null))
                                   : null,
                               child: CustomPaint(
                                 painter: ImagePainter(_image!, _points, source),
@@ -445,84 +616,56 @@ class _DommagesScreenState extends State<DommagesScreen> {
                   ],
                 ),
               ),
-              const SizedBox(height: 14),
-              Container(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-                decoration: const BoxDecoration(
-                  color: Colors.white,
-                  border: Border(top: BorderSide(color: SendraTheme.border)),
+            ],
+          ),
+        ),
+      ),
+      bottomNavigationBar: SafeArea(
+        top: false,
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            border: Border(top: BorderSide(color: SendraTheme.border)),
+          ),
+          child: Row(
+            children: [
+              OutlinedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  foregroundColor: Colors.red[700],
+                  minimumSize: const Size(0, 44),
                 ),
-                child: Row(
-                  children: [
-                    OutlinedButton.icon(
-                      style: ElevatedButton.styleFrom(
-                        foregroundColor: Colors.red[700],
-                        minimumSize: const Size(0, 44),
-                      ),
-                      onPressed: () async {
-                        setState(() {
-                          _points.clear(); // Efface les points
-                        });
-                        await _loadDefaultImage();
-                      },
-                      icon: const Icon(Icons.delete_outline, size: 19),
-                      label: const Text('Effacer'),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: SendraTheme.green,
-                          minimumSize: const Size(0, 44),
-                        ),
-                        onPressed: _isSaving ? null : _saveDrawing,
-                        icon: _isSaving
-                            ? const SizedBox.square(
-                                dimension: 18,
-                                child: CircularProgressIndicator(
-                                    color: Colors.white, strokeWidth: 2),
-                              )
-                            : const Icon(Icons.send_rounded, size: 19),
-                        label: Text(
-                            _isSaving ? 'Envoi…' : 'Envoyer pour approbation'),
-                      ),
-                    ),
-                  ],
+                onPressed: () async {
+                  setState(() {
+                    _points.clear(); // Efface les points
+                  });
+                  await _loadDefaultImage();
+                },
+                icon: const Icon(Icons.delete_outline, size: 19),
+                label: const Text('Effacer'),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: SendraTheme.green,
+                    minimumSize: const Size(0, 44),
+                  ),
+                  onPressed: _isSaving ? null : _saveDrawing,
+                  icon: _isSaving
+                      ? const SizedBox.square(
+                          dimension: 18,
+                          child: CircularProgressIndicator(
+                              color: Colors.white, strokeWidth: 2),
+                        )
+                      : const Icon(Icons.send_rounded, size: 19),
+                  label:
+                      Text(_isSaving ? 'Envoi…' : 'Envoyer pour approbation'),
                 ),
               ),
             ],
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _vehicleChoice(String label, IconData icon) {
-    final selected = _vehicleKind == label;
-    return Expanded(
-      child: ChoiceChip(
-        showCheckmark: false,
-        avatar: Icon(icon,
-            color: selected ? SendraTheme.forest : SendraTheme.muted),
-        label: SizedBox(
-            width: double.infinity,
-            child: Text(label, textAlign: TextAlign.center)),
-        selected: selected,
-        onSelected: (_) async {
-          // Changer de type sur une image déjà enregistrée n'a pas de sens
-          // (ce n'est plus le gabarit à deux panneaux) — on repart du
-          // gabarit vierge pour une nouvelle annotation.
-          if (_isExistingImage) {
-            await _loadDefaultImage();
-          }
-          setState(() {
-            _vehicleKind = label;
-            _points.clear();
-          });
-        },
-        selectedColor: const Color(0xFFE1F3E8),
-        side: BorderSide(
-            color: selected ? SendraTheme.green : SendraTheme.border),
       ),
     );
   }

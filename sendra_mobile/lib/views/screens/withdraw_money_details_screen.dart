@@ -24,12 +24,11 @@ class WithdrawMoneyDetailsScreen extends StatelessWidget {
       appBar: AppBar(
         title: const Text(
           Strings.withdrawMoneyDetails,
-          style: TextStyle(color: CustomColor.whiteColor),
+          style: TextStyle(),
         ),
         leading: const BackButtonWidget(
           backButtonImage: Strings.backButtonWhite,
         ),
-        backgroundColor: CustomColor.primaryColor,
         elevation: 0,
       ),
       body: _bodyWidget(context),

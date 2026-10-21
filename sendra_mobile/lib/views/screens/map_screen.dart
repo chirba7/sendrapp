@@ -156,7 +156,6 @@ class _MapScreenState extends State<MapScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text('Itinéraire détaillé'),
-        backgroundColor: Colors.green,
       ),
       body: Stack(
         children: [

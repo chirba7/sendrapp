@@ -33,6 +33,7 @@ class CarPositionController extends Controller
                 ['etat', 'SIGNALE']
             ]
         )
+            ->whereNull('non_removed_at')
             ->with('photo')
             ->orderBy('created_at')
             ->paginate(5);
@@ -61,10 +62,22 @@ class CarPositionController extends Controller
                 ['etat', 'EN COURS']
             ]
         )
+            ->whereNull('non_removed_at')
             ->with('photo')
             ->orderBy('created_at')
             ->paginate(5);
         return view('carPosition.encours', compact('signalements'));
+    }
+
+    public function nonResolus()
+    {
+        $signalements = CarPosition::where('is_deleted', false)
+            ->whereIn('etat', ['SIGNALE', 'EN COURS'])
+            ->whereNotNull('non_removed_at')
+            ->with('photo')
+            ->orderByDesc('non_removed_at')
+            ->paginate(10);
+        return view('carPosition.non_resolus', compact('signalements'));
     }
     /**
      * Show the form for creating a new resource.
@@ -109,14 +122,16 @@ class CarPositionController extends Controller
     {
         // Toutes les photos du signalement (une par angle depuis l'app avec
         // mode hors ligne), vue d'ensemble d'abord.
-        $photos = CarPhoto::where('card_id', $carPosition->id)->orderBy('id')->get();
+        $allPhotos = CarPhoto::where('card_id', $carPosition->id)->orderBy('id')->get();
+        $photos = $allPhotos->where('position', '!=', 'agent_constat')->values();
+        $agentPhotos = $allPhotos->where('position', 'agent_constat')->values();
         $photo = $photos->first();
         // Le binding de route fournit déjà le bon signalement. Appeler
         // first() sur une nouvelle requête repartait de toute la table et
         // affichait systématiquement le signalement n° 1 avec la photo du
         // signalement demandé.
-        $carPosition->load('user');
-        return view('carPosition.show', compact('carPosition', 'photo', 'photos'));
+        $carPosition->load(['user', 'agent']);
+        return view('carPosition.show', compact('carPosition', 'photo', 'photos', 'agentPhotos'));
     }
 
     /**
@@ -132,6 +147,7 @@ class CarPositionController extends Controller
      */
     public function vehicule(UpdateCarPositionRequest $request, CarPosition $carPosition)
     {
+        abort_if((int) Auth::user()->role_id === 2 && !empty($carPosition->dommage_image), 403, 'Signalement transmis : modification interdite.');
         $carPosition->numero_vehicule = strtoupper($request->numero_vehicule);
         $carPosition->motif_infraction = $request->motif_infraction;
         $carPosition->marque = $request->marque;
@@ -157,6 +173,7 @@ class CarPositionController extends Controller
 
     public function infraction(Request $request, CarPosition $carPosition)
     {
+        abort_if((int) Auth::user()->role_id === 2 && !empty($carPosition->dommage_image), 403, 'Signalement transmis : modification interdite.');
         $request->validate([
             'adresse_precise' => 'required|string|max:255',
             'motif_infraction' => 'required|string|max:255',
@@ -189,17 +206,49 @@ class CarPositionController extends Controller
         $carPosition->lieu_enlevement = $request->lieu_enlevement;
         $carPosition->nom_responsable_mef = $request->nom_responsable_mef;
         $carPosition->etat = "ENLEVE";
+        $carPosition->non_removal_reason = null;
+        $carPosition->non_removed_at = null;
         $carPosition->update();
 
         return redirect()->back()->with('success', 'Les données ont été mises à jour avec succès.');
     }
 
+    public function approbations(Request $request)
+    {
+        $filtre = $request->query('filtre', 'attente');
+        $recherche = trim((string) $request->query('q', ''));
+        abort_unless(in_array($filtre, ['attente', 'approuves', 'refuses'], true), 404);
+        $query = CarPosition::query()->where('is_deleted', false)
+            ->whereNotNull('dommage_image')->with(['user', 'agent', 'photo']);
+        if ($filtre === 'attente') {
+            $query->where('is_approve', false)->where('etat', '!=', 'REJETE');
+        } elseif ($filtre === 'approuves') {
+            $query->where('is_approve', true);
+        } else {
+            $query->where('etat', 'REJETE');
+        }
+        if ($recherche !== '') {
+            $query->where(function ($q) use ($recherche) {
+                if (ctype_digit($recherche)) $q->orWhere('id', (int) $recherche);
+                $q->orWhere('commune', 'like', '%'.$recherche.'%')
+                  ->orWhere('numero_vehicule', 'like', '%'.$recherche.'%');
+            });
+        }
+        $signalements = $query->orderByDesc('updated_at')->paginate(30)->withQueryString();
+        $enAttente = CarPosition::where('is_deleted', false)->whereNotNull('dommage_image')
+            ->where('is_approve', false)->where('etat', '!=', 'REJETE')->count();
+        return view('carPosition.approbations', compact('signalements', 'filtre', 'enAttente', 'recherche'));
+    }
+
     public function approbation(Request $request, CarPosition $carPosition)
     {
         $request->validate([
-            'approbation' => 'required',
-            'motife_approbation' => 'nullable|string|max:225',
+            'approbation' => 'required|in:OUI,NON',
+            'motife_approbation' => 'required_if:approbation,NON|nullable|string|max:225',
         ]);
+
+        abort_if(empty($carPosition->dommage_image), 422, 'Constatation non transmise.');
+        abort_if($carPosition->is_approve || $carPosition->etat === 'REJETE', 409, 'Décision déjà enregistrée.');
 
         // Correction API-M-1 (même bug dupliqué côté back-office) : l'état
         // était forcé à "EN COURS" même en cas de refus.
@@ -214,7 +263,7 @@ class CarPositionController extends Controller
 
         $carPosition->update();
 
-        return redirect()->back()->with('success', 'Les données ont été mises à jour avec succès.');
+        return redirect()->route('approbations.index')->with('success', 'Décision enregistrée.');
     }
     public function locatlisation(CarPosition $carPosition)
     {
@@ -235,7 +284,7 @@ class CarPositionController extends Controller
 
     public function pdf_constation(CarPosition $carPosition)
     {
-        $carPosition->load('agent');
+        $carPosition->load(['agent', 'photo']);
         $pdf = Pdf::loadView('carPosition.pdf.constation', compact('carPosition'));
 
         return $pdf->stream("$carPosition->numero_vehicule.pdf");
@@ -247,20 +296,25 @@ class CarPositionController extends Controller
         // pour la compter en PHP. ->count() fait l'agrégation en SQL, sans
         // rapatrier ni instancier la moindre ligne.
         $signalements = CarPosition::count();
-        $signales = CarPosition::where('etat', 'SIGNALE')->count();
+        $signales = CarPosition::where('etat', 'SIGNALE')->whereNull('non_removed_at')->count();
         $enleves = CarPosition::where('etat', 'ENLEVE')->count();
-        $encours = CarPosition::where('etat', 'EN COURS')->count();
+        $encours = CarPosition::where('etat', 'EN COURS')->whereNull('non_removed_at')->count();
+        $nonResolus = CarPosition::whereIn('etat', ['SIGNALE', 'EN COURS'])->whereNotNull('non_removed_at')->count();
+        $approbationsEnAttente = CarPosition::where('is_deleted', false)
+            ->whereNotNull('dommage_image')->where('is_approve', false)
+            ->where('etat', '!=', 'REJETE')->count();
         $signalement = CarPosition::where('is_deleted', false)
             ->with('photo')
             ->orderBy('created_at', 'desc')
             ->take(5)
             ->get();
-        return view('welcome', compact('signales', 'signalements', 'enleves', 'encours', 'signalement'));
+        return view('welcome', compact('signales', 'signalements', 'enleves', 'encours', 'nonResolus', 'signalement', 'approbationsEnAttente'));
     }
 
 
     public function signaturestore(Request $request, CarPosition $carPosition)
     {
+        abort_if((int) Auth::user()->role_id === 2 && !empty($carPosition->dommage_image), 403, 'Signalement transmis : modification interdite.');
         // Correction WEB-M-4 : aucune validation de format/taille avant —
         // un payload malformé faisait planter explode(), un payload énorme
         // pouvait remplir le stockage sans limite.

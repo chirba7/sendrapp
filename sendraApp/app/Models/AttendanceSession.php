@@ -12,6 +12,8 @@ class AttendanceSession extends Model
         'scheduled_start' => 'immutable_datetime', 'scheduled_end' => 'immutable_datetime',
         'arrived_at' => 'immutable_datetime', 'departed_at' => 'immutable_datetime',
         'arrival_position' => 'array', 'departure_position' => 'array',
+        'break_started_at' => 'immutable_datetime', 'break_ended_at' => 'immutable_datetime',
+        'break_start_position' => 'array', 'break_end_position' => 'array',
     ];
 
     public function site()

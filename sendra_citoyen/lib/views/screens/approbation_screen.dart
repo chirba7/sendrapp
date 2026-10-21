@@ -139,12 +139,9 @@ class _ApprovalFormState extends State<ApprovalForm> {
         title: Text(
           'Approbation',
           style: TextStyle(
-            color: Colors.white,
             fontWeight: FontWeight.bold, // Met le texte en gras
           ),
         ),
-        backgroundColor: Colors.green[700],
-        iconTheme: IconThemeData(color: Colors.white),
       ),
       body: Padding(
         padding: const EdgeInsets.all(25.0),

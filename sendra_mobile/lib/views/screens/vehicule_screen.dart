@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:walletium/views/screens/vehicle_details_screen.dart';
@@ -9,58 +8,6 @@ import '../../utils/strings.dart';
 import '../../utils/sendra_theme.dart';
 import '../../utils/vehicle_brands.dart';
 import 'infraction_screen.dart';
-
-/// Formate la saisie de plaque en AA-<chiffres>-AA au fil de la frappe
-/// (majuscules forcées, tirets automatiques). Le nombre de chiffres n'est
-/// pas fixe (0, 00, 000, 0000... selon la plaque) : le segment se termine
-/// dès qu'une lettre suit, pas après un nombre de caractères donné. La
-/// validation stricte du format se fait séparément, à la soumission.
-class _PlateInputFormatter extends TextInputFormatter {
-  @override
-  TextEditingValue formatEditUpdate(
-    TextEditingValue oldValue,
-    TextEditingValue newValue,
-  ) {
-    final raw = newValue.text.toUpperCase();
-    final letters1 = <String>[];
-    final digits = <String>[];
-    final letters2 = <String>[];
-
-    for (final char in raw.split('')) {
-      final isLetter = RegExp(r'[A-Z]').hasMatch(char);
-      final isDigit = RegExp(r'[0-9]').hasMatch(char);
-      if (isLetter) {
-        if (digits.isEmpty && letters1.length < 2) {
-          letters1.add(char);
-        } else if (digits.isNotEmpty && letters2.length < 2) {
-          letters2.add(char);
-        }
-      } else if (isDigit) {
-        // Le segment chiffres se termine dès que letters2 a commencé —
-        // pas de longueur fixe imposée avant ça.
-        if (letters1.length == 2 && letters2.isEmpty) {
-          digits.add(char);
-        }
-      }
-    }
-
-    final buffer = StringBuffer(letters1.join());
-    if (letters1.length == 2) {
-      buffer.write('-');
-      buffer.write(digits.join());
-    }
-    if (letters2.isNotEmpty) {
-      buffer.write('-');
-      buffer.write(letters2.join());
-    }
-
-    final text = buffer.toString();
-    return TextEditingValue(
-      text: text,
-      selection: TextSelection.collapsed(offset: text.length),
-    );
-  }
-}
 
 class VehicleForm extends StatefulWidget {
   final int signalementId; // Identifiant du véhicule à mettre à jour
@@ -78,8 +25,14 @@ class _VehicleFormState extends State<VehicleForm> {
     'VUS',
     'SUV',
     'Hayon',
-    'Camion',
     'Electrique',
+    'Citadine',
+    'SUV / 4x4',
+    'Utilitaire',
+    'Camion',
+    'Bus',
+    'Moto',
+    'Autre',
   ];
   static const List<String> _vehicleCategories = [
     'VPP',
@@ -87,6 +40,7 @@ class _VehicleFormState extends State<VehicleForm> {
     'VUL',
     'VTM',
     'CYCL',
+    'AUTRE',
   ];
   static const Map<String, Color> _vehicleColors = {
     'Blanc': Color(0xFFF5F5F5),
@@ -136,10 +90,6 @@ class _VehicleFormState extends State<VehicleForm> {
       icon: Icons.local_fire_department_outlined,
       description: 'Le véhicule présente des dégâts liés à un incendie.'
     ),
-    'Châssis non réparable': (
-      icon: Icons.car_crash_outlined,
-      description: 'La structure du véhicule ne peut plus être réparée.'
-    ),
   };
 
   // Sélecteur en tête d'écran : filtre la liste de marques suggérées
@@ -161,7 +111,6 @@ class _VehicleFormState extends State<VehicleForm> {
     'Défauts techniques irréversibles': false,
     'Véhicule non identifiable': false,
     'Véhicule brûlé': false,
-    'Châssis non réparable': false,
   };
 
   @override
@@ -204,6 +153,13 @@ class _VehicleFormState extends State<VehicleForm> {
         _brandFieldVersion++;
         _typeController.text =
             _canonicalChoice(_cleanValue(data['type']), _vehicleTypes);
+        final savedKind = _cleanValue(data['vehicle_kind']);
+        if (savedKind == 'Moto' || savedKind == 'Voiture') {
+          _vehicleKind = savedKind;
+        } else if (_typeController.text == 'Moto' ||
+            _cleanValue(data['categorie']) == 'CYCL') {
+          _vehicleKind = 'Moto';
+        }
         _modeleController.text = _cleanValue(data['model']);
         _categorieController.text = _canonicalChoice(
             _cleanValue(data['categorie']), _vehicleCategories);
@@ -224,7 +180,6 @@ class _VehicleFormState extends State<VehicleForm> {
               (data['defauts_techniques_irreversibles'] == 1),
           'Véhicule non identifiable': (data['vehicule_non_identifiable'] == 1),
           'Véhicule brûlé': (data['vehicule_brule'] == 1),
-          'Châssis non réparable': (data['chassis_non_reparable'] == 1),
         };
       });
     } else {
@@ -261,18 +216,6 @@ class _VehicleFormState extends State<VehicleForm> {
       return;
     }
 
-    // Le nombre de chiffres varie selon la plaque (0, 00, 000, 0000...) —
-    // seul le nombre de lettres de part et d'autre est fixe.
-    if (!RegExp(r'^[A-Z]{2}-\d+-[A-Z]{2}$').hasMatch(_numeroController.text)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-              'Le numéro du véhicule doit être au format AB-0000-KO (le nombre de chiffres peut varier).'),
-        ),
-      );
-      return;
-    }
-
     final url = '${Strings.apiURI}vehicule/${widget.signalementId}';
     SharedPreferences prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('token');
@@ -288,8 +231,7 @@ class _VehicleFormState extends State<VehicleForm> {
       'vehicule_non_identifiable':
           _details['Véhicule non identifiable'] == true ? 1 : 0,
       'vehicule_brule': _details['Véhicule brûlé'] == true ? 1 : 0,
-      'chassis_non_reparable':
-          _details['Châssis non réparable'] == true ? 1 : 0,
+      'chassis_non_reparable': 0,
     };
 
     final response = await http.put(
@@ -302,6 +244,7 @@ class _VehicleFormState extends State<VehicleForm> {
         'numero_vehicule': _numeroController.text,
         'marque': _marqueController.text,
         'type': _typeController.text,
+        'vehicle_kind': _vehicleKind,
         'model': _modeleController.text,
         'categorie': _categorieController.text,
         'couleur': _couleurController.text,
@@ -313,6 +256,8 @@ class _VehicleFormState extends State<VehicleForm> {
     );
 
     if (response.statusCode == 200) {
+      await prefs.setString(
+          'vehicleKind_${widget.signalementId}', _vehicleKind);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Véhicule mis à jour avec succès'),
@@ -353,7 +298,8 @@ class _VehicleFormState extends State<VehicleForm> {
           ),
         ],
       ),
-      body: Padding(
+      body: SafeArea(
+          child: Padding(
         padding: const EdgeInsets.all(20.0),
         child: Scrollbar(
           // Ajouter l'indicateur de défilement
@@ -374,6 +320,17 @@ class _VehicleFormState extends State<VehicleForm> {
               ),
               SizedBox(height: 20),
               _buildPlateField(),
+              _buildSectionTitle('Pays étranger'),
+              _buildChoiceGroup(
+                  const {'NON': '🇸🇳  Non', 'OUI': '🌍  Oui'}, _paysEtranger,
+                  (value) {
+                setState(() {
+                  _paysEtranger = value;
+                });
+              }),
+              SizedBox(height: 20),
+              Divider(),
+              SizedBox(height: 10),
               _buildBrandField(),
               _buildDropdown(
                   'Type', _typeController, Icons.category, _vehicleTypes),
@@ -392,83 +349,73 @@ class _VehicleFormState extends State<VehicleForm> {
               }, _entretien, (value) {
                 setState(() {
                   _entretien = value;
+                  if (value == 'BON') {
+                    _details.updateAll((_, __) => false);
+                    _autreSituationController.clear();
+                  }
                 });
               }),
               SizedBox(height: 20),
               Divider(),
               SizedBox(height: 10),
-              _buildSectionTitle('Pays étranger'),
-              _buildChoiceGroup(
-                  const {'NON': '🇸🇳  Non', 'OUI': '🌍  Oui'}, _paysEtranger,
-                  (value) {
-                setState(() {
-                  _paysEtranger = value;
-                });
-              }),
-              SizedBox(height: 20),
-              Divider(),
-              SizedBox(height: 10),
-              _buildSectionTitle('Détails du véhicule'),
-              const SizedBox(height: 8),
-              const Text(
-                  'Sélectionnez les situations constatées sur le véhicule.'),
-              const SizedBox(height: 12),
-              ..._details.keys.map((key) {
-                final help = _detailHelp[key]!;
-                return Card(
-                  margin: const EdgeInsets.only(bottom: 10),
-                  color: _details[key] == true
-                      ? const Color(0xFFE9F7EE)
-                      : Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
-                    side: BorderSide(
-                        color: _details[key] == true
-                            ? SendraTheme.green
-                            : SendraTheme.border),
-                  ),
-                  child: CheckboxListTile(
-                    secondary: Container(
-                      width: 48,
-                      height: 48,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFE1F3E8),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Icon(help.icon, color: SendraTheme.forest),
+              if (_entretien == 'MOYEN' || _entretien == 'DEGRADE') ...[
+                _buildSectionTitle('Détails du véhicule'),
+                const SizedBox(height: 8),
+                const Text(
+                    'Sélectionnez les situations constatées sur le véhicule.'),
+                const SizedBox(height: 12),
+                ..._details.keys.map((key) {
+                  final help = _detailHelp[key]!;
+                  return Card(
+                    margin: const EdgeInsets.only(bottom: 10),
+                    color: _details[key] == true
+                        ? const Color(0xFFE9F7EE)
+                        : Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      side: BorderSide(
+                          color: _details[key] == true
+                              ? SendraTheme.green
+                              : SendraTheme.border),
                     ),
-                    title: Text(key,
-                        style: const TextStyle(fontWeight: FontWeight.w700)),
-                    subtitle: Text(help.description),
-                    value: _details[key],
-                    onChanged: (value) =>
-                        setState(() => _details[key] = value ?? false),
+                    child: CheckboxListTile(
+                      secondary: Container(
+                        width: 48,
+                        height: 48,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE1F3E8),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Icon(help.icon, color: SendraTheme.forest),
+                      ),
+                      title: Text(key,
+                          style: const TextStyle(fontWeight: FontWeight.w700)),
+                      subtitle: Text(help.description),
+                      value: _details[key],
+                      onChanged: (value) =>
+                          setState(() => _details[key] = value ?? false),
+                    ),
+                  );
+                }).toList(),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: _autreSituationController,
+                  maxLines: 3,
+                  maxLength: 500,
+                  decoration: InputDecoration(
+                    labelText: 'Autre situation constatée',
+                    hintText: 'Décrivez une situation absente de la liste',
+                    prefixIcon: const Icon(Icons.edit_note_outlined),
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14)),
+                    alignLabelWithHint: true,
                   ),
-                );
-              }).toList(),
-              const SizedBox(height: 16),
-              TextField(
-                controller: _autreSituationController,
-                maxLines: 3,
-                maxLength: 500,
-                decoration: InputDecoration(
-                  labelText: 'Autre situation constatée',
-                  hintText: 'Décrivez une situation absente de la liste',
-                  prefixIcon: const Icon(Icons.edit_note_outlined),
-                  border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(14)),
-                  alignLabelWithHint: true,
                 ),
-              ),
+              ],
               SizedBox(height: 30),
               ElevatedButton.icon(
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.green[700],
-                  foregroundColor: Colors.white,
-                  padding: EdgeInsets.symmetric(vertical: 15),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
+                  minimumSize: const Size.fromHeight(54),
                 ),
                 onPressed: _updateVehicle,
                 icon: Icon(Icons.directions_car), // Ajoutez une icône ici
@@ -480,7 +427,7 @@ class _VehicleFormState extends State<VehicleForm> {
             ],
           ),
         ),
-      ),
+      )),
     );
   }
 
@@ -500,22 +447,42 @@ class _VehicleFormState extends State<VehicleForm> {
 
   Widget _kindChoice(String label, IconData icon) {
     final selected = _vehicleKind == label;
-    return ChoiceChip(
-      showCheckmark: false,
-      avatar: Icon(icon, color: selected ? SendraTheme.forest : Colors.grey),
-      label: SizedBox(
-        width: double.infinity,
-        child: Text(label, textAlign: TextAlign.center),
+    // Bouton à deux états, pleine largeur : texte toujours lisible et plus
+    // de débordement à droite de l'écran.
+    return Material(
+      color: selected ? SendraTheme.greenSoft : Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+        side: BorderSide(
+            color: selected ? SendraTheme.green : SendraTheme.border,
+            width: selected ? 1.6 : 1),
       ),
-      selected: selected,
-      onSelected: (_) => setState(() {
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
         // Change seulement la liste de marques suggérées — n'efface pas une
         // marque déjà saisie, y compris hors-liste.
-        _vehicleKind = label;
-      }),
-      selectedColor: const Color(0xFFE1F3E8),
-      side:
-          BorderSide(color: selected ? SendraTheme.green : SendraTheme.border),
+        onTap: () => setState(() => _vehicleKind = label),
+        child: SizedBox(
+          height: 50,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon,
+                  size: 22,
+                  color: selected ? SendraTheme.forest : SendraTheme.muted),
+              const SizedBox(width: 8),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                  color: selected ? SendraTheme.forest : SendraTheme.ink,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -525,10 +492,9 @@ class _VehicleFormState extends State<VehicleForm> {
       child: TextField(
         controller: _numeroController,
         textCapitalization: TextCapitalization.characters,
-        inputFormatters: [_PlateInputFormatter()],
         decoration: InputDecoration(
           labelText: 'Numéro du véhicule',
-          hintText: 'AB-0000-KO',
+          hintText: 'Saisissez la plaque telle qu’elle apparaît',
           prefixIcon: const Icon(Icons.numbers),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(10),
@@ -622,7 +588,8 @@ class _VehicleFormState extends State<VehicleForm> {
   Widget _buildSectionTitle(String title) {
     return Text(
       title,
-      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+      style: const TextStyle(
+          fontSize: 17, fontWeight: FontWeight.w700, color: SendraTheme.ink),
     );
   }
 
@@ -650,13 +617,24 @@ class _VehicleFormState extends State<VehicleForm> {
         items: options
             .map((option) => DropdownMenuItem(
                   value: option,
-                  child: Text(option),
+                  child: Text(_categoryLabel(option),
+                      overflow: TextOverflow.ellipsis),
                 ))
             .toList(),
         onChanged: (value) => setState(() => controller.text = value ?? ''),
       ),
     );
   }
+
+  String _categoryLabel(String option) => switch (option) {
+        'VPP' => 'VPP — voiture particulière',
+        'VUS' => 'VUS — véhicule utilitaire sportif',
+        'VUL' => 'VUL — utilitaire léger',
+        'VTM' => 'VTM — transport de marchandises',
+        'CYCL' => 'CYCL — deux-roues',
+        'AUTRE' => 'Autre catégorie',
+        _ => option,
+      };
 
   Widget _buildColorPalette() {
     return Padding(

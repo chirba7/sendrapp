@@ -1,104 +1,65 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:walletium/routes/routes.dart';
-import 'package:walletium/utils/custom_color.dart';
-import 'package:walletium/utils/custom_style.dart';
-import 'package:walletium/utils/size.dart';
-import 'package:walletium/utils/strings.dart';
-import 'package:walletium/widgets/buttons/primary_button_widget.dart';
 
 class WelcomeScreen extends StatelessWidget {
-  const WelcomeScreen({Key? key}) : super(key: key);
+  const WelcomeScreen({super.key});
+
+  Future<void> _continue(String route) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('has_seen_welcome', true);
+    Get.offAllNamed(route);
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: CustomColor.primaryBackgroundColor,
-      body: _bodyWidget(context),
-    );
-  }
-
-  ListView _bodyWidget(BuildContext context) {
-    return ListView(
-      // mainAxisAlignment: mainSpaceBet,
-      children: [
-        _upperBackgroundImage(context),
-        _buttonWidget(context),
-        _downBackgroundImage(context),
-      ],
-    );
-  }
-
-  Stack _upperBackgroundImage(BuildContext context) {
-    return Stack(
-      children: [
-        Container(
-          height: MediaQuery.of(context).size.height * 0.37,
-          alignment: Alignment.topCenter,
-          child: Image.asset(
-            Strings.welcomeUpBg,
-            width: double.infinity,
-            fit: BoxFit.fill,
+      backgroundColor: const Color(0xFFF7FAF8),
+      body: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 440),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Image.asset('assets/images/logo.png',
+                      width: double.infinity, height: 130, fit: BoxFit.contain),
+                  const SizedBox(height: 30),
+                  const Text('Bienvenue sur epaVie Pro',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                          fontSize: 27,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF10251A))),
+                  const SizedBox(height: 12),
+                  const Text(
+                      'Votre espace pour suivre les missions et les enlèvements.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                          fontSize: 16, height: 1.5, color: Color(0xFF52665A))),
+                  const SizedBox(height: 34),
+                  _button(context, 'Se connecter', Routes.signInScreen),
+                ],
+              ),
+            ),
           ),
         ),
-        Positioned(
-            top: MediaQuery.of(context).size.height * 0.22,
-            left: 40,
-            child: Column(
-              mainAxisAlignment: mainStart,
-              crossAxisAlignment: crossStart,
-              children: [
-                Image.asset(
-                  Strings.splashLogo,
-                  width: 180.w,
-                ),
-                addVerticalSpace(20.h),
-                Text(
-                  Strings.welcomeTitle,
-                  style: CustomStyler.onboardTitleStyle,
-                ),
-                addVerticalSpace(5.h),
-                Text(
-                  Strings.welcomeDescription,
-                  style: CustomStyler.onboardDesStyle,
-                ),
-              ],
-            ))
-      ],
-    );
-  }
-
-  Container _buttonWidget(BuildContext context) {
-    return Container(
-      height: MediaQuery.of(context).size.height * 0.3,
-      child: Column(
-        mainAxisAlignment: mainCenter,
-        crossAxisAlignment: crossCenter,
-        children: [
-          PrimaryButtonWidget(
-            backgroundColor: CustomColor.primaryColor,
-            borderColor: CustomColor.primaryColor,
-            textColor: CustomColor.whiteColor,
-            onPressed: () {
-              Get.toNamed(Routes.signInScreen);
-            },
-            title: Strings.signIn,
-          ),
-        ],
       ),
     );
   }
 
-  Container _downBackgroundImage(BuildContext context) {
-    return Container(
-      height: MediaQuery.of(context).size.height * 0.33,
-      alignment: Alignment.bottomCenter,
-      child: Image.asset(
-        Strings.welcomeDownBg,
+  Widget _button(BuildContext context, String label, String route,
+          {bool outlined = false}) =>
+      SizedBox(
         width: double.infinity,
-        fit: BoxFit.fill,
-      ),
-    );
-  }
+        height: 54,
+        child: outlined
+            ? OutlinedButton(
+                onPressed: () => _continue(route), child: Text(label))
+            : FilledButton(
+                onPressed: () => _continue(route), child: Text(label)),
+      );
 }

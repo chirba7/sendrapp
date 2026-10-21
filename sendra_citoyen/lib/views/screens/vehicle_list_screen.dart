@@ -72,12 +72,9 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
         title: Text(
           'Liste des Véhicules',
           style: TextStyle(
-            color: Colors.white,
             fontWeight: FontWeight.bold, // Met le texte en gras
           ),
         ),
-        backgroundColor: Colors.green[700],
-        iconTheme: IconThemeData(color: Colors.white),
       ),
       body: _isLoading
           ? Center(

@@ -35,7 +35,8 @@ class AttendanceApiTest extends TestCase
         foreach (['2026_09_28_000001_create_attendance_tables.php',
             '2026_09_28_000002_create_attendance_enrollments.php',
             '2026_10_01_000001_create_attendance_face_tables.php',
-            '2026_10_01_000002_create_attendance_device_tables.php'] as $migration) {
+            '2026_10_01_000002_create_attendance_device_tables.php',
+            '2026_10_08_000001_add_attendance_breaks.php'] as $migration) {
             (require database_path('migrations/'.$migration))->up();
         }
         CarbonImmutable::setTestNow(CarbonImmutable::parse('2026-09-28T08:08:00Z'));
@@ -144,10 +145,7 @@ class AttendanceApiTest extends TestCase
         CarbonImmutable::setTestNow(CarbonImmutable::parse('2026-09-28T16:45:00Z'));
         $this->postJson('/api/pointage/pointer', $this->payload(['type' => 'departure', 'latitude' => 0]))->assertUnprocessable();
         $payload = $this->payload(['type' => 'departure']);
-        $this->postJson('/api/pointage/pointer', $payload)->assertUnprocessable();
-        CarbonImmutable::setTestNow(CarbonImmutable::parse('2026-09-28T17:00:00Z'));
-        $payload = $this->payload(['type' => 'departure']);
-        $this->postJson('/api/pointage/pointer', $payload)->assertOk()->assertJsonPath('session.early_departure_minutes', 0);
+        $this->postJson('/api/pointage/pointer', $payload)->assertOk()->assertJsonPath('session.early_departure_minutes', 15);
         $this->postJson('/api/pointage/pointer', $payload)->assertOk();
         $this->postJson('/api/pointage/pointer', $this->payload(['type' => 'departure']))->assertUnprocessable();
     }
@@ -208,6 +206,41 @@ class AttendanceApiTest extends TestCase
         CarbonImmutable::setTestNow(CarbonImmutable::parse('2026-09-28T17:00:00Z'));
         $this->postJson('/api/pointage/pointer', $this->payload(['type' => 'departure']))->assertOk();
         $this->postJson('/api/pointage/pointer', $this->payload())->assertUnprocessable();
+    }
+
+    public function test_incomplete_previous_day_does_not_block_new_day(): void
+    {
+        CarbonImmutable::setTestNow(CarbonImmutable::parse('2026-10-14T08:36:00Z'));
+        $this->postJson('/api/pointage/pointer', $this->payload())->assertOk()
+            ->assertJsonPath('session.work_date', '2026-10-14');
+        CarbonImmutable::setTestNow(CarbonImmutable::parse('2026-10-16T08:36:00Z'));
+        $this->getJson('/api/pointage/configuration')->assertOk()->assertJsonPath('open_session', null);
+        $this->postJson('/api/pointage/pointer', $this->payload(['type' => 'break_start']))->assertUnprocessable();
+        $this->postJson('/api/pointage/pointer', $this->payload())->assertOk()
+            ->assertJsonPath('session.work_date', '2026-10-16');
+        $this->getJson('/api/pointage/configuration')->assertOk()
+            ->assertJsonPath('open_session.work_date', '2026-10-16');
+        $this->assertSame(2, AttendanceSession::count());
+        $this->assertNull(AttendanceSession::whereDate('work_date', '2026-10-14')->firstOrFail()->departed_at);
+    }
+
+    public function test_break_choices_are_once_per_day_and_ordered(): void
+    {
+        $this->postJson('/api/pointage/pointer', $this->payload(['type' => 'break_start']))->assertUnprocessable();
+        $this->postJson('/api/pointage/pointer', $this->payload())->assertOk();
+        $this->postJson('/api/pointage/pointer', $this->payload(['type' => 'break_end']))->assertUnprocessable();
+        $start = $this->payload(['type' => 'break_start']);
+        $this->postJson('/api/pointage/pointer', $start)->assertOk();
+        $this->postJson('/api/pointage/pointer', $start)->assertOk();
+        $this->postJson('/api/pointage/pointer', $this->payload(['type' => 'break_start']))->assertUnprocessable();
+        CarbonImmutable::setTestNow(CarbonImmutable::parse('2026-09-28T17:00:00Z'));
+        $this->postJson('/api/pointage/pointer', $this->payload(['type' => 'departure']))->assertUnprocessable();
+        $end = $this->payload(['type' => 'break_end']);
+        $this->postJson('/api/pointage/pointer', $end)->assertOk();
+        $this->postJson('/api/pointage/pointer', $end)->assertOk();
+        $this->postJson('/api/pointage/pointer', $this->payload(['type' => 'break_end']))->assertUnprocessable();
+        $this->postJson('/api/pointage/pointer', $this->payload(['type' => 'departure']))->assertOk();
+        $this->assertSame(1, AttendanceSession::count());
     }
 
     public function test_approved_pointage_app_user_can_use_attendance_api(): void

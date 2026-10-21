@@ -16,21 +16,22 @@ class ResetPasswordCongratulationsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: CustomColor.primaryColor,
-      body: _bodyWidget(context),
+      body: SafeArea(child: _bodyWidget(context)),
     );
   }
 
 
 
 
-  Column _bodyWidget(BuildContext context) {
-    return Column(
+  Widget _bodyWidget(BuildContext context) {
+    return SingleChildScrollView(child: Column(
       children: [
         _upperWidget(context),
         addVerticalSpace(60.h),
-        _okayButtonWidget(context)
+        _okayButtonWidget(context),
+        addVerticalSpace(24.h),
       ],
-    );
+    ));
   }
 
 
@@ -41,9 +42,9 @@ class ResetPasswordCongratulationsScreen extends StatelessWidget {
         mainAxisAlignment: mainStart,
         crossAxisAlignment: crossStart,
         children: [
-          addVerticalSpace(100.h),
+          addVerticalSpace(40.h),
           _titleWidget(context),
-          addVerticalSpace(100.h),
+          addVerticalSpace(40.h),
           _imageWidget(context),
           addVerticalSpace(40.h),
 
@@ -61,8 +62,9 @@ class ResetPasswordCongratulationsScreen extends StatelessWidget {
         crossAxisAlignment: crossStart,
         children: [
           Image.asset(
-            Strings.splashLogo,
-            width: 180.w,
+            'assets/images/logo.png',
+            width: 220.w,
+            fit: BoxFit.contain,
           ),
           addVerticalSpace(20.h),
           Text(
@@ -89,7 +91,7 @@ class ResetPasswordCongratulationsScreen extends StatelessWidget {
           Image.asset(
             Strings.congratulationsImage,
             width: double.infinity,
-            fit: BoxFit.fill,
+            fit: BoxFit.contain,
           ),
         ],
       ),

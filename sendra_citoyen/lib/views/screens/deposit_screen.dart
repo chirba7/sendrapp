@@ -29,15 +29,17 @@ class DepositScreen extends StatefulWidget {
 class _DepositScreenState extends State<DepositScreen> {
   final _controller = Get.put(DepositController());
   final _offline = OfflineSignalementService.instance;
+  final _description = TextEditingController();
 
   // Une photo par angle. `null` = emplacement encore vide.
   final Map<String, File?> _photos = {
-    for (final position in anglesSignalement.keys) position: null,
+    'vue_ensemble': null,
   };
 
   Position? locationData;
   String locality = '';
   String subLocality = '';
+  String adressePrecise = '';
   double? latitude;
   double? longitude;
 
@@ -57,6 +59,12 @@ class _DepositScreenState extends State<DepositScreen> {
   void initState() {
     super.initState();
     _restaurerBrouillon();
+  }
+
+  @override
+  void dispose() {
+    _description.dispose();
+    super.dispose();
   }
 
   Future<void> _restaurerBrouillon() async {
@@ -137,11 +145,14 @@ class _DepositScreenState extends State<DepositScreen> {
         currentPosition.longitude,
       );
       if (placemarks.isNotEmpty) {
-        locality = placemarks.first.locality ?? '';
-        subLocality = placemarks.first.subLocality ?? '';
-        if (subLocality.isNotEmpty) {
-          locality = subLocality;
-        }
+        final place = placemarks.first;
+        locality = place.locality ?? place.subAdministrativeArea ?? '';
+        subLocality = place.subLocality ?? '';
+        adressePrecise = [place.street, subLocality, locality]
+            .where((part) => part != null && part.trim().isNotEmpty)
+            .map((part) => part!.trim())
+            .toSet()
+            .join(', ');
       }
     } catch (e) {
       print(e);
@@ -200,7 +211,7 @@ class _DepositScreenState extends State<DepositScreen> {
     await prefs.setString(_cleCaptureEnCours, position);
 
     // 1600px suffit (le backend redimensionne à 1600px de toute façon) et
-    // garde les 5 photos en base64 sous le post_max_size (8 Mo) du serveur :
+    // garde la photo en base64 sous le post_max_size (8 Mo) du serveur :
     // au-delà, PHP vide la requête et le signalement est refusé.
     final pickedFile = await picker.pickImage(
       source: source,
@@ -261,7 +272,9 @@ class _DepositScreenState extends State<DepositScreen> {
       final signalement = PendingSignalement(
         uuid: _offline.nouvelUuid(),
         titre: _controller.titreController.text,
+        description: _description.text.trim(),
         commune: locality,
+        adressePrecise: adressePrecise,
         latitude: latitude,
         longitude: longitude,
         createdAt: DateTime.now().toIso8601String(),
@@ -306,6 +319,7 @@ class _DepositScreenState extends State<DepositScreen> {
 
   void _reinitialiser() {
     _controller.titreController.text = '';
+    _description.clear();
     for (final position in _photos.keys.toList()) {
       _photos[position] = null;
     }
@@ -329,12 +343,11 @@ class _DepositScreenState extends State<DepositScreen> {
       appBar: AppBar(
         title: const Text(
           Strings.signalement,
-          style: TextStyle(color: CustomColor.whiteColor),
+          style: TextStyle(),
         ),
         leading: const BackButtonWidget(
           backButtonImage: Strings.backButtonWhite,
         ),
-        backgroundColor: CustomColor.primaryColor,
         elevation: 0,
       ),
       body: ListView(
@@ -342,15 +355,26 @@ class _DepositScreenState extends State<DepositScreen> {
         children: [
           addVerticalSpace(20.h),
           _champTitre(),
+          addVerticalSpace(16.h),
+          TextFormField(
+            controller: _description,
+            maxLines: 3,
+            maxLength: 254,
+            decoration: InputDecoration(
+              labelText: 'Description (facultative)',
+              hintText: 'Précisez la situation ou un repère utile',
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+          ),
           addVerticalSpace(20.h),
           TextLabelsWidget(
-            textLabels: 'Photos du véhicule ($_nbPhotos/5)',
+            textLabels: 'Photo du véhicule ($_nbPhotos/1)',
             textColor: CustomColor.textColor,
           ),
           addVerticalSpace(6.h),
           Text(
-            'Prenez le véhicule sous plusieurs angles (au moins une photo).',
-            style: TextStyle(fontSize: 12.sp, color: Colors.grey[600]),
+            'Ajoutez une photo nette du véhicule.',
+            style: const TextStyle(fontSize: 13.5, color: CustomColor.gray),
           ),
           addVerticalSpace(12.h),
           _grillePhotos(),
@@ -374,26 +398,15 @@ class _DepositScreenState extends State<DepositScreen> {
           ),
           addVerticalSpace(6.h),
           TextFormField(
-            style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
-            cursorColor: Colors.black,
+            style: const TextStyle(
+                color: CustomColor.textColor,
+                fontSize: 16,
+                fontWeight: FontWeight.w600),
             controller: _controller.titreController,
-            decoration: InputDecoration(
+            textCapitalization: TextCapitalization.sentences,
+            decoration: const InputDecoration(
               hintText: 'Que voulez-vous signaler ?',
-              hintStyle: const TextStyle(color: CustomColor.gray),
-              border: OutlineInputBorder(
-                borderSide: const BorderSide(color: Colors.black),
-                borderRadius: BorderRadius.circular(10.0),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderSide: const BorderSide(color: Colors.black),
-                borderRadius: BorderRadius.circular(10.0),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderSide: const BorderSide(color: Colors.black),
-                borderRadius: BorderRadius.circular(10.0),
-              ),
-              filled: true,
-              fillColor: CustomColor.whiteColor,
+              prefixIcon: Icon(Icons.edit_note_rounded),
             ),
             validator: (value) {
               if (value == null || value.isEmpty) {
@@ -408,16 +421,9 @@ class _DepositScreenState extends State<DepositScreen> {
   }
 
   Widget _grillePhotos() {
-    return GridView.count(
-      crossAxisCount: 2,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      mainAxisSpacing: 12,
-      crossAxisSpacing: 12,
-      childAspectRatio: 1.05,
-      children: anglesSignalement.entries
-          .map((entry) => _tuilePhoto(entry.key, entry.value))
-          .toList(),
+    return SizedBox(
+      height: 220,
+      child: _tuilePhoto('vue_ensemble', 'Photo du véhicule'),
     );
   }
 
@@ -430,10 +436,10 @@ class _DepositScreenState extends State<DepositScreen> {
       child: Container(
         decoration: BoxDecoration(
           color: CustomColor.whiteColor,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: rempli ? CustomColor.primaryColor : Colors.grey.shade400,
-            width: rempli ? 2 : 1,
+            color: rempli ? CustomColor.primaryColor : const Color(0xFFD5DED9),
+            width: rempli ? 2 : 1.2,
           ),
         ),
         clipBehavior: Clip.antiAlias,
@@ -441,14 +447,22 @@ class _DepositScreenState extends State<DepositScreen> {
           fit: StackFit.expand,
           children: [
             if (rempli)
-              // Vignette décodée en petit : 5 photos en pleine résolution
-              // en mémoire suffisaient à faire tuer l'app par Android.
+              // Vignette décodée en petit pour limiter la mémoire.
               Image.file(fichier, fit: BoxFit.cover, cacheWidth: 400)
             else
               Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.add_a_photo, color: Colors.grey.shade500, size: 28),
+                  Container(
+                    width: 46,
+                    height: 46,
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFE3F3EA),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.add_a_photo_rounded,
+                        color: CustomColor.primaryColor, size: 24),
+                  ),
                   const SizedBox(height: 8),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 6),
@@ -456,9 +470,9 @@ class _DepositScreenState extends State<DepositScreen> {
                       libelle,
                       textAlign: TextAlign.center,
                       style: TextStyle(
-                        color: Colors.grey.shade700,
+                        color: CustomColor.textColor,
                         fontWeight: FontWeight.w600,
-                        fontSize: 13.sp,
+                        fontSize: 13.5,
                       ),
                     ),
                   ),
@@ -510,11 +524,7 @@ class _DepositScreenState extends State<DepositScreen> {
     return ElevatedButton(
       onPressed: _isLoading ? null : _soumettre,
       style: ElevatedButton.styleFrom(
-        backgroundColor: CustomColor.primaryColor,
-        foregroundColor: CustomColor.whiteColor,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.0)),
-        elevation: 3,
-        padding: const EdgeInsets.symmetric(vertical: 14.0),
+        minimumSize: const Size.fromHeight(54),
       ),
       child: _isLoading
           ? const SizedBox(

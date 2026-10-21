@@ -27,6 +27,8 @@ class EnlevementController extends Controller
         $carPosition->lieu_enlevement = $request->input('lieu');
         $carPosition->nom_responsable_mef = $request->input('nom_responsable');
         $carPosition->etat = "ENLEVE";
+        $carPosition->non_removal_reason = null;
+        $carPosition->non_removed_at = null;
         $carPosition->save();
 
         return response()->json(['message' => 'Enlèvement ajouté avec succès'], 201);

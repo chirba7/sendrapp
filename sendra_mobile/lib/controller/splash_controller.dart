@@ -1,9 +1,12 @@
 import 'package:get/get.dart';
 import 'package:walletium/routes/routes.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:walletium/utils/session.dart';
+import 'package:walletium/utils/app_prefs.dart';
 
 class SplashController extends GetxController {
+  /// Durée minimale du splash animé : juste le temps de l'animation
+  /// d'entrée (auparavant 1,7 s d'attente fixe à chaque ouverture).
+  static const minimumDisplay = Duration(milliseconds: 1100);
+
   @override
   void onReady() {
     super.onReady();
@@ -11,14 +14,17 @@ class SplashController extends GetxController {
   }
 
   Future<void> _goToScreen() async {
-    final minimumDisplay =
-        Future<void>.delayed(const Duration(milliseconds: 900));
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = await AppPrefs.init();
     final token = prefs.getString('token');
-    final authorized =
-        token != null && token.isNotEmpty && await Session.isAgent();
-    await minimumDisplay;
+    final authorized = token != null && token.isNotEmpty && AppPrefs.isAgent;
+    final hasSeenWelcome = prefs.getBool('has_seen_welcome') ?? false;
+    await Future<void>.delayed(minimumDisplay);
     Get.offAllNamed(
-        authorized ? Routes.bottomNavigationScreen : Routes.signInScreen);
+      authorized
+          ? Routes.bottomNavigationScreen
+          : hasSeenWelcome
+              ? Routes.signInScreen
+              : Routes.welcomeScreen,
+    );
   }
 }

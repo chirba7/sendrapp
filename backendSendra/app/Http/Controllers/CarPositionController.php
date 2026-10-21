@@ -72,6 +72,8 @@ class CarPositionController extends Controller
                 $carPosition->latitude = $request->latitude;
                 $carPosition->longitude = $request->longitude;
                 $carPosition->title = $request->titre;
+                $carPosition->description = $request->description;
+                $carPosition->adresse_precise = $request->adresse_precise;
                 $carPosition->commune = $request->commune;
                 $carPosition->uuid = $uuid;
                 $carPosition->user_id = Auth::user()->id;
@@ -154,9 +156,10 @@ class CarPositionController extends Controller
         return response()->json(
             [
                 'signalements' => CarPosition::count(),
-                'signales' => $parEtat->get('SIGNALE', 0),
+                'signales' => CarPosition::where('etat', 'SIGNALE')->whereNull('non_removed_at')->count(),
                 'enleves' => $parEtat->get('ENLEVE', 0),
-                'encours' => $parEtat->get('EN COURS', 0),
+                'encours' => CarPosition::where('etat', 'EN COURS')->whereNull('non_removed_at')->count(),
+                'non_resolus' => CarPosition::whereIn('etat', ['SIGNALE', 'EN COURS'])->whereNotNull('non_removed_at')->count(),
             ]
         );
     }

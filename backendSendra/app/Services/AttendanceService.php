@@ -23,9 +23,13 @@ class AttendanceService
 
             $previous = AttendanceSession::where('user_id', $user->id)
                 ->where(fn ($q) => $q->where('arrival_request_id', $data['request_id'])
-                    ->orWhere('departure_request_id', $data['request_id']))->first();
+                    ->orWhere('departure_request_id', $data['request_id'])
+                    ->orWhere('break_start_request_id', $data['request_id'])
+                    ->orWhere('break_end_request_id', $data['request_id']))->first();
             if ($previous) {
-                $kind = $previous->arrival_request_id === $data['request_id'] ? 'arrival' : 'departure';
+                $kind = collect(['arrival' => 'arrival_request_id', 'departure' => 'departure_request_id',
+                    'break_start' => 'break_start_request_id', 'break_end' => 'break_end_request_id'])
+                    ->search(fn ($column) => $previous->{$column} === $data['request_id']);
                 if ($kind !== $data['type'] || $previous->attendance_site_id != $data['site_id']) {
                     $this->reject('request_id', 'Cet identifiant correspond à un autre pointage.');
                 }
@@ -33,7 +37,25 @@ class AttendanceService
             }
 
             $now = CarbonImmutable::now('UTC');
-            $open = AttendanceSession::where('user_id', $user->id)->whereNull('departed_at')->first();
+            $open = AttendanceSession::where('user_id', $user->id)->whereNull('departed_at')
+                ->orderByDesc('arrived_at')->get()->first(fn ($session) => $session->isCurrentAt($now));
+            if (in_array($data['type'], ['break_start', 'break_end'], true)) {
+                if (!$open || $open->attendance_site_id != $data['site_id']) {
+                    $this->reject('type', 'Commencez votre journée sur ce site avant de pointer la pause.');
+                }
+                if ($data['type'] === 'break_start') {
+                    if ($open->break_started_at) $this->reject('type', 'Le début de pause a déjà été pointé aujourd’hui.');
+                    $open->update(['break_started_at' => $now, 'break_start_request_id' => $data['request_id'],
+                        'break_start_position' => $this->position($data, $open->schedule_snapshot, $now)]);
+                } else {
+                    if (!$open->break_started_at || $open->break_ended_at) {
+                        $this->reject('type', 'Pointez d’abord le début de pause. La fin de pause ne peut être enregistrée qu’une fois.');
+                    }
+                    $open->update(['break_ended_at' => $now, 'break_end_request_id' => $data['request_id'],
+                        'break_end_position' => $this->position($data, $open->schedule_snapshot, $now)]);
+                }
+                return $open->refresh();
+            }
             if ($data['type'] === 'departure') {
                 if (!$open) {
                     $this->reject('type', 'Aucune arrivée à clôturer.');
@@ -41,8 +63,8 @@ class AttendanceService
                 if ($open->attendance_site_id != $data['site_id']) {
                     $this->reject('site_id', 'Le départ doit être pointé sur le site de votre arrivée.');
                 }
-                if ($now->lessThan($open->scheduled_end)) {
-                    $this->reject('type', 'Le départ est possible à partir de l’heure de fin prévue.');
+                if ($open->break_started_at && !$open->break_ended_at) {
+                    $this->reject('type', 'Pointez la fin de pause avant la fin de travail.');
                 }
                 // Une modification du planning ne change pas une journée déjà commencée.
                 $position = $this->position($data, $open->schedule_snapshot, $now);

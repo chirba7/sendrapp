@@ -21,10 +21,8 @@ class DepositMoneySuccessScreen extends StatelessWidget {
         title: const Text(
           Strings.depositMoney,
           style: TextStyle(
-            color: CustomColor.whiteColor,
-          ),
+            ),
         ),
-        backgroundColor: CustomColor.primaryColor,
       ),
       body: _bodyWidget(context),
     );
