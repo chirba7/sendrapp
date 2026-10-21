@@ -6,7 +6,7 @@
             <div class="row align-items-center">
                 <div class="col-md-6"><h2 class="text-success">{{ $history ? 'Historique des missions' : 'Missions ouvertes' }}</h2></div>
                 <div class="col-md-6 text-md-end mt-3 mt-md-0">
-                    <a href="{{ route('missions.index', $history ? [] : ['historique' => 1]) }}" class="btn btn-outline-success me-2">{{ $history ? 'Missions ouvertes' : 'Historique' }}</a>
+                    <a href="{{ route('missions.index', ['historique' => $history ? 0 : 1]) }}" class="btn btn-outline-success me-2">{{ $history ? 'Missions ouvertes' : 'Historique' }}</a>
                     <a href="{{ route('missions.create') }}" class="main-btn success-btn btn-hover">
                         <i class="lni lni-plus"></i> Créer une mission
                     </a>

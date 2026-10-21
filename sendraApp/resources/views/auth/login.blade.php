@@ -43,14 +43,13 @@
                         <div class="row">
                             <div class="col-12">
                                 <div class="input-style-1">
-                                    <label>Téléphone</label>
-                                    {{-- Correction : type="email" déclenchait la validation
-                                         native du navigateur (exige un "@"), alors que la
-                                         connexion se fait avec un numéro de téléphone, pas
-                                         une adresse e-mail (le nom de champ "email" reste
-                                         côté serveur pour Fortify, mais n'est ici qu'un
-                                         identifiant texte). --}}
-                                    <input type="text" inputmode="tel" name="email" :value="old('email')" class="form-control" placeholder="Numéro de téléphone">
+                                    <label>E-mail</label>
+                                    {{-- La connexion au back-office se fait par e-mail
+                                         (config/fortify.php : 'username' => 'email'). Le
+                                         libellé « Téléphone » posé par une correction
+                                         antérieure faisait saisir un numéro, d'où des
+                                         « identifiants incorrects » incompréhensibles. --}}
+                                    <input type="email" name="email" value="{{ old('email') }}" class="form-control" placeholder="votre@email.sn" autocomplete="username" autofocus>
                                     @error('email')
                                     <div class="text-danger">{{ $message }}</div>
                                     @enderror
@@ -60,7 +59,7 @@
                             <div class="col-12">
                                 <div class="input-style-1">
                                     <label>Mot de passe</label>
-                                    <input type="password" name="password" class="form-control" placeholder="Votre mot de passe">
+                                    <input type="password" name="password" class="form-control" placeholder="Votre mot de passe" autocomplete="current-password">
                                     @error('password')
                                     <div class="text-danger">{{ $message }}</div>
                                     @enderror

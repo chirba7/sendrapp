@@ -15,7 +15,10 @@ class MissionController extends Controller
 {
     public function index()
     {
-        $history = request()->boolean('historique');
+        // L'historique est la vue par défaut (demande de la direction) : on
+        // arrive sur les missions déjà clôturées, et « Missions ouvertes »
+        // bascule explicitement avec ?historique=0.
+        $history = request()->boolean('historique', true);
         $missions = Mission::with(['agents', 'vehicles', 'creator', 'commune', 'trucks'])
             ->where('status', $history ? '=' : '!=', 'terminee')
             ->orderByDesc('scheduled_at')->paginate(15);
