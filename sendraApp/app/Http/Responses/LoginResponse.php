@@ -28,6 +28,50 @@ class LoginResponse implements LoginResponseContract
             default => Fortify::redirects('login'),
         };
 
-        return redirect()->intended($home);
+        // `intended()` rejoue l'adresse demandée avant la connexion. Or un
+        // visiteur non connecté est systématiquement renvoyé depuis /dashboard
+        // (ou /), qui se retrouve mémorisé : la page propre au rôle était donc
+        // toujours écrasée par le tableau de bord. On n'honore que les liens
+        // profonds, c'est-à-dire tout sauf ces adresses génériques.
+        $memorisee = $request->session()?->pull('url.intended');
+        $generiques = array_map(
+            fn ($u) => rtrim($u, '/'),
+            [url('/'), url('/dashboard'), url('/login'), Fortify::redirects('login')]
+        );
+
+        $profonde = $memorisee && !in_array(rtrim($memorisee, '/'), $generiques, true);
+
+        return redirect()->to(
+            $profonde && $this->accessible($memorisee, (int) $request->user()->role_id)
+                ? $memorisee
+                : $home
+        );
+    }
+
+    /**
+     * Le rôle connecté a-t-il le droit d'ouvrir cette adresse ?
+     *
+     * Sans ce contrôle, un lien profond mémorisé avant la connexion renvoie
+     * l'utilisateur sur une page interdite : il se connecte et reçoit un 403,
+     * sans comprendre pourquoi.
+     */
+    private function accessible(string $url, int $roleId): bool
+    {
+        try {
+            $chemin = parse_url($url, PHP_URL_PATH) ?: '/';
+            $route = app('router')->getRoutes()
+                ->match(\Illuminate\Http\Request::create($chemin, 'GET'));
+
+            foreach ($route->gatherMiddleware() as $middleware) {
+                if (is_string($middleware) && str_starts_with($middleware, 'role:')) {
+                    return in_array((string) $roleId, explode(',', substr($middleware, 5)), true);
+                }
+            }
+
+            return true;
+        } catch (\Throwable $e) {
+            // Adresse inconnue ou non résolue : on retombe sur la page du rôle.
+            return false;
+        }
     }
 }
