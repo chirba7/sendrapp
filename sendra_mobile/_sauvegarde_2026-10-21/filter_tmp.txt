@@ -1,0 +1,149 @@
+  /// Sélecteur de statut : un seul bouton (statut courant + nombre) qui
+  /// déroule la liste des statuts quand on le touche.
+  Widget _filterBar() {
+    final current = _filters.firstWhere((f) => f.value == _filter);
+    Color colorOf(String v) =>
+        v == 'TOUS' ? SendraTheme.green : SendraTheme.status(v).color;
+    final color = colorOf(current.value);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+      child: Row(
+        children: [
+          const Text('Statut',
+              style: TextStyle(
+                  color: SendraTheme.muted,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600)),
+          const SizedBox(width: 12),
+          Expanded(
+            child: PopupMenuButton<String>(
+              tooltip: 'Filtrer par statut',
+              initialValue: _filter,
+              position: PopupMenuPosition.under,
+              offset: const Offset(0, 6),
+              color: Colors.white,
+              surfaceTintColor: Colors.transparent,
+              elevation: 6,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16)),
+              constraints: const BoxConstraints(minWidth: 240),
+              onSelected: (v) => setState(() => _filter = v),
+              onOpened: () => setState(() => _filterOpen = true),
+              onCanceled: () => setState(() => _filterOpen = false),
+              itemBuilder: (context) => [
+                for (final f in _filters)
+                  PopupMenuItem<String>(
+                    value: f.value,
+                    height: 48,
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 10,
+                          height: 10,
+                          decoration: BoxDecoration(
+                            color: colorOf(f.value),
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            f.label,
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: f.value == _filter
+                                  ? FontWeight.w700
+                                  : FontWeight.w400,
+                              color: SendraTheme.ink,
+                            ),
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: colorOf(f.value).withValues(alpha: .12),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            '${_counts[f.value] ?? 0}',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: colorOf(f.value),
+                            ),
+                          ),
+                        ),
+                        if (f.value == _filter) ...[
+                          const SizedBox(width: 8),
+                          const Icon(Icons.check_rounded,
+                              size: 18, color: SendraTheme.green),
+                        ],
+                      ],
+                    ),
+                  ),
+              ],
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                height: 48,
+                padding: const EdgeInsets.symmetric(horizontal: 14),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: _filterOpen ? color : SendraTheme.border,
+                    width: _filterOpen ? 1.6 : 1,
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 10,
+                      height: 10,
+                      decoration:
+                          BoxDecoration(color: color, shape: BoxShape.circle),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        current.label,
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          color: SendraTheme.ink,
+                        ),
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: color.withValues(alpha: .12),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        '${_counts[current.value] ?? 0}',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: color,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    AnimatedRotation(
+                      turns: _filterOpen ? .5 : 0,
+                      duration: const Duration(milliseconds: 200),
+                      child: const Icon(Icons.keyboard_arrow_down_rounded,
+                          color: SendraTheme.muted),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+

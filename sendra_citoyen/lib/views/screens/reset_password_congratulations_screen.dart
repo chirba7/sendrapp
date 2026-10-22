@@ -62,7 +62,7 @@ class ResetPasswordCongratulationsScreen extends StatelessWidget {
         crossAxisAlignment: crossStart,
         children: [
           Image.asset(
-            'assets/images/logo.png',
+            'assets/images/logo_epavie.png',
             width: 220.w,
             fit: BoxFit.contain,
           ),

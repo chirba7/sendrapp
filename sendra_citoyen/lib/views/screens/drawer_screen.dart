@@ -24,6 +24,7 @@ class DrawerScreen extends StatelessWidget {
       child: Column(
         children: [
           _buildHeader(context),
+          const Divider(height: 1),
           Expanded(
             child: ListView(
               padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
@@ -82,122 +83,92 @@ class DrawerScreen extends StatelessWidget {
     Get.toNamed(route);
   }
 
+  /// En-tête du menu : fond blanc, logo epAvie (+ PRO pour l'app agents),
+  /// puis la carte de l'utilisateur connecté (photo ou initiale, nom, n°).
   Widget _buildHeader(BuildContext context) {
     final prefs = AppPrefs.maybe;
     final fullName = prefs?.getString('fullName') ?? '';
     final phone = prefs?.getString('phone') ?? '';
+    final photoUrl = prefs?.getString('profilePhotoUrl') ?? '';
+    final initial =
+        fullName.trim().isNotEmpty ? fullName.trim()[0].toUpperCase() : '?';
     return Container(
       width: double.infinity,
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [SendraTheme.green, SendraTheme.forest],
-        ),
-      ),
-      child: Stack(
-        children: [
-          // Motif de cercles décoratifs
-          Positioned(
-            top: -40,
-            right: -40,
-            child: _circle(140, .08),
-          ),
-          Positioned(
-            bottom: -50,
-            left: -30,
-            child: _circle(120, .06),
-          ),
-          SafeArea(
-            bottom: false,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 22, 20, 20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Logo posé directement sur le vert, sans cadre blanc.
-                  if (AppBrand.drawerLogo != null)
-                    Image.asset(
-                      AppBrand.drawerLogo!,
-                      height: 52,
-                      fit: BoxFit.contain,
-                      alignment: Alignment.centerLeft,
-                      filterQuality: FilterQuality.medium,
-                    )
-                  else
-                    Row(
-                      children: [
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(12),
-                          child: Image.asset(AppBrand.appIcon,
-                              width: 48, height: 48),
-                        ),
-                        const SizedBox(width: 12),
-                        const Text(
-                          AppBrand.name,
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 26,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: -.3,
-                          ),
-                        ),
-                      ],
-                    ),
-                  if (fullName.isNotEmpty || phone.isNotEmpty) ...[
-                    const SizedBox(height: 18),
-                    Row(
-                      children: [
-                        CircleAvatar(
-                          radius: 20,
-                          backgroundColor: Colors.white.withValues(alpha: .18),
-                          child: Text(
-                            fullName.isNotEmpty
-                                ? fullName.trim()[0].toUpperCase()
-                                : '?',
-                            style: const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w700,
-                                fontSize: 17),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              if (fullName.isNotEmpty)
-                                Text(
-                                  fullName,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 15.5,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                              if (phone.isNotEmpty)
-                                Text(
-                                  phone,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    color: Colors.white.withValues(alpha: .8),
-                                    fontSize: 13,
-                                  ),
-                                ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ],
+      color: Colors.white,
+      child: SafeArea(
+        bottom: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Image.asset(
+                AppBrand.drawerLogo ?? AppBrand.appBarLogo,
+                height: 46,
+                fit: BoxFit.contain,
+                alignment: Alignment.centerLeft,
+                filterQuality: FilterQuality.medium,
               ),
-            ),
+              if (fullName.isNotEmpty || phone.isNotEmpty) ...[
+                const SizedBox(height: 18),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: SendraTheme.greenSoft,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Row(
+                    children: [
+                      CircleAvatar(
+                        radius: 22,
+                        backgroundColor: SendraTheme.green,
+                        foregroundImage: photoUrl.isNotEmpty
+                            ? NetworkImage(photoUrl)
+                            : null,
+                        child: Text(
+                          initial,
+                          style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 18),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            if (fullName.isNotEmpty)
+                              Text(
+                                fullName,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: SendraTheme.ink,
+                                  fontSize: 15.5,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            if (phone.isNotEmpty)
+                              Text(
+                                phone,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: SendraTheme.muted,
+                                  fontSize: 13,
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -285,8 +256,9 @@ class DrawerScreen extends StatelessWidget {
         width: double.infinity,
         child: FilledButton.icon(
           onPressed: () => _showLogoutConfirmation(context),
+          // Déconnexion en rouge (action de sortie).
           style: FilledButton.styleFrom(
-            backgroundColor: SendraTheme.green,
+            backgroundColor: SendraTheme.statusSignale,
             foregroundColor: Colors.white,
           ),
           icon: const Icon(Icons.logout_rounded, size: 20),

@@ -38,7 +38,9 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _initialLoading = true;
   bool _loadingMore = false;
   String? _loadError;
-  String _filter = 'TOUS';
+  // Par défaut : les dossiers à traiter (« Signalés »).
+  String _filter = 'SIGNALE';
+  bool _filterOpen = false;
   String _nextPageUrl = '';
   String _token = '';
   late final bool _isStaff = AppPrefs.isStaff;
@@ -50,6 +52,7 @@ class _HomeScreenState extends State<HomeScreen> {
     (value: 'EN COURS', label: 'En cours'),
     (value: 'ENLEVE', label: 'Résolus'),
     (value: 'NON RESOLU', label: 'Non résolus'),
+    (value: 'REJETE', label: 'Rejetés'),
   ];
 
   List<dynamic> get _filtered => _filter == 'TOUS'
@@ -179,15 +182,13 @@ class _HomeScreenState extends State<HomeScreen> {
       backgroundColor: SendraTheme.surface,
       drawer: const DrawerScreen(),
       appBar: AppBar(
-        toolbarHeight: 60,
-        title: ClipRRect(
-          borderRadius: BorderRadius.circular(AppBrand.isPro ? 8 : 0),
-          child: Image.asset(
-            AppBrand.appBarLogo,
-            height: AppBrand.isPro ? 36 : 40,
-            fit: BoxFit.contain,
-            filterQuality: FilterQuality.medium,
-          ),
+        toolbarHeight: 68,
+        // Logo epAvie en grand dans la barre du haut.
+        title: Image.asset(
+          AppBrand.appBarLogo,
+          height: 46,
+          fit: BoxFit.contain,
+          filterQuality: FilterQuality.medium,
         ),
         actions: [
           IconButton(
@@ -250,81 +251,154 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  /// Filtres en une ligne défilante : l'ancienne grille 2×3 occupait la
-  /// moitié de l'écran et repoussait la liste hors de vue.
+  /// Sélecteur de statut : un seul bouton (statut courant + nombre) qui
+  /// déroule la liste des statuts quand on le touche.
   Widget _filterBar() {
-    return SizedBox(
-      height: 64,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
-        itemCount: _filters.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 8),
-        itemBuilder: (context, i) {
-          final f = _filters[i];
-          final selected = _filter == f.value;
-          final color = f.value == 'TOUS'
-              ? SendraTheme.green
-              : SendraTheme.status(f.value).color;
-          final count = _counts[f.value] ?? 0;
-          return Material(
-            color: selected ? color : Colors.white,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-              side: BorderSide(color: selected ? color : SendraTheme.border),
-            ),
-            child: InkWell(
-              borderRadius: BorderRadius.circular(12),
-              onTap: () => setState(() => _filter = f.value),
-              child: Padding(
+    final current = _filters.firstWhere((f) => f.value == _filter);
+    Color colorOf(String v) =>
+        v == 'TOUS' ? SendraTheme.green : SendraTheme.status(v).color;
+    final color = colorOf(current.value);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+      child: Row(
+        children: [
+          const Text('Statut',
+              style: TextStyle(
+                  color: SendraTheme.muted,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600)),
+          const SizedBox(width: 12),
+          Expanded(
+            child: PopupMenuButton<String>(
+              tooltip: 'Filtrer par statut',
+              initialValue: _filter,
+              position: PopupMenuPosition.under,
+              offset: const Offset(0, 6),
+              color: Colors.white,
+              surfaceTintColor: Colors.transparent,
+              elevation: 6,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16)),
+              constraints: const BoxConstraints(minWidth: 240),
+              onSelected: (v) => setState(() {
+                _filter = v;
+                _filterOpen = false;
+              }),
+              onOpened: () => setState(() => _filterOpen = true),
+              onCanceled: () => setState(() => _filterOpen = false),
+              itemBuilder: (context) => [
+                for (final f in _filters)
+                  PopupMenuItem<String>(
+                    value: f.value,
+                    height: 48,
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 10,
+                          height: 10,
+                          decoration: BoxDecoration(
+                            color: colorOf(f.value),
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            f.label,
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: f.value == _filter
+                                  ? FontWeight.w700
+                                  : FontWeight.w400,
+                              color: SendraTheme.ink,
+                            ),
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: colorOf(f.value).withValues(alpha: .12),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            '${_counts[f.value] ?? 0}',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: colorOf(f.value),
+                            ),
+                          ),
+                        ),
+                        if (f.value == _filter) ...[
+                          const SizedBox(width: 8),
+                          const Icon(Icons.check_rounded,
+                              size: 18, color: SendraTheme.green),
+                        ],
+                      ],
+                    ),
+                  ),
+              ],
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                height: 48,
                 padding: const EdgeInsets.symmetric(horizontal: 14),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: _filterOpen ? color : SendraTheme.border,
+                    width: _filterOpen ? 1.6 : 1,
+                  ),
+                ),
                 child: Row(
-                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    if (f.value != 'TOUS') ...[
-                      Container(
-                        width: 8,
-                        height: 8,
-                        decoration: BoxDecoration(
-                          color: selected ? Colors.white : color,
-                          shape: BoxShape.circle,
+                    Container(
+                      width: 10,
+                      height: 10,
+                      decoration:
+                          BoxDecoration(color: color, shape: BoxShape.circle),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        current.label,
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          color: SendraTheme.ink,
                         ),
                       ),
-                      const SizedBox(width: 8),
-                    ],
-                    Text(
-                      f.label,
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: selected ? Colors.white : SendraTheme.ink,
-                      ),
                     ),
-                    const SizedBox(width: 8),
                     Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 7, vertical: 2),
+                          horizontal: 8, vertical: 2),
                       decoration: BoxDecoration(
-                        color: selected
-                            ? Colors.white.withValues(alpha: .22)
-                            : color.withValues(alpha: .10),
+                        color: color.withValues(alpha: .12),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
-                        '$count',
+                        '${_counts[current.value] ?? 0}',
                         style: TextStyle(
-                          fontSize: 12.5,
+                          fontSize: 13,
                           fontWeight: FontWeight.w700,
-                          color: selected ? Colors.white : color,
+                          color: color,
                         ),
                       ),
+                    ),
+                    const SizedBox(width: 6),
+                    AnimatedRotation(
+                      turns: _filterOpen ? .5 : 0,
+                      duration: const Duration(milliseconds: 200),
+                      child: const Icon(Icons.keyboard_arrow_down_rounded,
+                          color: SendraTheme.muted),
                     ),
                   ],
                 ),
               ),
             ),
-          );
-        },
+          ),
+        ],
       ),
     );
   }

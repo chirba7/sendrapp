@@ -25,7 +25,7 @@ class WelcomeScreen extends StatelessWidget {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Image.asset('assets/images/logo.png',
+                  Image.asset('assets/images/logo_epavie.png',
                       width: double.infinity, height: 130, fit: BoxFit.contain),
                   const SizedBox(height: 30),
                   const Text('Bienvenue sur epaVie',

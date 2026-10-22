@@ -577,8 +577,11 @@ class _DepositMoneyDetailsScreenState extends State<DepositMoneyDetailsScreen> {
       rejected ? 'Refusé par l’autorité' : 'Approuvé par l’autorité',
       status == 'NON RESOLU' ? 'Véhicule non enlevé' : 'Enlèvement du véhicule',
     ];
-    final reached = status == 'ENLEVE' || status == 'NON RESOLU' ? 5
-        : (approved || rejected) ? 4 : submitted ? 3
+    // Un refus de l'autorité clôture le dossier : l'étape « Enlèvement du
+    // véhicule » est complétée automatiquement, en rouge.
+    final reached = status == 'ENLEVE' || status == 'NON RESOLU' || rejected
+        ? 5
+        : approved ? 4 : submitted ? 3
         : status == 'EN COURS' ? 2 : 1;
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
@@ -600,9 +603,15 @@ class _DepositMoneyDetailsScreenState extends State<DepositMoneyDetailsScreen> {
                         : i < reached ? Icons.check_circle : Icons.circle_outlined,
                     color: status == 'NON RESOLU' && i == 4
                         ? Colors.deepOrange
-                        : i < reached ? (rejected && i == 3 ? Colors.red : Colors.green)
-                            : Colors.grey),
+                        : i < reached
+                            ? (rejected && i >= 3
+                                ? SendraTheme.statusSignale
+                                : SendraTheme.statusResolu)
+                            : SendraTheme.border),
                 title: Text(steps[i]),
+                subtitle: rejected && i == 4
+                    ? const Text('Clôturé suite au refus de l’autorité')
+                    : null,
               ),
             if (rejected && data['motif_approbation'] != null)
               Text('Motif : ${data['motif_approbation']}'),

@@ -10,11 +10,11 @@ class AppBrand {
   static const String tagline = 'Agir pour un environnement plus sûr';
 
   /// Logo horizontal pour la barre du haut.
-  static const String appBarLogo = 'assets/images/logo.png';
+  static const String appBarLogo = 'assets/images/logo_epavie.png';
 
   /// Pas de logo transparent pour l'application citoyen : le menu affiche
   /// l'icône de l'application et le nom en blanc sur le vert.
-  static const String? drawerLogo = null;
+  static const String? drawerLogo = 'assets/images/logo_epavie.png';
 
   /// Icône de l'application (identique au splash natif Android).
   static const String appIcon = 'assets/images/splash/app_icon.png';

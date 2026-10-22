@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../utils/app_brand.dart';
 import '../../utils/sendra_theme.dart';
 
 /// Éléments communs aux écrans de connexion et d'inscription, pour qu'ils
@@ -52,7 +53,7 @@ class AuthBrand extends StatelessWidget {
         ],
       ),
       child: Image.asset(
-        'assets/images/logo.png',
+        AppBrand.appBarLogo,
         height: compact ? 64 : 84,
         fit: BoxFit.contain,
       ),
