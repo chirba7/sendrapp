@@ -3,7 +3,9 @@
 @php
     $storageBase = rtrim(config('services.backend.storage_url'), '/');
     $vehicleKind = $carPosition->vehicle_kind ?: (($carPosition->type_car === 'Moto' || $carPosition->categorie === 'CYCL') ? 'Moto' : 'Voiture');
-    $statusLabel = $carPosition->etat === 'ENLEVE' ? 'Enlevé' : (in_array($carPosition->etat, ['SIGNALE', 'EN COURS']) && $carPosition->non_removed_at ? 'Non résolu' : ($carPosition->etat === 'REJETE' ? 'Refusé' : ($carPosition->is_approve ? 'Approuvé' : ($carPosition->dommage_image ? 'En attente de décision' : 'Signalé'))));
+    // Cinq états, les mêmes que dans les applications : Signalé, En cours,
+    // Résolu, Non résolu, Rejeté.
+    $statusLabel = \App\Support\AvancementSignalement::LIBELLES[\App\Support\AvancementSignalement::etatAffiche($carPosition)] ?? 'Signalé';
 @endphp
 <style>
     .report-hero { background:linear-gradient(135deg,#073b2a,#0b8f55); color:#fff; border-radius:22px; padding:24px; box-shadow:0 16px 38px rgba(7,59,42,.18); }
@@ -74,8 +76,14 @@
         @endif
         <div class="row g-3 mb-4">
             <div class="col-md-4"><div class="report-stat"><div class="text-muted small">Citoyen</div><div class="fw-bold">{{ trim(($carPosition->user?->first_name ?? '').' '.($carPosition->user?->last_name ?? '')) ?: 'Non renseigné' }}</div><small>{{ $carPosition->user?->telephone ?: 'Téléphone non renseigné' }}</small></div></div>
-            <div class="col-md-4"><div class="report-stat"><div class="text-muted small">Agent</div><div class="fw-bold">{{ trim(($carPosition->agent?->first_name ?? '').' '.($carPosition->agent?->last_name ?? '')) ?: 'Non affecté' }}</div><small>{{ $carPosition->dommage_image ? 'Constatation transmise' : 'Constatation en attente' }}</small></div></div>
+            <div class="col-md-4"><div class="report-stat"><div class="text-muted small">Agent</div><div class="fw-bold">{{ trim(($carPosition->agent?->first_name ?? '').' '.($carPosition->agent?->last_name ?? '')) ?: 'Non pris en charge' }}</div><small>{{ $carPosition->dommage_image ? 'Constatation transmise' : ($carPosition->pris_en_charge_at ? 'Pris en charge le '.\Carbon\Carbon::parse($carPosition->pris_en_charge_at)->format('d/m/Y à H:i') : 'Constatation en attente') }}{{ $carPosition->pv_signe_at ? ' · PV signé' : '' }}</small></div></div>
             <div class="col-md-4"><div class="report-stat"><div class="text-muted small">Décision</div><div class="fw-bold">{{ $carPosition->etat === 'REJETE' ? 'Refusée' : ($carPosition->is_approve ? 'Approuvée' : 'En attente') }}</div><small>{{ $carPosition->motife_approbation ?: 'Aucun motif renseigné' }}</small></div></div>
+        </div>
+        <div class="row g-3 mb-4">
+            <div class="col-12"><div class="report-detail">
+                <h4 class="mb-3">Avancement du signalement</h4>
+                @include('carPosition.partials.avancement')
+            </div></div>
         </div>
         <div class="row g-3 mb-4">
             <div class="col-lg-6"><div class="report-detail">

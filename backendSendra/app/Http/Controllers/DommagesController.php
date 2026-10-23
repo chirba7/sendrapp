@@ -17,6 +17,9 @@ class DommagesController extends Controller
     public function enregistrerDommages(Request $request, CarPosition $carPosition)
     {
         abort_if((int) auth()->user()->role_id === 2 && !empty($carPosition->dommage_image), 403, 'Signalement transmis : modification interdite.');
+        if ($refus = \App\Support\PriseEnCharge::refusSiAutreAgent($carPosition)) {
+            return $refus;
+        }
         // Correction perf : aucune limite de taille sur le payload base64
         // entrant (vecteur de gonflement du stockage / requêtes lentes).
         // ~15M caractères ≈ 11 Mo décodés, largement suffisant pour une
@@ -64,6 +67,7 @@ class DommagesController extends Controller
         $carPosition->pieces_manquantes = $request->input('pieces_manquantes');
         if ((int) auth()->user()->role_id === 2 && !$carPosition->agent_id) {
             $carPosition->agent_id = auth()->id();
+            $carPosition->pris_en_charge_at = now();
         }
         // Enregistrer les dommages vaut envoi pour approbation : on date ce
         // passage, il sert de verrou et de repère dans l'historique.
@@ -105,7 +109,17 @@ class DommagesController extends Controller
     {
         abort_unless((int) auth()->user()->role_id === 2, 403);
         abort_if(!empty($carPosition->dommage_image), 403, 'Constatation déjà transmise.');
+        if ($refus = \App\Support\PriseEnCharge::refusSiAutreAgent($carPosition)) {
+            return $refus;
+        }
         $request->validate(['photo' => 'required|image|mimes:jpeg,png,webp|max:5120']);
+        $dejaPrises = CarPhoto::where('card_id', $carPosition->id)->where('position', 'agent_constat')->count();
+        if ($dejaPrises >= SignalementAgentController::PHOTOS_AGENT_MAX) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Quatre photos au maximum : supprimez-en une pour en ajouter une autre.',
+            ], 422);
+        }
         $path = $request->file('photo')->store('signalement/agent', 'public');
         $photo = new CarPhoto();
         $photo->card_id = $carPosition->id;
@@ -114,10 +128,12 @@ class DommagesController extends Controller
         $photo->save();
         if (!$carPosition->agent_id) {
             $carPosition->agent_id = auth()->id();
+            $carPosition->pris_en_charge_at = now();
             $carPosition->save();
         }
         return response()->json([
             'success' => true,
+            'id' => $photo->id,
             'url' => $request->getSchemeAndHttpHost().'/storage/'.$path,
         ], 201);
     }

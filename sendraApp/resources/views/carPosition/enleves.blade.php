@@ -21,7 +21,7 @@
                 <div class="card-style mb-30">
                     <div class="title d-flex flex-wrap align-items-center justify-content-between">
                         <div class="left">
-                            <h6 class="text-medium mb-30">Liste des signalements qui sont enlevés</h6>
+                            <h6 class="text-medium mb-30">Signalements résolus (véhicule enlevé)</h6>
                         </div>
                     </div>
                     <!-- End Title -->
@@ -77,7 +77,7 @@
                                         <p class="text-sm">{{$signalement->created_at->format('d F Y \à H\hi')}}</p>
                                     </td>
                                     <td>
-                                        <span class="status-btn success-btn">{{$signalement->etat}}</span>
+                                        <span class="status-btn success-btn">Résolu</span>
                                     </td>
                                     <td>
                                         <div class="action justify-content-center">

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\StoreCarPositionRequest;
+use App\Http\Resources\SignalementPublicRessource;
 use App\Http\Resources\SignalementRessource;
 use App\Models\CarPhoto;
 use App\Models\CarPosition;
@@ -72,7 +73,8 @@ class CarPositionController extends Controller
                 $carPosition = new CarPosition();
                 $carPosition->latitude = $request->latitude;
                 $carPosition->longitude = $request->longitude;
-                $carPosition->title = $request->titre;
+                $carPosition->title = $request->filled('titre') ? $request->titre : $request->vehicle_kind;
+                $carPosition->vehicle_kind = $request->vehicle_kind;
                 $carPosition->description = $request->description;
                 $carPosition->adresse_precise = $request->adresse_precise;
                 $carPosition->commune = $request->commune;
@@ -144,7 +146,7 @@ class CarPositionController extends Controller
     {
 
         $signalement = CarPosition::where('is_deleted', false)
-            ->with('photo')
+            ->with(['photo', 'agent'])
             ->orderBy('created_at', 'desc')
             ->paginate(10);
         // dd($signalement);
@@ -165,17 +167,39 @@ class CarPositionController extends Controller
         return response()->json(
             [
                 'signalements' => CarPosition::count(),
-                'signales' => CarPosition::where('etat', 'SIGNALE')->whereNull('non_removed_at')->count(),
+                // « En cours » dès l'envoi pour approbation (23/10/2026).
+                'signales' => CarPosition::where('etat', 'SIGNALE')->whereNull('non_removed_at')
+                    ->whereNull('soumis_approbation_at')->count(),
                 'enleves' => $parEtat->get('ENLEVE', 0),
-                'encours' => CarPosition::where('etat', 'EN COURS')->whereNull('non_removed_at')->count(),
+                'encours' => CarPosition::whereNull('non_removed_at')
+                    ->where(fn ($q) => $q->where('etat', 'EN COURS')
+                        ->orWhere(fn ($q) => $q->where('etat', 'SIGNALE')->whereNotNull('soumis_approbation_at')))
+                    ->count(),
                 'non_resolus' => CarPosition::whereIn('etat', ['SIGNALE', 'EN COURS'])->whereNotNull('non_removed_at')->count(),
             ]
         );
     }
 
+    /**
+     * Signalements de tous les citoyens, pour la liste « Autres » et la carte
+     * de l'application citoyen. Données réduites : ni description, ni adresse
+     * précise, ni historique, ni identité de l'auteur — seulement de quoi
+     * savoir qu'un véhicule est déjà signalé et où en est son traitement.
+     */
+    public function signalementsCommunaute()
+    {
+        $signalements = CarPosition::where('is_deleted', false)
+            ->with('photo')
+            ->orderBy('created_at', 'desc')
+            ->limit(300)
+            ->get();
+
+        return response()->json(SignalementPublicRessource::collection($signalements));
+    }
+
     public function listerSignalement(CarPosition $carPosition)
     {
-        $signalement = CarPosition::where('id', $carPosition->id)->with('photo')->get();
+        $signalement = CarPosition::where('id', $carPosition->id)->with(['photo', 'agent'])->get();
         return SignalementRessource::collection($signalement);
     }
 }

@@ -14,4 +14,10 @@ class CarPosition extends Model
     {
         return $this->hasMany(CarPhoto::class, 'card_id');
     }
+
+    /** Agent qui a pris le signalement en charge (constatation). */
+    public function agent()
+    {
+        return $this->belongsTo(User::class, 'agent_id');
+    }
 }

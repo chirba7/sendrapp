@@ -44,6 +44,7 @@ Route::middleware([
     Route::get('/dashboard/signalement/enleves', [CarPositionController::class, 'index2'])->name('enleves');
     Route::get('/dashboard/signalement/encours', [CarPositionController::class, 'index3'])->name('encours');
     Route::get('/dashboard/signalement/non-resolus', [CarPositionController::class, 'nonResolus'])->name('non_resolus');
+    Route::get('/dashboard/signalement/rejetes', [CarPositionController::class, 'rejetes'])->name('rejetes');
     Route::get('/dashboard/signalement/{carPosition}', [CarPositionController::class, 'show'])->name('details');
     Route::get('/dashboard/locatlisation/{carPosition}', [CarPositionController::class, 'locatlisation'])->name('locatlisation');
     Route::get('/signalements/{carPosition}/pdf', [CarPositionController::class, 'pdf'])->name('pdf');

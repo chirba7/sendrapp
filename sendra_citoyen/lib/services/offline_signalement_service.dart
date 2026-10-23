@@ -59,6 +59,8 @@ class ResultatEnvoi {
 class PendingSignalement {
   final String uuid;
   final String titre;
+  /// Voiture, Moto ou Camion (bulles du formulaire) — remplace le titre.
+  final String vehicleKind;
   final String description;
   final String commune;
   final String adressePrecise;
@@ -70,6 +72,7 @@ class PendingSignalement {
   PendingSignalement({
     required this.uuid,
     required this.titre,
+    this.vehicleKind = '',
     required this.description,
     required this.commune,
     required this.adressePrecise,
@@ -82,6 +85,7 @@ class PendingSignalement {
   Map<String, dynamic> toJson() => {
         'uuid': uuid,
         'titre': titre,
+        'vehicle_kind': vehicleKind,
         'description': description,
         'commune': commune,
         'adresse_precise': adressePrecise,
@@ -95,6 +99,7 @@ class PendingSignalement {
       PendingSignalement(
         uuid: json['uuid'] as String,
         titre: json['titre'] as String? ?? '',
+        vehicleKind: json['vehicle_kind'] as String? ?? '',
         description: json['description'] as String? ?? '',
         commune: json['commune'] as String? ?? '',
         adressePrecise: json['adresse_precise'] as String? ?? '',
@@ -201,6 +206,7 @@ class OfflineSignalementService {
             },
             body: jsonEncode({
               'titre': s.titre,
+              if (s.vehicleKind.isNotEmpty) 'vehicle_kind': s.vehicleKind,
               'description': s.description,
               'commune': s.commune,
               'adresse_precise': s.adressePrecise,
@@ -279,6 +285,7 @@ class OfflineSignalementService {
       final complete = PendingSignalement(
         uuid: s.uuid,
         titre: s.titre,
+        vehicleKind: s.vehicleKind,
         description: s.description,
         commune: commune,
         adressePrecise: s.adressePrecise.isNotEmpty ? s.adressePrecise : adresse,

@@ -3,10 +3,13 @@ import 'package:geolocator/geolocator.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:walletium/views/screens/vehicule_screen.dart';
+import '../../utils/app_prefs.dart';
 import '../../utils/session.dart';
 import '../../utils/strings.dart';
 import '../../utils/sendra_theme.dart';
+import '../../widgets/others/avancement_timeline.dart';
 import '../../widgets/others/galerie_photos_signalement.dart';
+import 'pv_screen.dart';
 import 'carto.dart';
 import 'dommages_screen.dart';
 import 'informationBase_screen.dart';
@@ -26,6 +29,9 @@ class _DepositMoneyDetailsScreenState extends State<DepositMoneyDetailsScreen> {
   bool isLoading = true;
   Map<String, dynamic> signalementData = {};
   bool _isStaff = false;
+  late final bool _isAgent = AppPrefs.isAgent;
+  bool _priseEnCours = false;
+  bool _propositionFaite = false;
 
   @override
   void initState() {
@@ -64,6 +70,17 @@ class _DepositMoneyDetailsScreenState extends State<DepositMoneyDetailsScreen> {
         // Actualiser depuis l’API citoyenne pour refléter la décision de l’autorité.
         final initial = Map<String, dynamic>.from(args);
         signalementData = initial;
+        if (_isStaff && initial['signalementId'] != null) {
+          // Staff : détail complet et à jour (prise en charge, PV…).
+          try {
+            signalementData = await fetchSignalementDetails(
+                int.parse(initial['signalementId'].toString()));
+          } catch (_) {}
+          signalementDataFuture = Future.value(signalementData);
+          setState(() => isLoading = false);
+          _proposerPriseEnCharge();
+          return;
+        }
         final prefs = await SharedPreferences.getInstance();
         final token = prefs.getString('token');
         if (token != null) {
@@ -100,6 +117,7 @@ class _DepositMoneyDetailsScreenState extends State<DepositMoneyDetailsScreen> {
       setState(() {
         isLoading = false;
       });
+      _proposerPriseEnCharge();
     } catch (e) {
       print('Erreur: $e');
       setState(() {
@@ -303,14 +321,20 @@ class _DepositMoneyDetailsScreenState extends State<DepositMoneyDetailsScreen> {
 
   Widget _buildContent(Map<String, dynamic> signalementData) {
     final isApproved = signalementData['is_approve'] == true;
-    final isResolved = signalementData['etat']?.toString() == 'ENLEVE';
+    final etat = signalementData['etat']?.toString();
+    final isResolved = etat == 'ENLEVE';
+    final clos = isResolved || etat == 'REJETE' || etat == 'NON RESOLU';
     // Une fois approuvé (et tant que ce n'est pas résolu), la constatation
-    // (infos/véhicule/infraction/dommages) n'est plus l'action prioritaire —
-    // elle est repliée dans un seul bouton dépliable, et l'enlèvement (la
-    // vraie prochaine étape) est mis en relief. Un signalement résolu
-    // retrouve l'affichage à plat des 5 items, comme avant approbation.
+    // (véhicule/infraction/dommages) n'est plus l'action prioritaire — elle
+    // est repliée dans un seul bouton dépliable, et l'enlèvement (la vraie
+    // prochaine étape) est mis en relief.
     final grouped = _isStaff && isApproved && !isResolved;
     final submitted = signalementData['dommages_saisis'] == true;
+    // Agent : la constatation n'est saisissable que par l'agent qui a pris
+    // le signalement en charge.
+    final parMoi = signalementData['pris_en_charge_par_moi'] == true;
+    final libre = signalementData['agent_id'] == null;
+    final peutSaisir = !_isAgent || parMoi;
 
     return RefreshIndicator(
       onRefresh: fetchSignalementData,
@@ -328,20 +352,25 @@ class _DepositMoneyDetailsScreenState extends State<DepositMoneyDetailsScreen> {
             ),
             _workflowHeader(signalementData),
             _localisationButton(),
-            if (!grouped && !submitted) _menuItem('Informations de base', signalementData),
+            if (_isAgent && !submitted && !clos)
+              _priseEnChargeCard(signalementData, parMoi: parMoi, libre: libre),
+            // « Informations de base » est réservé au personnel : un citoyen
+            // n'a pas à voir les données de constatation.
+            if (_isStaff && peutSaisir && !grouped && !submitted)
+              _menuItem('Informations de base', signalementData),
             // Le workflow métier (véhicule, infraction, dommages, enlèvement)
-            // est réservé au staff côté API (role:1,2,3,4) — masqué pour un
-            // citoyen, qui n'a qu'une vue de suivi de son signalement.
+            // est réservé au staff côté API (role:1,2,3,4).
             if (_isStaff) ...[
               if (submitted) ...[
+                if (_isAgent) _pvCard(signalementData),
                 _submittedRecap(signalementData),
                 if (isApproved && !isResolved) _missionAssignmentCard(),
               ] else if (!isApproved) ...[
-                _menuItem('Véhicule', signalementData),
-                _menuItem('Infraction', signalementData),
-                _menuItem('Dommages', signalementData),
-                if (signalementData['dommages_saisis'] == true)
-                  _approvalStatus(signalementData['etat']?.toString()),
+                if (peutSaisir) ...[
+                  _menuItem('Véhicule', signalementData),
+                  _menuItem('Infraction', signalementData),
+                  _menuItem('Dommages', signalementData),
+                ],
               ] else if (grouped) ...[
                 _constatationGroup(signalementData),
                 _missionAssignmentCard(),
@@ -350,11 +379,283 @@ class _DepositMoneyDetailsScreenState extends State<DepositMoneyDetailsScreen> {
                 _menuItem('Infraction', signalementData),
                 _menuItem('Dommages', signalementData),
               ],
-            ] else
-              _citizenStatusCard(signalementData),
+            ],
+            AvancementTimeline(data: signalementData),
+            if (!_isStaff)
+              const Padding(
+                padding: EdgeInsets.fromLTRB(20, 4, 20, 0),
+                child: Text('Faites glisser vers le bas pour actualiser.',
+                    style: TextStyle(color: SendraTheme.muted, fontSize: 13)),
+              ),
             const SizedBox(height: 16),
           ],
         ),
+      ),
+    );
+  }
+
+  // ───────────────────────── Prise en charge (agent) ─────────────────────
+
+  /// À l'ouverture d'un signalement libre, l'agent est invité à le prendre en
+  /// charge : il en devient le seul à pouvoir saisir la constatation.
+  Future<void> _proposerPriseEnCharge() async {
+    if (!_isAgent || _propositionFaite || !mounted) return;
+    final d = signalementData;
+    final etat = d['etat']?.toString();
+    if (d['agent_id'] != null ||
+        d['dommages_saisis'] == true ||
+        etat == 'ENLEVE' ||
+        etat == 'REJETE' ||
+        etat == 'NON RESOLU') {
+      return;
+    }
+    _propositionFaite = true;
+    final ok = await showModalBottomSheet<bool>(
+      context: context,
+      showDragHandle: true,
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Icon(Icons.assignment_ind_rounded,
+                  size: 44, color: SendraTheme.green),
+              const SizedBox(height: 12),
+              const Text('Prendre en charge ce signalement ?',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 19, fontWeight: FontWeight.w800)),
+              const SizedBox(height: 8),
+              const Text(
+                'Vous serez le seul agent à pouvoir saisir la constatation. '
+                'Les autres agents le verront « pris en charge ».',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: SendraTheme.muted, height: 1.4),
+              ),
+              const SizedBox(height: 18),
+              FilledButton.icon(
+                style: FilledButton.styleFrom(minimumSize: const Size(0, 52)),
+                onPressed: () => Navigator.of(ctx).pop(true),
+                icon: const Icon(Icons.lock_rounded),
+                label: const Text('Prendre en charge'),
+              ),
+              const SizedBox(height: 8),
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(false),
+                child: const Text('Consulter seulement'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (ok == true) await _prendreEnCharge();
+  }
+
+  Future<void> _prendreEnCharge({bool liberer = false}) async {
+    final id = signalementData['signalementId'];
+    if (id == null || _priseEnCours) return;
+    setState(() => _priseEnCours = true);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('token');
+      final uri =
+          Uri.parse('${Strings.apiURI}signalements/$id/prise-en-charge');
+      final headers = {
+        'Authorization': 'Bearer $token',
+        'Accept': 'application/json',
+      };
+      final response = liberer
+          ? await http.delete(uri, headers: headers)
+          : await http.post(uri, headers: headers);
+      final corps = jsonDecode(response.body);
+      if (response.statusCode != 200) {
+        _snack(corps is Map && corps['message'] != null
+            ? corps['message'].toString()
+            : 'Action impossible (${response.statusCode}).');
+      } else {
+        _snack(liberer
+            ? 'Signalement libéré.'
+            : 'Signalement pris en charge : vous pouvez saisir la constatation.');
+      }
+    } catch (_) {
+      _snack('Impossible de joindre le serveur.');
+    } finally {
+      if (mounted) setState(() => _priseEnCours = false);
+      await _rafraichir();
+    }
+  }
+
+  Future<void> _rafraichir() async {
+    final id = signalementData['signalementId'];
+    if (id == null) return;
+    try {
+      final frais = await fetchSignalementDetails(int.parse(id.toString()));
+      if (!mounted) return;
+      setState(() {
+        signalementData = frais;
+        signalementDataFuture = Future.value(frais);
+      });
+    } catch (_) {}
+  }
+
+  void _snack(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  Widget _priseEnChargeCard(Map<String, dynamic> data,
+      {required bool parMoi, required bool libre}) {
+    final (Color fond, Color bord, IconData icone, String titre, String texte) =
+        parMoi
+            ? (
+                const Color(0xFFE8F5ED),
+                const Color(0xFFB7DEC4),
+                Icons.lock_open_rounded,
+                'Pris en charge par vous',
+                'Vous seul pouvez saisir la constatation de ce signalement.',
+              )
+            : libre
+                ? (
+                    Colors.white,
+                    SendraTheme.border,
+                    Icons.assignment_ind_outlined,
+                    'Aucun agent ne l’a pris en charge',
+                    'Prenez-le en charge pour saisir la constatation.',
+                  )
+                : (
+                    const Color(0xFFFFF4E5),
+                    const Color(0xFFF5D3A3),
+                    Icons.lock_rounded,
+                    'Pris en charge par ${data['pris_en_charge_par'] ?? 'un autre agent'}',
+                    'Consultation seule : un autre agent saisit la constatation.',
+                  );
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 8, 16, 6),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: fond,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: bord),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(icone, color: SendraTheme.forest),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(titre,
+                        style: const TextStyle(
+                            fontWeight: FontWeight.w800, fontSize: 15.5)),
+                    const SizedBox(height: 2),
+                    Text(texte,
+                        style: const TextStyle(
+                            color: SendraTheme.muted, fontSize: 13.5)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          if (libre) ...[
+            const SizedBox(height: 12),
+            FilledButton.icon(
+              onPressed: _priseEnCours ? null : () => _prendreEnCharge(),
+              icon: _priseEnCours
+                  ? const SizedBox.square(
+                      dimension: 18,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: Colors.white))
+                  : const Icon(Icons.lock_rounded),
+              label: const Text('Prendre en charge'),
+            ),
+          ] else if (parMoi)
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton(
+                onPressed: _priseEnCours
+                    ? null
+                    : () async {
+                        final ok = await showDialog<bool>(
+                          context: context,
+                          builder: (ctx) => AlertDialog(
+                            title: const Text('Libérer ce signalement ?'),
+                            content: const Text(
+                                'Un autre agent pourra alors le prendre en charge.'),
+                            actions: [
+                              TextButton(
+                                  onPressed: () => Navigator.pop(ctx, false),
+                                  child: const Text('Annuler')),
+                              FilledButton(
+                                  onPressed: () => Navigator.pop(ctx, true),
+                                  child: const Text('Libérer')),
+                            ],
+                          ),
+                        );
+                        if (ok == true) await _prendreEnCharge(liberer: true);
+                      },
+                child: const Text('Libérer'),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  // ───────────────────────── Procès-verbal (agent) ───────────────────────
+
+  Widget _pvCard(Map<String, dynamic> data) {
+    final signe = data['pv_signe'] == true;
+    final id = int.tryParse(data['signalementId']?.toString() ?? '');
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: signe ? const Color(0xFFE8F5ED) : const Color(0xFFFFF4E5),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+            color: signe ? const Color(0xFFB7DEC4) : const Color(0xFFF5D3A3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Icon(signe ? Icons.verified_rounded : Icons.draw_rounded,
+                  color: SendraTheme.forest),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  signe
+                      ? 'Procès-verbal signé ${data['pv_numero'] != null ? '· ${data['pv_numero']}' : ''}'
+                      : 'Procès-verbal à signer',
+                  style: const TextStyle(
+                      fontWeight: FontWeight.w800, fontSize: 15.5),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          FilledButton.icon(
+            onPressed: id == null || !(data['pris_en_charge_par_moi'] == true || signe)
+                ? null
+                : () async {
+                    await Navigator.of(context).push(MaterialPageRoute(
+                      builder: (_) => PvScreen(signalementId: id),
+                    ));
+                    await _rafraichir();
+                  },
+            icon: Icon(signe ? Icons.picture_as_pdf_rounded : Icons.draw_rounded),
+            label: Text(signe ? 'Consulter / télécharger le PV' : 'Signer le PV'),
+          ),
+        ],
       ),
     );
   }
@@ -491,21 +792,9 @@ class _DepositMoneyDetailsScreenState extends State<DepositMoneyDetailsScreen> {
   }
 
   Widget _workflowHeader(Map<String, dynamic> data) {
-    final status = data['etat']?.toString() ?? 'SIGNALE';
-    final color = status == 'ENLEVE'
-        ? SendraTheme.green
-        : status == 'EN COURS'
-            ? SendraTheme.amber
-            : Colors.red.shade600;
-    final label = status == 'ENLEVE'
-        ? 'Résolu'
-        : status == 'NON RESOLU'
-            ? 'Non résolu'
-        : status == 'EN COURS'
-            ? 'En cours'
-            : status == 'REJETE'
-                ? 'Rejeté'
-                : 'À constater';
+    final style = SendraTheme.status(data['etat']?.toString() ?? 'SIGNALE');
+    final color = style.color;
+    final label = style.label;
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.fromLTRB(16, 16, 16, 4),
@@ -543,7 +832,7 @@ class _DepositMoneyDetailsScreenState extends State<DepositMoneyDetailsScreen> {
           ),
           const SizedBox(height: 14),
           Text(
-            data['titre']?.toString() ?? 'Signalement',
+            (data['vehicle_kind'] ?? data['titre'])?.toString() ?? 'Signalement',
             style: const TextStyle(fontSize: 21, fontWeight: FontWeight.w800),
           ),
           const SizedBox(height: 5),
@@ -561,66 +850,6 @@ class _DepositMoneyDetailsScreenState extends State<DepositMoneyDetailsScreen> {
             ],
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _citizenStatusCard(Map<String, dynamic> data) {
-    final status = data['etat']?.toString() ?? 'SIGNALE';
-    final submitted = data['dommages_saisis'] == true;
-    final approved = data['is_approve'] == true;
-    final rejected = status == 'REJETE';
-    final steps = <String>[
-      'Signalement reçu',
-      'Constatation par un agent',
-      'Transmis pour approbation',
-      rejected ? 'Refusé par l’autorité' : 'Approuvé par l’autorité',
-      status == 'NON RESOLU' ? 'Véhicule non enlevé' : 'Enlèvement du véhicule',
-    ];
-    // Un refus de l'autorité clôture le dossier : l'étape « Enlèvement du
-    // véhicule » est complétée automatiquement, en rouge.
-    final reached = status == 'ENLEVE' || status == 'NON RESOLU' || rejected
-        ? 5
-        : approved ? 4 : submitted ? 3
-        : status == 'EN COURS' ? 2 : 1;
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Avancement du signalement',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17)),
-            const SizedBox(height: 10),
-            for (var i = 0; i < steps.length; i++)
-              ListTile(
-                dense: true,
-                contentPadding: EdgeInsets.zero,
-                leading: Icon(
-                    status == 'NON RESOLU' && i == 4
-                        ? Icons.report_problem_outlined
-                        : i < reached ? Icons.check_circle : Icons.circle_outlined,
-                    color: status == 'NON RESOLU' && i == 4
-                        ? Colors.deepOrange
-                        : i < reached
-                            ? (rejected && i >= 3
-                                ? SendraTheme.statusSignale
-                                : SendraTheme.statusResolu)
-                            : SendraTheme.border),
-                title: Text(steps[i]),
-                subtitle: rejected && i == 4
-                    ? const Text('Clôturé suite au refus de l’autorité')
-                    : null,
-              ),
-            if (rejected && data['motif_approbation'] != null)
-              Text('Motif : ${data['motif_approbation']}'),
-            if (status == 'NON RESOLU')
-              Text('Motif de non-enlèvement : ${data['non_removal_reason'] ?? 'Non renseigné'}'),
-            const Text('Faites glisser vers le bas pour actualiser.',
-                style: TextStyle(color: SendraTheme.muted)),
-          ],
-        ),
       ),
     );
   }

@@ -6,6 +6,7 @@ import 'package:walletium/views/screens/vehicule_screen.dart';
 import '../../utils/session.dart';
 import '../../utils/strings.dart';
 import '../../utils/sendra_theme.dart';
+import '../../widgets/others/avancement_timeline.dart';
 import '../../widgets/others/galerie_photos_signalement.dart';
 import 'carto.dart';
 import 'dommages_screen.dart';
@@ -66,7 +67,8 @@ class _DepositMoneyDetailsScreenState extends State<DepositMoneyDetailsScreen> {
         signalementData = initial;
         final prefs = await SharedPreferences.getInstance();
         final token = prefs.getString('token');
-        if (token != null) {
+        // Signalement d'un autre citoyen : données publiques déjà reçues.
+        if (token != null && initial['public'] != true) {
           try {
             final response = await http.get(
               Uri.parse('${Strings.apiURI}voirSignalements'),
@@ -327,7 +329,10 @@ class _DepositMoneyDetailsScreenState extends State<DepositMoneyDetailsScreen> {
             ),
             _workflowHeader(signalementData),
             _localisationButton(),
-            if (!grouped) _menuItem('Informations de base', signalementData),
+            // « Informations de base » sert à la constatation des agents : un
+            // citoyen n'y a pas accès (elle exposait des données internes).
+            if (_isStaff && !grouped)
+              _menuItem('Informations de base', signalementData),
             // Le workflow métier (véhicule, infraction, dommages, enlèvement)
             // est réservé au staff côté API (role:1,2,3,4) — masqué pour un
             // citoyen, qui n'a qu'une vue de suivi de son signalement.
@@ -346,8 +351,15 @@ class _DepositMoneyDetailsScreenState extends State<DepositMoneyDetailsScreen> {
                 _menuItem('Infraction', signalementData),
                 _menuItem('Dommages', signalementData),
               ],
-            ] else
-              _citizenStatusCard(signalementData),
+            ],
+            // Avancement : Signalé → En cours → Résolu / Non résolu / Rejeté.
+            AvancementTimeline(data: signalementData),
+            if (!_isStaff)
+              const Padding(
+                padding: EdgeInsets.fromLTRB(20, 4, 20, 0),
+                child: Text('Faites glisser vers le bas pour actualiser.',
+                    style: TextStyle(color: SendraTheme.muted, fontSize: 13)),
+              ),
             const SizedBox(height: 16),
           ],
         ),
@@ -447,21 +459,9 @@ class _DepositMoneyDetailsScreenState extends State<DepositMoneyDetailsScreen> {
   }
 
   Widget _workflowHeader(Map<String, dynamic> data) {
-    final status = data['etat']?.toString() ?? 'SIGNALE';
-    final color = status == 'ENLEVE'
-        ? SendraTheme.green
-        : status == 'EN COURS'
-            ? SendraTheme.amber
-            : Colors.red.shade600;
-    final label = status == 'ENLEVE'
-        ? 'Résolu'
-        : status == 'NON RESOLU'
-            ? 'Non résolu'
-        : status == 'EN COURS'
-            ? 'En cours'
-            : status == 'REJETE'
-                ? 'Rejeté'
-                : 'À constater';
+    final style = SendraTheme.status(data['etat']?.toString() ?? 'SIGNALE');
+    final color = style.color;
+    final label = style.label;
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.fromLTRB(16, 16, 16, 4),
@@ -499,7 +499,7 @@ class _DepositMoneyDetailsScreenState extends State<DepositMoneyDetailsScreen> {
           ),
           const SizedBox(height: 14),
           Text(
-            data['titre']?.toString() ?? 'Signalement',
+            (data['vehicle_kind'] ?? data['titre'])?.toString() ?? 'Signalement',
             style: const TextStyle(fontSize: 21, fontWeight: FontWeight.w800),
           ),
           const SizedBox(height: 5),
@@ -527,66 +527,6 @@ class _DepositMoneyDetailsScreenState extends State<DepositMoneyDetailsScreen> {
             Text(data['description'].toString()),
           ],
         ],
-      ),
-    );
-  }
-
-  Widget _citizenStatusCard(Map<String, dynamic> data) {
-    final status = data['etat']?.toString() ?? 'SIGNALE';
-    final submitted = data['dommages_saisis'] == true;
-    final approved = data['is_approve'] == true;
-    final rejected = status == 'REJETE';
-    final steps = <String>[
-      'Signalement reçu',
-      'Constatation par un agent',
-      'Transmis pour approbation',
-      rejected ? 'Refusé par l’autorité' : 'Approuvé par l’autorité',
-      status == 'NON RESOLU' ? 'Véhicule non enlevé' : 'Enlèvement du véhicule',
-    ];
-    // Un refus de l'autorité clôture le dossier : l'étape « Enlèvement du
-    // véhicule » est complétée automatiquement, en rouge.
-    final reached = status == 'ENLEVE' || status == 'NON RESOLU' || rejected
-        ? 5
-        : approved ? 4 : submitted ? 3
-        : status == 'EN COURS' ? 2 : 1;
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Avancement du signalement',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17)),
-            const SizedBox(height: 10),
-            for (var i = 0; i < steps.length; i++)
-              ListTile(
-                dense: true,
-                contentPadding: EdgeInsets.zero,
-                leading: Icon(
-                    status == 'NON RESOLU' && i == 4
-                        ? Icons.report_problem_outlined
-                        : i < reached ? Icons.check_circle : Icons.circle_outlined,
-                    color: status == 'NON RESOLU' && i == 4
-                        ? Colors.deepOrange
-                        : i < reached
-                            ? (rejected && i >= 3
-                                ? SendraTheme.statusSignale
-                                : SendraTheme.statusResolu)
-                            : SendraTheme.border),
-                title: Text(steps[i]),
-                subtitle: rejected && i == 4
-                    ? const Text('Clôturé suite au refus de l’autorité')
-                    : null,
-              ),
-            if (rejected && data['motif_approbation'] != null)
-              Text('Motif : ${data['motif_approbation']}'),
-            if (status == 'NON RESOLU')
-              Text('Motif de non-enlèvement : ${data['non_removal_reason'] ?? 'Non renseigné'}'),
-            const Text('Faites glisser vers le bas pour actualiser.',
-                style: TextStyle(color: SendraTheme.muted)),
-          ],
-        ),
       ),
     );
   }

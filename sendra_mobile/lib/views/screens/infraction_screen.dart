@@ -138,6 +138,15 @@ class _InfractionFormState extends State<InfractionForm> {
         });
       } else {
         final responseData = json.decode(response.body);
+        if (responseData is! Map || responseData['errorList'] is! Map) {
+          // 409 (pris en charge par un autre agent), 423 (déjà transmis)…
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(responseData is Map && responseData['message'] != null
+                ? responseData['message'].toString()
+                : 'Mise à jour impossible (${response.statusCode}).'),
+          ));
+          return;
+        }
         final errors = responseData['errorList'] as Map<String, dynamic>;
         final errorMessages = errors.entries.map((entry) {
           final field = entry.key;
@@ -180,7 +189,27 @@ class _InfractionFormState extends State<InfractionForm> {
           key: _formKey,
           child: ListView(
             children: [
-              _buildField('Adresse précise', _adresseController),
+              // Adresse issue de la géolocalisation du signalement : grisée,
+              // l'agent ne la modifie pas.
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 20.0),
+                child: TextFormField(
+                  controller: _adresseController,
+                  readOnly: true,
+                  enabled: false,
+                  style: const TextStyle(color: Color(0xFF6B7570)),
+                  decoration: InputDecoration(
+                    labelText: 'Adresse précise',
+                    helperText: 'Renseignée automatiquement, non modifiable',
+                    filled: true,
+                    fillColor: const Color(0xFFEDEFEE),
+                    prefixIcon: const Icon(Icons.lock_outline_rounded),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12.0),
+                    ),
+                  ),
+                ),
+              ),
               DropdownButtonFormField<String>(
                 value: _motifs.contains(_motifController.text)
                     ? _motifController.text : null,
@@ -260,26 +289,7 @@ class _InfractionFormState extends State<InfractionForm> {
     );
   }
 
-  Widget _buildField(String label, TextEditingController controller) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 20.0),
-      child: TextFormField(
-        controller: controller,
-        decoration: InputDecoration(
-          labelText: label,
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12.0),
-          ),
-        ),
-        validator: (value) {
-          if (value == null || value.isEmpty) {
-            return 'Ce champ est obligatoire';
-          }
-          return null;
-        },
-      ),
-    );
-  }
+
 
   Widget _choiceRow(
     Map<String, String> choices,

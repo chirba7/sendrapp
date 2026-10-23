@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:walletium/controller/bottom_navigation_controller.dart';
-import 'package:walletium/routes/routes.dart';
 import 'package:walletium/utils/app_brand.dart';
 import 'package:walletium/utils/app_prefs.dart';
+import 'package:walletium/utils/signaler_flow.dart';
 import 'package:walletium/utils/sendra_theme.dart';
 import 'package:walletium/views/screens/cartography_screen.dart';
 import 'package:walletium/views/screens/home_screen.dart';
@@ -106,12 +106,16 @@ class _BottomNavigationWidgetState extends State<BottomNavigationWidget> {
                 _built[i] ? _tabs[i].builder() : const SizedBox.shrink(),
             ],
           ),
-          floatingActionButton: FloatingActionButton.extended(
-            heroTag: 'signaler',
-            onPressed: () => Get.toNamed(Routes.depositScreen),
-            icon: const Icon(Icons.add_a_photo_rounded),
-            label: const Text('Signaler'),
-          ),
+          // Sur l'accueil, le grand bouton Signaler est dans la page (tiers
+          // haut) ; ailleurs il reste accessible en bouton flottant.
+          floatingActionButton: index == 0
+              ? null
+              : FloatingActionButton.extended(
+                  heroTag: 'signaler',
+                  onPressed: () => SignalerFlow.demarrer(context),
+                  icon: const Icon(Icons.add_a_photo_rounded),
+                  label: const Text('Signaler'),
+                ),
           floatingActionButtonLocation:
               FloatingActionButtonLocation.centerFloat,
           bottomNavigationBar: DecoratedBox(

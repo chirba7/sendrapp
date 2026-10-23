@@ -2,238 +2,148 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:image_picker/image_picker.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:get/get.dart';
-import 'package:walletium/controller/deposit_controller.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:walletium/routes/routes.dart';
 import 'package:walletium/services/offline_signalement_service.dart';
-import 'package:walletium/utils/custom_color.dart';
-import 'package:walletium/utils/dimsensions.dart';
-import 'package:walletium/utils/size.dart';
-import 'package:walletium/utils/strings.dart';
-import 'package:walletium/widgets/labels/text_labels_widget.dart';
-import 'package:walletium/widgets/others/back_button_widget.dart';
+import 'package:walletium/utils/app_prefs.dart';
+import 'package:walletium/utils/sendra_theme.dart';
+import 'package:walletium/utils/signaler_flow.dart';
 
+/// Formulaire de signalement, ouvert juste après la photo.
+///
+/// Le bouton « Signaler » ouvre directement l'appareil photo ; ici on choisit
+/// le type de véhicule (trois bulles qui remplacent l'ancien titre libre),
+/// on ajoute éventuellement une description, puis on valide.
 class DepositScreen extends StatefulWidget {
-  DepositScreen({Key? key}) : super(key: key);
+  const DepositScreen({super.key});
 
   @override
-  _DepositScreenState createState() => _DepositScreenState();
+  State<DepositScreen> createState() => _DepositScreenState();
 }
 
+/// Les trois types proposés : valeur envoyée au backend, libellé, icône.
+const _typesVehicule = <(String, String, IconData)>[
+  ('Voiture', 'Voiture', Icons.directions_car_filled_rounded),
+  ('Moto', 'Moto', Icons.two_wheeler_rounded),
+  ('Camion', 'Camion', Icons.local_shipping_rounded),
+];
+
+/// Angles supplémentaires (facultatifs), réservés aux agents : le backend
+/// n'accepte qu'une photo pour un citoyen.
+const _anglesSupplementaires = ['devant', 'derriere', 'cote_gauche', 'cote_droit'];
+
 class _DepositScreenState extends State<DepositScreen> {
-  final _controller = Get.put(DepositController());
   final _offline = OfflineSignalementService.instance;
+  final _description = TextEditingController();
+  late final bool _isStaff = AppPrefs.isStaff;
 
-  // Une photo par angle. `null` = emplacement encore vide.
-  final Map<String, File?> _photos = {
-    for (final position in anglesSignalement.keys) position: null,
-  };
+  File? _photo;
+  final Map<String, File> _angles = {};
+  String? _type;
+  bool _envoi = false;
+  bool _typeManquant = false;
 
-  Position? locationData;
-  String locality = '';
-  String subLocality = '';
-  double? latitude;
-  double? longitude;
-
-  bool _isLoading = false;
-
-  int get _nbPhotos => _photos.values.where((f) => f != null).length;
-
-  // Sur Android, le système peut tuer l'app pendant que l'appareil photo est
-  // ouvert (mémoire basse, fréquent à partir de la 3e photo) : l'app
-  // « redémarre » et perd le formulaire. Les chemins des photos déjà prises
-  // et l'angle en cours de capture sont donc gardés dans les préférences,
-  // puis restaurés ici, avec la photo « perdue » récupérée par image_picker.
-  static const _clePhotosBrouillon = 'signalement_brouillon_photos';
-  static const _cleCaptureEnCours = 'signalement_capture_en_cours';
+  // Position cherchée dès l'ouverture, pour ne pas attendre le GPS au moment
+  // de valider.
+  Future<void>? _localisation;
+  double? _latitude;
+  double? _longitude;
+  String _commune = '';
+  String _adresse = '';
 
   @override
   void initState() {
     super.initState();
-    _restaurerBrouillon();
-  }
-
-  Future<void> _restaurerBrouillon() async {
-    final prefs = await SharedPreferences.getInstance();
-    final restaurees = <String, File>{};
-
-    try {
-      final brut = prefs.getString(_clePhotosBrouillon);
-      if (brut != null) {
-        (jsonDecode(brut) as Map<String, dynamic>).forEach((position, chemin) {
-          final fichier = File(chemin.toString());
-          if (_photos.containsKey(position) && fichier.existsSync()) {
-            restaurees[position] = fichier;
-          }
-        });
-      }
-
-      final enCours = prefs.getString(_cleCaptureEnCours);
-      if (Platform.isAndroid && enCours != null && _photos.containsKey(enCours)) {
-        final perdue = await ImagePicker().retrieveLostData();
-        if (!perdue.isEmpty && perdue.file != null) {
-          restaurees[enCours] = File(perdue.file!.path);
-        }
-      }
-    } catch (e) {
-      print('Restauration du brouillon impossible: $e');
-    }
-
-    await prefs.remove(_cleCaptureEnCours);
-    if (restaurees.isEmpty || !mounted) return;
-
-    setState(() => _photos.addAll(restaurees));
-    await _sauverBrouillon();
-    _message('Photos du signalement en cours restaurées.');
-  }
-
-  Future<void> _sauverBrouillon() async {
-    final prefs = await SharedPreferences.getInstance();
-    final chemins = {
-      for (final e in _photos.entries)
-        if (e.value != null) e.key: e.value!.path,
-    };
-    if (chemins.isEmpty) {
-      await prefs.remove(_clePhotosBrouillon);
+    final argument = Get.arguments;
+    if (argument is File) {
+      _photo = argument;
     } else {
-      await prefs.setString(_clePhotosBrouillon, jsonEncode(chemins));
+      // Ouvert sans photo (ancien lien) : on lance l'appareil photo.
+      WidgetsBinding.instance.addPostFrameCallback((_) => _reprendre());
     }
+    _localisation = _localiser();
   }
 
-  Future<void> getLocation() async {
-    bool serviceEnabled;
-    LocationPermission permission;
+  @override
+  void dispose() {
+    _description.dispose();
+    super.dispose();
+  }
 
-    serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) {
-      locationData = null;
-      return;
-    }
-
-    permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
-      if (permission != LocationPermission.whileInUse &&
-          permission != LocationPermission.always) {
-        locationData = null;
+  Future<void> _localiser() async {
+    try {
+      if (!await Geolocator.isLocationServiceEnabled()) return;
+      var permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
         return;
       }
-    }
-
-    Position currentPosition = await Geolocator.getCurrentPosition();
-    latitude = currentPosition.latitude;
-    longitude = currentPosition.longitude;
-    locationData = currentPosition;
-
-    try {
-      List<Placemark> placemarks = await placemarkFromCoordinates(
-        currentPosition.latitude,
-        currentPosition.longitude,
-      );
-      if (placemarks.isNotEmpty) {
-        locality = placemarks.first.locality ?? '';
-        subLocality = placemarks.first.subLocality ?? '';
-        if (subLocality.isNotEmpty) {
-          locality = subLocality;
+      final position = await Geolocator.getCurrentPosition()
+          .timeout(const Duration(seconds: 20));
+      _latitude = position.latitude;
+      _longitude = position.longitude;
+      try {
+        final lieux =
+            await placemarkFromCoordinates(position.latitude, position.longitude);
+        if (lieux.isNotEmpty) {
+          final lieu = lieux.first;
+          final sousLocalite = lieu.subLocality ?? '';
+          _commune = AppPrefs.isStaff && sousLocalite.isNotEmpty
+              ? sousLocalite
+              : (lieu.locality ?? lieu.subAdministrativeArea ?? '');
+          _adresse = [lieu.street, sousLocalite, lieu.locality]
+              .where((p) => p != null && p.trim().isNotEmpty)
+              .map((p) => p!.trim())
+              .toSet()
+              .join(', ');
         }
+      } catch (_) {
+        // Hors ligne : la commune sera complétée à la synchronisation.
       }
-    } catch (e) {
-      print(e);
+    } catch (_) {
+      // Position indisponible : dernier recours, la dernière connue.
+      final derniere = await Geolocator.getLastKnownPosition();
+      _latitude ??= derniere?.latitude;
+      _longitude ??= derniere?.longitude;
     }
+    if (mounted) setState(() {});
   }
 
-  Future<void> _capturer(String position) async {
-    final picker = ImagePicker();
-
-    final source = await showDialog<ImageSource>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Photo — ${anglesSignalement[position]}'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ElevatedButton(
-              onPressed: () => Navigator.of(context).pop(ImageSource.camera),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: CustomColor.primaryColor,
-                foregroundColor: CustomColor.whiteColor,
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: const [
-                  Icon(Icons.camera_alt),
-                  SizedBox(width: 10),
-                  Text('Appareil photo'),
-                ],
-              ),
-            ),
-            SizedBox(height: 10),
-            ElevatedButton(
-              onPressed: () => Navigator.of(context).pop(ImageSource.gallery),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blueGrey,
-                foregroundColor: CustomColor.whiteColor,
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: const [
-                  Icon(Icons.photo_library),
-                  SizedBox(width: 10),
-                  Text('Galerie'),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-
-    if (source == null) return;
-
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_cleCaptureEnCours, position);
-
-    // 1600px suffit (le backend redimensionne à 1600px de toute façon) et
-    // garde les 5 photos en base64 sous le post_max_size (8 Mo) du serveur :
-    // au-delà, PHP vide la requête et le signalement est refusé.
-    final pickedFile = await picker.pickImage(
-      source: source,
-      imageQuality: 70,
-      maxWidth: 1600,
-      maxHeight: 1600,
-    );
-    await prefs.remove(_cleCaptureEnCours);
-    if (pickedFile == null || !mounted) return;
-
-    setState(() {
-      _photos[position] = File(pickedFile.path);
-    });
-    await _sauverBrouillon();
-  }
-
-  void _retirer(String position) {
-    setState(() {
-      _photos[position] = null;
-    });
-    _sauverBrouillon();
-  }
-
-  Future<void> _soumettre() async {
-    if (!_controller.formKey.currentState!.validate()) return;
-
-    if (_nbPhotos == 0) {
-      _message('Ajoutez au moins une photo du véhicule.');
+  Future<void> _reprendre() async {
+    final prise = await SignalerFlow.prendrePhoto();
+    if (prise == null) {
+      if (_photo == null && mounted) Get.back();
       return;
     }
+    final photo = await SignalerFlow.optimiser(File(prise.path));
+    if (mounted) setState(() => _photo = photo);
+  }
 
-    setState(() => _isLoading = true);
+  Future<void> _ajouterAngle(String angle) async {
+    final prise = await SignalerFlow.prendrePhoto();
+    if (prise == null) return;
+    final photo = await SignalerFlow.optimiser(File(prise.path));
+    if (mounted) setState(() => _angles[angle] = photo);
+  }
 
+  Future<void> _valider() async {
+    if (_type == null) {
+      setState(() => _typeManquant = true);
+      _message('Choisissez le type de véhicule.');
+      return;
+    }
+    if (_photo == null) {
+      _message('Prenez une photo du véhicule.');
+      return;
+    }
+    setState(() => _envoi = true);
     try {
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('token');
@@ -242,28 +152,34 @@ class _DepositScreenState extends State<DepositScreen> {
         return;
       }
 
-      // Encode les photos remplies, dans l'ordre des angles.
-      final photos = <PhotoSignalement>[];
-      for (final entry in _photos.entries) {
-        final fichier = entry.value;
-        if (fichier == null) continue;
-        final bytes = await fichier.readAsBytes();
-        photos.add(PhotoSignalement(
-          position: entry.key,
-          imageBase64: base64.encode(bytes),
-        ));
+      await _localisation?.timeout(const Duration(seconds: 25), onTimeout: () {});
+      if (_latitude == null || _longitude == null) {
+        _message('Position introuvable : activez la localisation puis réessayez.');
+        return;
       }
 
-      await getLocation();
+      final photos = <PhotoSignalement>[
+        PhotoSignalement(
+          position: 'vue_ensemble',
+          imageBase64: base64Encode(await _photo!.readAsBytes()),
+        ),
+        if (_isStaff)
+          for (final e in _angles.entries)
+            PhotoSignalement(
+              position: e.key,
+              imageBase64: base64Encode(await e.value.readAsBytes()),
+            ),
+      ];
 
-      // uuid stable : sert de clé de déduplication si l'envoi est rejoué
-      // (hors ligne puis synchro, ou réseau instable).
       final signalement = PendingSignalement(
         uuid: _offline.nouvelUuid(),
-        titre: _controller.titreController.text,
-        commune: locality,
-        latitude: latitude,
-        longitude: longitude,
+        titre: _type!,
+        vehicleKind: _type!,
+        description: _description.text.trim(),
+        commune: _commune,
+        adressePrecise: _adresse,
+        latitude: _latitude,
+        longitude: _longitude,
         createdAt: DateTime.now().toIso8601String(),
         photos: photos,
       );
@@ -272,262 +188,358 @@ class _DepositScreenState extends State<DepositScreen> {
           ? await _offline.envoyer(signalement, token)
           : ResultatEnvoi.aReessayer();
 
+      String message;
       switch (resultat.statut) {
         case StatutEnvoi.envoye:
-          _message('Votre signalement a été pris en compte !');
+          message = 'Votre signalement a été pris en compte. Merci !';
           break;
         case StatutEnvoi.rejete:
-          // Refus du serveur (validation) : ce n'est pas un problème de
-          // réseau, un renvoi automatique échouerait pareil. On laisse le
-          // formulaire rempli pour que l'utilisateur corrige.
           _message('Signalement refusé : ${resultat.message}');
           return;
         case StatutEnvoi.aReessayer:
-          // Hors ligne, timeout ou erreur serveur : on stocke localement, la
-          // synchro automatique s'en chargera au retour de la connexion.
           await _offline.enfiler(signalement);
-          final diag = resultat.message != null ? ' (${resultat.message})' : '';
-          _message(
-            'Envoi impossible pour le moment$diag : signalement enregistré. '
-            'Il sera renvoyé automatiquement dès que possible.',
-          );
+          message = 'Pas de connexion : signalement enregistré, il sera '
+              'envoyé automatiquement dès que possible.';
           break;
       }
 
-      _reinitialiser();
-      Get.toNamed(Routes.bottomNavigationScreen);
+      // Retour à l'accueil en vidant la pile : le bouton retour du téléphone
+      // ne ramène plus sur ce formulaire déjà envoyé.
+      Get.offAllNamed(Routes.bottomNavigationScreen);
+      Get.rawSnackbar(
+        message: message,
+        backgroundColor: SendraTheme.forest,
+        margin: const EdgeInsets.all(16),
+        borderRadius: 14,
+        duration: const Duration(seconds: 4),
+      );
     } catch (e) {
-      print('Erreur lors du signalement: $e');
-      _message('Une erreur s\'est produite : $e');
+      _message('Une erreur s’est produite : $e');
     } finally {
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted) setState(() => _envoi = false);
     }
   }
 
-  void _reinitialiser() {
-    _controller.titreController.text = '';
-    for (final position in _photos.keys.toList()) {
-      _photos[position] = null;
-    }
-    _sauverBrouillon();
-  }
-
-  void _message(String message) {
+  void _message(String texte) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        behavior: SnackBarBehavior.floating,
-        margin: const EdgeInsets.symmetric(horizontal: 20),
-      ),
-    );
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(texte),
+      behavior: SnackBarBehavior.floating,
+      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+    ));
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text(
-          Strings.signalement,
-          style: TextStyle(),
-        ),
-        leading: const BackButtonWidget(
-          backButtonImage: Strings.backButtonWhite,
-        ),
-        elevation: 0,
-      ),
-      body: ListView(
-        padding: EdgeInsets.symmetric(horizontal: Dimensions.marginSize * 0.5),
-        children: [
-          addVerticalSpace(20.h),
-          _champTitre(),
-          addVerticalSpace(20.h),
-          TextLabelsWidget(
-            textLabels: 'Photos du véhicule ($_nbPhotos/5)',
-            textColor: CustomColor.textColor,
-          ),
-          addVerticalSpace(6.h),
-          Text(
-            'Prenez le véhicule sous plusieurs angles (au moins une photo).',
-            style: const TextStyle(fontSize: 13.5, color: CustomColor.gray),
-          ),
-          addVerticalSpace(12.h),
-          _grillePhotos(),
-          addVerticalSpace(24.h),
-          _boutonSignaler(),
-          addVerticalSpace(20.h),
-        ],
-      ),
-    );
-  }
-
-  Widget _champTitre() {
-    return Form(
-      key: _controller.formKey,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          TextLabelsWidget(
-            textLabels: Strings.titre,
-            textColor: CustomColor.textColor,
-          ),
-          addVerticalSpace(6.h),
-          TextFormField(
-            style: const TextStyle(
-                color: CustomColor.textColor,
-                fontSize: 16,
-                fontWeight: FontWeight.w600),
-            controller: _controller.titreController,
-            textCapitalization: TextCapitalization.sentences,
-            decoration: const InputDecoration(
-              hintText: 'Que voulez-vous signaler ?',
-              prefixIcon: Icon(Icons.edit_note_rounded),
+    return PopScope(
+      canPop: !_envoi,
+      child: Scaffold(
+        backgroundColor: SendraTheme.surface,
+        appBar: AppBar(title: const Text('Nouveau signalement')),
+        body: ListView(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+          children: [
+            _apercuPhoto(),
+            const SizedBox(height: 22),
+            _titreSection('Type de véhicule', obligatoire: true),
+            const SizedBox(height: 12),
+            _bullesType(),
+            if (_typeManquant && _type == null)
+              const Padding(
+                padding: EdgeInsets.only(top: 8),
+                child: Text('Choisissez un type pour continuer.',
+                    style: TextStyle(color: SendraTheme.statusSignale)),
+              ),
+            const SizedBox(height: 22),
+            _titreSection('Description'),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _description,
+              maxLines: 3,
+              minLines: 2,
+              maxLength: 254,
+              textCapitalization: TextCapitalization.sentences,
+              decoration: const InputDecoration(
+                hintText: 'Facultatif : un repère, la situation…',
+              ),
             ),
-            validator: (value) {
-              if (value == null || value.isEmpty) {
-                return 'Veuillez saisir un titre.';
-              }
-              return null;
-            },
+            if (_isStaff) ...[
+              const SizedBox(height: 10),
+              _titreSection('Autres angles'),
+              const SizedBox(height: 10),
+              _anglesAgent(),
+            ],
+            const SizedBox(height: 14),
+            _lignePosition(),
+          ],
+        ),
+        bottomNavigationBar: SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+            child: SizedBox(
+              height: 56,
+              child: FilledButton.icon(
+                onPressed: _envoi ? null : _valider,
+                icon: _envoi
+                    ? const SizedBox.square(
+                        dimension: 20,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2.4, color: Colors.white),
+                      )
+                    : const Icon(Icons.check_rounded),
+                label: Text(_envoi ? 'Envoi…' : 'Valider le signalement',
+                    style: const TextStyle(
+                        fontSize: 16, fontWeight: FontWeight.w700)),
+              ),
+            ),
           ),
-        ],
+        ),
       ),
     );
   }
 
-  Widget _grillePhotos() {
-    return GridView.count(
-      crossAxisCount: 2,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      mainAxisSpacing: 12,
-      crossAxisSpacing: 12,
-      childAspectRatio: 1.05,
-      children: anglesSignalement.entries
-          .map((entry) => _tuilePhoto(entry.key, entry.value))
-          .toList(),
+  Widget _titreSection(String texte, {bool obligatoire = false}) {
+    return Row(
+      children: [
+        Text(texte,
+            style: const TextStyle(
+                fontSize: 16, fontWeight: FontWeight.w800, color: SendraTheme.ink)),
+        const SizedBox(width: 6),
+        Text(obligatoire ? '' : '(facultatif)',
+            style: const TextStyle(color: SendraTheme.muted, fontSize: 13)),
+      ],
     );
   }
 
-  Widget _tuilePhoto(String position, String libelle) {
-    final fichier = _photos[position];
-    final rempli = fichier != null;
-
-    return GestureDetector(
-      onTap: () => _capturer(position),
-      child: Container(
-        decoration: BoxDecoration(
-          color: CustomColor.whiteColor,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: rempli ? CustomColor.primaryColor : const Color(0xFFD5DED9),
-            width: rempli ? 2 : 1.2,
-          ),
-        ),
-        clipBehavior: Clip.antiAlias,
+  Widget _apercuPhoto() {
+    return AspectRatio(
+      aspectRatio: 4 / 3,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
         child: Stack(
           fit: StackFit.expand,
           children: [
-            if (rempli)
-              // Vignette décodée en petit : 5 photos en pleine résolution
-              // en mémoire suffisaient à faire tuer l'app par Android.
-              Image.file(fichier, fit: BoxFit.cover, cacheWidth: 400)
+            if (_photo != null)
+              Image.file(_photo!, fit: BoxFit.cover, cacheWidth: 1000)
             else
-              Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Container(
-                    width: 46,
-                    height: 46,
-                    decoration: const BoxDecoration(
-                      color: Color(0xFFE3F3EA),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(Icons.add_a_photo_rounded,
-                        color: CustomColor.primaryColor, size: 24),
-                  ),
-                  const SizedBox(height: 8),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 6),
-                    child: Text(
-                      libelle,
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: CustomColor.textColor,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 13.5,
-                      ),
-                    ),
-                  ),
-                ],
+              const ColoredBox(
+                color: Color(0xFFEAF1ED),
+                child: Center(child: CircularProgressIndicator()),
               ),
-            // Bandeau du libellé sur les tuiles remplies.
-            if (rempli)
-              Positioned(
-                left: 0,
-                right: 0,
-                bottom: 0,
-                child: Container(
-                  color: Colors.black.withOpacity(0.55),
-                  padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 6),
-                  child: Text(
-                    libelle,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 12,
-                    ),
-                  ),
+            Positioned(
+              right: 10,
+              bottom: 10,
+              child: FilledButton.tonalIcon(
+                style: FilledButton.styleFrom(
+                  backgroundColor: Colors.black.withValues(alpha: .55),
+                  foregroundColor: Colors.white,
+                  minimumSize: const Size(0, 40),
                 ),
+                onPressed: _envoi ? null : _reprendre,
+                icon: const Icon(Icons.cameraswitch_rounded, size: 18),
+                label: const Text('Reprendre'),
               ),
-            if (rempli)
-              Positioned(
-                top: 4,
-                right: 4,
-                child: GestureDetector(
-                  onTap: () => _retirer(position),
-                  child: Container(
-                    decoration: const BoxDecoration(
-                      color: Colors.red,
-                      shape: BoxShape.circle,
-                    ),
-                    padding: const EdgeInsets.all(4),
-                    child: const Icon(Icons.close, color: Colors.white, size: 16),
-                  ),
-                ),
-              ),
+            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _boutonSignaler() {
-    return ElevatedButton(
-      onPressed: _isLoading ? null : _soumettre,
-      style: ElevatedButton.styleFrom(
-        minimumSize: const Size.fromHeight(54),
-      ),
-      child: _isLoading
-          ? const SizedBox(
-              width: 24.0,
-              height: 24.0,
-              child: CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-              ),
-            )
-          : Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: const [
-                Icon(Icons.send, size: 22.0, color: Colors.white),
-                SizedBox(width: 10.0),
-                Text(
-                  Strings.signaler,
-                  style: TextStyle(fontSize: 16.0, fontWeight: FontWeight.bold),
-                ),
-              ],
+  Widget _bullesType() {
+    return Row(
+      children: [
+        for (final t in _typesVehicule)
+          Expanded(
+            child: _Bulle(
+              libelle: t.$2,
+              icone: t.$3,
+              choisie: _type == t.$1,
+              onTap: () => setState(() => _type = t.$1),
             ),
+          ),
+      ],
+    );
+  }
+
+  Widget _anglesAgent() {
+    const libelles = {
+      'devant': 'Devant',
+      'derriere': 'Derrière',
+      'cote_gauche': 'Gauche',
+      'cote_droit': 'Droite',
+    };
+    return LayoutBuilder(builder: (context, c) {
+      final colonnes = c.maxWidth < 330 ? 2 : 4;
+      return GridView.count(
+        crossAxisCount: colonnes,
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        mainAxisSpacing: 10,
+        crossAxisSpacing: 10,
+        children: [
+          for (final angle in _anglesSupplementaires)
+            _TuileAngle(
+              libelle: libelles[angle]!,
+              photo: _angles[angle],
+              onTap: () => _ajouterAngle(angle),
+              onRetirer: () => setState(() => _angles.remove(angle)),
+            ),
+        ],
+      );
+    });
+  }
+
+  Widget _lignePosition() {
+    final ok = _latitude != null;
+    return Row(
+      children: [
+        Icon(ok ? Icons.place_rounded : Icons.location_searching_rounded,
+            size: 18, color: ok ? SendraTheme.green : SendraTheme.muted),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Text(
+            ok
+                ? (_adresse.isNotEmpty ? _adresse : 'Position enregistrée')
+                : 'Recherche de la position…',
+            style: const TextStyle(color: SendraTheme.muted, fontSize: 13.5),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Bulle ronde d'un type de véhicule.
+class _Bulle extends StatelessWidget {
+  const _Bulle({
+    required this.libelle,
+    required this.icone,
+    required this.choisie,
+    required this.onTap,
+  });
+
+  final String libelle;
+  final IconData icone;
+  final bool choisie;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      selected: choisie,
+      label: libelle,
+      child: GestureDetector(
+        onTap: onTap,
+        behavior: HitTestBehavior.opaque,
+        child: LayoutBuilder(builder: (context, c) {
+          final taille = (c.maxWidth - 12).clamp(56.0, 92.0);
+          return Column(
+            children: [
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                width: taille,
+                height: taille,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: choisie ? SendraTheme.green : Colors.white,
+                  border: Border.all(
+                    color: choisie ? SendraTheme.green : SendraTheme.border,
+                    width: choisie ? 3 : 1.4,
+                  ),
+                  boxShadow: choisie
+                      ? [
+                          BoxShadow(
+                            color: SendraTheme.green.withValues(alpha: .3),
+                            blurRadius: 12,
+                            offset: const Offset(0, 4),
+                          )
+                        ]
+                      : null,
+                ),
+                child: Icon(icone,
+                    size: taille * .46,
+                    color: choisie ? Colors.white : SendraTheme.forest),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                libelle,
+                style: TextStyle(
+                  fontSize: 14.5,
+                  fontWeight: choisie ? FontWeight.w800 : FontWeight.w600,
+                  color: choisie ? SendraTheme.forest : SendraTheme.ink,
+                ),
+              ),
+            ],
+          );
+        }),
+      ),
+    );
+  }
+}
+
+class _TuileAngle extends StatelessWidget {
+  const _TuileAngle({
+    required this.libelle,
+    required this.photo,
+    required this.onTap,
+    required this.onRetirer,
+  });
+
+  final String libelle;
+  final File? photo;
+  final VoidCallback onTap;
+  final VoidCallback onRetirer;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+        side: BorderSide(
+            color: photo != null ? SendraTheme.green : SendraTheme.border,
+            width: photo != null ? 2 : 1),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            if (photo != null)
+              Image.file(photo!, fit: BoxFit.cover, cacheWidth: 300)
+            else
+              Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.add_a_photo_outlined,
+                      color: SendraTheme.green, size: 22),
+                  const SizedBox(height: 4),
+                  Text(libelle,
+                      style: const TextStyle(
+                          fontSize: 12, fontWeight: FontWeight.w600)),
+                ],
+              ),
+            if (photo != null)
+              Positioned(
+                top: 2,
+                right: 2,
+                child: IconButton.filled(
+                  visualDensity: VisualDensity.compact,
+                  iconSize: 16,
+                  style: IconButton.styleFrom(
+                      backgroundColor: Colors.black54,
+                      foregroundColor: Colors.white),
+                  onPressed: onRetirer,
+                  icon: const Icon(Icons.close_rounded),
+                ),
+              ),
+          ],
+        ),
+      ),
     );
   }
 }

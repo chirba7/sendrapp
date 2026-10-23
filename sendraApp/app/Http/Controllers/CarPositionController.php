@@ -35,6 +35,8 @@ class CarPositionController extends Controller
             ]
         )
             ->whereNull('non_removed_at')
+            // Envoyé pour approbation : passe dans « En cours » (23/10/2026).
+            ->whereNull('soumis_approbation_at')
             ->with('photo')
             ->orderBy('created_at')
             ->paginate(5);
@@ -57,17 +59,27 @@ class CarPositionController extends Controller
     }
     public function index3()
     {
-        $signalements = CarPosition::where(
-            [
-                ['is_deleted', false],
-                ['etat', 'EN COURS']
-            ]
-        )
+        // « En cours » dès que l'agent a envoyé la constatation pour
+        // approbation, puis jusqu'à l'enlèvement.
+        $signalements = CarPosition::where('is_deleted', false)
+            ->where(fn ($q) => $q->where('etat', 'EN COURS')
+                ->orWhere(fn ($q) => $q->where('etat', 'SIGNALE')->whereNotNull('soumis_approbation_at')))
             ->whereNull('non_removed_at')
             ->with('photo')
             ->orderBy('created_at')
             ->paginate(5);
         return view('carPosition.encours', compact('signalements'));
+    }
+
+    /** Signalements refusés par l'autorité (5e état, « Rejeté »). */
+    public function rejetes()
+    {
+        $signalements = CarPosition::where('is_deleted', false)
+            ->where('etat', 'REJETE')
+            ->with('photo')
+            ->orderByDesc('updated_at')
+            ->paginate(10);
+        return view('carPosition.rejetes', compact('signalements'));
     }
 
     public function nonResolus()

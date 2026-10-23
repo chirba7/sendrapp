@@ -24,7 +24,10 @@ class StoreCarPositionRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'titre' => 'required|string',
+            // Nouvelle app : le type de véhicule (bulles Voiture / Moto /
+            // Camion) remplace le titre libre. Anciennes versions : titre.
+            'titre' => 'required_without:vehicle_kind|nullable|string|max:254',
+            'vehicle_kind' => 'nullable|string|in:Voiture,Moto,Camion',
             'description' => 'nullable|string|max:254',
             'adresse_precise' => 'nullable|string|max:255',
             // Hors ligne, la commune (géocodage inverse, qui exige le réseau)

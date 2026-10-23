@@ -17,7 +17,7 @@ import '../../utils/strings.dart';
 /// carte s'affiche tout de suite à la dernière position connue, avec les
 /// marqueurs déjà chargés ; la mise à jour se fait en arrière-plan.
 class _MapCache {
-  static Set<Marker> markers = const {};
+  static List<Map<String, dynamic>> items = const [];
   static DateTime? fetchedAt;
   static LatLng? userPosition;
   static CameraPosition? camera;
@@ -41,9 +41,14 @@ class _CartographyScreenState extends State<CartographyScreen>
   final TextEditingController _searchController = TextEditingController();
   GoogleMapController? _mapController;
   LatLng? _userPosition = _MapCache.userPosition;
-  Set<Marker> _markers = _MapCache.markers;
+  List<Map<String, dynamic>> _items = _MapCache.items;
+  late Set<Marker> _markers = _buildMarkers();
   bool _isLoading = !_MapCache.isFresh;
   String? _errorMessage;
+
+  // Citoyen : tous les signalements, les siens ou ceux des autres.
+  late final bool _isStaff = AppPrefs.isStaff;
+  String _portee = 'tous';
 
   @override
   bool get wantKeepAlive => true;
@@ -116,8 +121,10 @@ class _CartographyScreenState extends State<CartographyScreen>
     try {
       final prefs = await AppPrefs.init();
       final token = prefs.getString('token') ?? '';
+      // Le citoyen voit aussi les signalements des autres (données
+      // réduites, champ `est_mien`) pour pouvoir filtrer.
       final endpoint =
-          AppPrefs.isStaff ? 'listerSignalements' : 'voirSignalements';
+          AppPrefs.isStaff ? 'listerSignalements' : 'signalementsCommunaute';
       final response = await http.get(
         Uri.parse('${Strings.apiURI}$endpoint'),
         headers: {'Authorization': 'Bearer $token'},
@@ -130,32 +137,15 @@ class _CartographyScreenState extends State<CartographyScreen>
       final items = decoded is List
           ? decoded
           : (decoded['data'] as List<dynamic>? ?? const []);
-      final markers = <Marker>{};
-      for (final item in items) {
-        final latitude = double.tryParse(item['latitude']?.toString() ?? '');
-        final longitude = double.tryParse(item['longitude']?.toString() ?? '');
-        if (latitude == null || longitude == null) continue;
-        markers.add(
-          Marker(
-            markerId: MarkerId(
-              item['signalementId']?.toString() ?? '$latitude,$longitude',
-            ),
-            position: LatLng(latitude, longitude),
-            icon: BitmapDescriptor.defaultMarkerWithHue(
-              _markerHue(item['etat']?.toString()),
-            ),
-            infoWindow: InfoWindow(
-              title: item['titre']?.toString() ?? 'Signalement',
-              snippet: item['commune']?.toString(),
-            ),
-          ),
-        );
-      }
-      _MapCache.markers = markers;
+      _MapCache.items = [
+        for (final item in items)
+          if (item is Map) Map<String, dynamic>.from(item),
+      ];
       _MapCache.fetchedAt = DateTime.now();
       if (!mounted) return;
       setState(() {
-        _markers = markers;
+        _items = _MapCache.items;
+        _markers = _buildMarkers();
         _isLoading = false;
       });
     } catch (_) {
@@ -167,9 +157,49 @@ class _CartographyScreenState extends State<CartographyScreen>
     }
   }
 
+  Set<Marker> _buildMarkers() {
+    final markers = <Marker>{};
+    for (final item in _items) {
+      final mien = item['est_mien'] == true;
+      if (!_isStaff && _portee == 'miens' && !mien) continue;
+      if (!_isStaff && _portee == 'autres' && mien) continue;
+      final latitude = double.tryParse(item['latitude']?.toString() ?? '');
+      final longitude = double.tryParse(item['longitude']?.toString() ?? '');
+      if (latitude == null || longitude == null) continue;
+      final etat = item['etat']?.toString();
+      markers.add(
+        Marker(
+          markerId: MarkerId(
+            item['signalementId']?.toString() ?? '$latitude,$longitude',
+          ),
+          position: LatLng(latitude, longitude),
+          icon: BitmapDescriptor.defaultMarkerWithHue(_markerHue(etat)),
+          infoWindow: InfoWindow(
+            title: '${item['vehicle_kind'] ?? item['titre'] ?? 'Signalement'}'
+                ' · ${SendraTheme.status(etat).label}',
+            snippet: [
+              item['commune']?.toString() ?? '',
+              if (!_isStaff) mien ? 'Mon signalement' : 'Signalé par un autre citoyen',
+            ].where((t) => t.isNotEmpty).join(' · '),
+          ),
+        ),
+      );
+    }
+    return markers;
+  }
+
+  void _choisirPortee(String portee) {
+    setState(() {
+      _portee = portee;
+      _markers = _buildMarkers();
+    });
+  }
+
   double _markerHue(String? status) => switch (status) {
         'ENLEVE' => BitmapDescriptor.hueGreen,
         'EN COURS' => BitmapDescriptor.hueOrange,
+        'NON RESOLU' => BitmapDescriptor.hueRose,
+        'REJETE' => BitmapDescriptor.hueViolet,
         _ => BitmapDescriptor.hueRed,
       };
 
@@ -237,7 +267,7 @@ class _CartographyScreenState extends State<CartographyScreen>
               mapToolbarEnabled: false,
               compassEnabled: false,
               buildingsEnabled: false,
-              padding: const EdgeInsets.only(top: 76, bottom: 90),
+              padding: EdgeInsets.only(top: _isStaff ? 76 : 120, bottom: 90),
             ),
           ),
           Positioned(
@@ -271,6 +301,49 @@ class _CartographyScreenState extends State<CartographyScreen>
               ),
             ),
           ),
+          if (!_isStaff)
+            Positioned(
+              top: 72,
+              left: 16,
+              right: 16,
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    for (final f in const [
+                      ('tous', 'Tous', Icons.layers_rounded),
+                      ('miens', 'Les miens', Icons.person_rounded),
+                      ('autres', 'Les autres', Icons.groups_rounded),
+                    ])
+                      Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: ChoiceChip(
+                          avatar: Icon(f.$3, size: 18),
+                          label: Text(f.$2),
+                          selected: _portee == f.$1,
+                          showCheckmark: false,
+                          backgroundColor: Colors.white,
+                          selectedColor: SendraTheme.greenSoft,
+                          elevation: 2,
+                          shadowColor: Colors.black26,
+                          side: BorderSide(
+                            color: _portee == f.$1
+                                ? SendraTheme.green
+                                : SendraTheme.border,
+                          ),
+                          labelStyle: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            color: _portee == f.$1
+                                ? SendraTheme.forest
+                                : SendraTheme.ink,
+                          ),
+                          onSelected: (_) => _choisirPortee(f.$1),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
           Positioned(
             right: 16,
             bottom: 96,
@@ -291,7 +364,7 @@ class _CartographyScreenState extends State<CartographyScreen>
             Positioned(
               left: 24,
               right: 24,
-              top: 84,
+              top: _isStaff ? 84 : 124,
               child: Card(
                 child: Padding(
                   padding: const EdgeInsets.all(16),
@@ -341,6 +414,8 @@ class _CartographyScreenState extends State<CartographyScreen>
             item(SendraTheme.statusSignale, 'Signalé'),
             item(SendraTheme.statusEnCours, 'En cours'),
             item(SendraTheme.statusResolu, 'Résolu'),
+            item(const Color(0xFFE91E63), 'Non résolu'),
+            item(const Color(0xFF8E24AA), 'Rejeté'),
           ],
         ),
       ),

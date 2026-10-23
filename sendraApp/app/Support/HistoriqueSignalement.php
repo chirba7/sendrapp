@@ -24,6 +24,9 @@ class HistoriqueSignalement
         'approuve' => 'Signalement approuvé',
         'rejete' => 'Signalement rejeté',
         'enleve' => 'Véhicule enlevé',
+        'pris_en_charge' => 'Pris en charge par un agent',
+        'libere' => 'Prise en charge libérée',
+        'pv_signe' => 'Procès-verbal signé par l’agent',
     ];
 
     /**

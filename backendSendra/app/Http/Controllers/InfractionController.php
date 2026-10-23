@@ -36,14 +36,23 @@ class InfractionController extends Controller
             ], 423);
         }
 
-    // Mise à jour des champs simples
-    $carPosition->adresse_precise = $request->input('adresse_precise');
+        if ($refus = \App\Support\PriseEnCharge::refusSiAutreAgent($carPosition)) {
+            return $refus;
+        }
+
+    // Mise à jour des champs simples. L'adresse précise vient du signalement
+    // (géolocalisation) : l'agent ne la modifie pas — elle n'est renseignée
+    // ici que si le signalement n'en avait aucune.
+    if (blank($carPosition->adresse_precise) && $request->filled('adresse_precise')) {
+        $carPosition->adresse_precise = $request->input('adresse_precise');
+    }
     $carPosition->motif_infraction = $request->input('motif_infraction');
     // Zone de texte justifiant le motif choisi : on conserve la valeur
     // existante si le client ne l'envoie pas, pour ne pas l'effacer.
     $carPosition->explication_infraction = $request->input('explication_infraction', $carPosition->explication_infraction);
     if ((int) auth()->user()->role_id === 2 && !$carPosition->agent_id) {
         $carPosition->agent_id = auth()->id();
+        $carPosition->pris_en_charge_at = now();
     }
 
     // Correction API-H-4 : la colonne `lieu` est NOT NULL en base ; ne

@@ -77,7 +77,7 @@
                                         <p class="text-sm">{{$signalement->created_at->format('d F Y \à H\hi')}}</p>
                                     </td>
                                     <td>
-                                        <span class="status-btn close-btn">{{$signalement->etat}}</span>
+                                        <span class="status-btn close-btn">Signalé</span>
                                     </td>
                                     <td>
                                         <div class="action justify-content-center">

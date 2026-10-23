@@ -7,6 +7,7 @@ use App\Http\Controllers\DommagesController;
 use App\Http\Controllers\EnlevementController;
 use App\Http\Controllers\InfractionController;
 use App\Http\Controllers\MissionController;
+use App\Http\Controllers\SignalementAgentController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\VehiculeController;
@@ -51,6 +52,12 @@ Route::group([
     // Mot de passe oublié : nécessite un code déjà vérifié via
     // /verify-code pour ce numéro (voir resetPassword()).
     Route::post('/reset-password', [AuthControllerApi::class, 'resetPassword']);
+
+    // Procès-verbal signé : ouvert par le navigateur du téléphone, qui n'a
+    // pas le jeton JWT — protégé par un lien signé valable 30 minutes.
+    Route::get('/pv/{carPosition}/telecharger', [SignalementAgentController::class, 'telechargerPv'])
+        ->middleware('signed:relative')
+        ->name('pv.telecharger');
 });
 
 // Protected routes (Authentication required with JWT)
@@ -76,6 +83,8 @@ Route::middleware('jwt.auth')->group(function () {
     // son propre compte côté contrôleur : store()/voirSignalements()).
     Route::get('/voirSignalements', [CarPositionController::class, 'voirSignalements']);
     Route::post('/faireSignalement', [CarPositionController::class, 'store']);
+    // Signalements des autres citoyens (liste et carte), en données réduites.
+    Route::get('/signalementsCommunaute', [CarPositionController::class, 'signalementsCommunaute']);
 
     // Correction API-C-3 : routes "métier" réservées au personnel
     // (Admin=1, Agent=2, Autorité commune=3, Autorité préfecture=4).
@@ -106,6 +115,16 @@ Route::middleware('jwt.auth')->group(function () {
 
         // Statistiques
         Route::get('/statistiques', [CarPositionController::class, 'statistiques']);
+    });
+
+    // Agent (et administrateur) : prise en charge exclusive, photos de
+    // constatation, procès-verbal.
+    Route::middleware('role:1,2')->group(function () {
+        Route::post('/signalements/{carPosition}/prise-en-charge', [SignalementAgentController::class, 'prendreEnCharge']);
+        Route::delete('/signalements/{carPosition}/prise-en-charge', [SignalementAgentController::class, 'liberer']);
+        Route::delete('/constatation/{carPosition}/photos/{photo}', [SignalementAgentController::class, 'supprimerPhoto']);
+        Route::post('/signalements/{carPosition}/pv/signer', [SignalementAgentController::class, 'signerPv']);
+        Route::get('/signalements/{carPosition}/pv', [SignalementAgentController::class, 'lienPv']);
     });
 
     Route::middleware('role:2')->group(function () {

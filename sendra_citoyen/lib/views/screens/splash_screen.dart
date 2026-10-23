@@ -169,19 +169,17 @@ class _BrandText extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  const Text(
-                    AppBrand.name,
-                    style: TextStyle(
-                      fontFamily: SendraTheme.fontFamily,
-                      color: Colors.white,
-                      fontSize: 34,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: -.5,
-                      height: 1.1,
-                    ),
+                  // Logotype « epAvie » (même dessin que le logo) à la place
+                  // du nom écrit en police.
+                  Image.asset(
+                    AppBrand.wordmarkWhite,
+                    height: 40,
+                    fit: BoxFit.contain,
+                    filterQuality: FilterQuality.medium,
+                    semanticLabel: AppBrand.name,
                   ),
                   if (AppBrand.badge.isNotEmpty) ...[
-                    const SizedBox(width: 8),
+                    const SizedBox(width: 10),
                     Container(
                       padding: const EdgeInsets.symmetric(
                           horizontal: 9, vertical: 3),

@@ -43,6 +43,10 @@ class VehiculeController extends Controller
             ], 423);
         }
 
+        if ($refus = \App\Support\PriseEnCharge::refusSiAutreAgent($carPosition)) {
+            return $refus;
+        }
+
     // Validation incluse dans UpdateCarPositionRequest
 
     // Mise à jour des champs principaux
@@ -77,6 +81,7 @@ class VehiculeController extends Controller
     // Mise à jour du modèle
     if ((int) auth()->user()->role_id === 2 && !$carPosition->agent_id) {
         $fieldsToUpdate['agent_id'] = auth()->id();
+        $fieldsToUpdate['pris_en_charge_at'] = now();
     }
     $carPosition->update($fieldsToUpdate);
 

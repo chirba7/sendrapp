@@ -68,7 +68,8 @@
                     ['Signalés', route('signales'), 'lni-alarm', [1, 2, 3, 4, 7], $actif('dashboard/signalement/signales')],
                     ['En cours', route('encours'), 'lni-reload', [1, 2, 3, 4, 7], $actif('dashboard/signalement/encours')],
                     ['Non résolus', route('non_resolus'), 'lni-warning', [1, 2, 3, 4, 7], $actif('dashboard/signalement/non-resolus')],
-                    ['Enlevés', route('enleves'), 'lni-checkmark-circle', [1, 2, 3, 4, 7], $actif('dashboard/signalement/enleves')],
+                    ['Résolus', route('enleves'), 'lni-checkmark-circle', [1, 2, 3, 4, 7], $actif('dashboard/signalement/enleves')],
+                    ['Rejetés', route('rejetes'), 'lni-ban', [1, 2, 3, 4, 7], $actif('dashboard/signalement/rejetes')],
                     ['Approbations', route('approbations.index'), 'lni-shield', [1, 3, 4], $actif('dashboard/approbations')],
                 ],
                 'Opérations' => [

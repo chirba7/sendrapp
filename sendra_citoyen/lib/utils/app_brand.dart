@@ -16,6 +16,10 @@ class AppBrand {
   /// l'icône de l'application et le nom en blanc sur le vert.
   static const String? drawerLogo = 'assets/images/logo_epavie.png';
 
+  /// Nom de l'application en logotype (texte « epAvie », lettres noires et
+  /// A recyclage vert), pour le splash et l'écran de bienvenue sur fond vert.
+  static const String wordmarkWhite = 'assets/images/splash/wordmark_white.png';
+
   /// Icône de l'application (identique au splash natif Android).
   static const String appIcon = 'assets/images/splash/app_icon.png';
 

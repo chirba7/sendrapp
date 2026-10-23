@@ -59,7 +59,11 @@ class ResultatEnvoi {
 class PendingSignalement {
   final String uuid;
   final String titre;
+  /// Voiture, Moto ou Camion (bulles du formulaire) — remplace le titre.
+  final String vehicleKind;
+  final String description;
   final String commune;
+  final String adressePrecise;
   final double? latitude;
   final double? longitude;
   final List<PhotoSignalement> photos;
@@ -68,7 +72,10 @@ class PendingSignalement {
   PendingSignalement({
     required this.uuid,
     required this.titre,
+    this.vehicleKind = '',
+    this.description = '',
     required this.commune,
+    this.adressePrecise = '',
     required this.latitude,
     required this.longitude,
     required this.photos,
@@ -78,7 +85,10 @@ class PendingSignalement {
   Map<String, dynamic> toJson() => {
         'uuid': uuid,
         'titre': titre,
+        'vehicle_kind': vehicleKind,
+        'description': description,
         'commune': commune,
+        'adresse_precise': adressePrecise,
         'latitude': latitude,
         'longitude': longitude,
         'createdAt': createdAt,
@@ -89,7 +99,10 @@ class PendingSignalement {
       PendingSignalement(
         uuid: json['uuid'] as String,
         titre: json['titre'] as String? ?? '',
+        vehicleKind: json['vehicle_kind'] as String? ?? '',
+        description: json['description'] as String? ?? '',
         commune: json['commune'] as String? ?? '',
+        adressePrecise: json['adresse_precise'] as String? ?? '',
         latitude: (json['latitude'] as num?)?.toDouble(),
         longitude: (json['longitude'] as num?)?.toDouble(),
         createdAt: json['createdAt'] as String? ?? '',
@@ -192,7 +205,10 @@ class OfflineSignalementService {
             },
             body: jsonEncode({
               'titre': s.titre,
+              if (s.vehicleKind.isNotEmpty) 'vehicle_kind': s.vehicleKind,
+              'description': s.description,
               'commune': s.commune,
+              'adresse_precise': s.adressePrecise,
               'latitude': s.latitude,
               'longitude': s.longitude,
               'uuid': s.uuid,
@@ -265,7 +281,10 @@ class OfflineSignalementService {
       final complete = PendingSignalement(
         uuid: s.uuid,
         titre: s.titre,
+        vehicleKind: s.vehicleKind,
+        description: s.description,
         commune: commune,
+        adressePrecise: s.adressePrecise,
         latitude: s.latitude,
         longitude: s.longitude,
         photos: s.photos,

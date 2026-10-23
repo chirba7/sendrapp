@@ -42,7 +42,8 @@ class InfractionRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'adresse_precise' => 'required|string|max:255',
+            // Adresse en lecture seule côté agent (23/10/2026) : facultative.
+            'adresse_precise' => 'nullable|string|max:255',
             'motif_infraction' => 'required|string|max:255',
             // Justification du motif choisi (zone de texte libre).
             'explication_infraction' => 'nullable|string|max:2000',

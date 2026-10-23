@@ -77,7 +77,7 @@
                                         <p class="text-sm">{{$signalement->created_at->format('d F Y \à H\hi')}}</p>
                                     </td>
                                     <td>
-                                        <span class="status-btn warning-btn">NON RÉSOLU</span>
+                                        <span class="status-btn warning-btn">Non résolu</span>
                                         <small class="d-block mt-1">{{ $signalement->non_removal_reason }}</small>
                                     </td>
                                     <td>

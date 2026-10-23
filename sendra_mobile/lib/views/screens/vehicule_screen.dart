@@ -154,7 +154,7 @@ class _VehicleFormState extends State<VehicleForm> {
         _typeController.text =
             _canonicalChoice(_cleanValue(data['type']), _vehicleTypes);
         final savedKind = _cleanValue(data['vehicle_kind']);
-        if (savedKind == 'Moto' || savedKind == 'Voiture') {
+        if (savedKind == 'Moto' || savedKind == 'Voiture' || savedKind == 'Camion') {
           _vehicleKind = savedKind;
         } else if (_typeController.text == 'Moto' ||
             _cleanValue(data['categorie']) == 'CYCL') {
@@ -441,6 +441,10 @@ class _VehicleFormState extends State<VehicleForm> {
         Expanded(
           child: _kindChoice('Moto', Icons.two_wheeler_rounded),
         ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: _kindChoice('Camion', Icons.local_shipping_rounded),
+        ),
       ],
     );
   }
@@ -464,7 +468,13 @@ class _VehicleFormState extends State<VehicleForm> {
         onTap: () => setState(() => _vehicleKind = label),
         child: SizedBox(
           height: 50,
-          child: Row(
+          // Trois choix sur une ligne : le contenu se réduit au besoin
+          // (petits écrans) au lieu de déborder.
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 6),
+              child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Icon(icon,
@@ -480,6 +490,8 @@ class _VehicleFormState extends State<VehicleForm> {
                 ),
               ),
             ],
+          ),
+            ),
           ),
         ),
       ),

@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 
 import '../../utils/app_brand.dart';
 import '../../utils/app_prefs.dart';
+import '../../utils/signaler_flow.dart';
 import '../../utils/strings.dart';
 import '../../utils/sendra_theme.dart';
 import '../../widgets/others/guide_view.dart';
@@ -45,6 +46,12 @@ class _HomeScreenState extends State<HomeScreen> {
   String _token = '';
   late final bool _isStaff = AppPrefs.isStaff;
 
+  // Citoyen : ses signalements ou ceux des autres (liste « Autres »).
+  bool _autres = false;
+  List<dynamic> _autresItems = [];
+  bool _autresCharges = false;
+  bool _autresChargement = false;
+
 
   static const _filters = <({String value, String label})>[
     (value: 'TOUS', label: 'Tous'),
@@ -55,15 +62,21 @@ class _HomeScreenState extends State<HomeScreen> {
     (value: 'REJETE', label: 'Rejetés'),
   ];
 
+  List<dynamic> get _source => _autres ? _autresItems : _items;
+
   List<dynamic> get _filtered => _filter == 'TOUS'
-      ? _items
-      : _items.where((s) => s['etat'] == _filter).toList(growable: false);
+      ? _source
+      : _source.where((s) => s['etat'] == _filter).toList(growable: false);
 
   @override
   void initState() {
     super.initState();
     _scroll.addListener(_onScroll);
     _fetchData();
+    // Photo prise juste avant que le système ne ferme l'app : on rouvre le
+    // formulaire de signalement avec elle.
+    WidgetsBinding.instance
+        .addPostFrameCallback((_) => SignalerFlow.recupererPhotoPerdue());
   }
 
   @override
@@ -78,12 +91,59 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _recount() {
-    final counts = <String, int>{'TOUS': _items.length};
-    for (final s in _items) {
+    final counts = <String, int>{'TOUS': _source.length};
+    for (final s in _source) {
       final etat = s['etat']?.toString() ?? '';
       counts[etat] = (counts[etat] ?? 0) + 1;
     }
     _counts = counts;
+  }
+
+  Future<void> _refresh() => _autres ? _fetchAutres() : _fetchData();
+
+  /// Signalements des autres citoyens (données réduites côté serveur).
+  Future<void> _fetchAutres() async {
+    setState(() {
+      _autresChargement = true;
+      _loadError = null;
+    });
+    try {
+      final prefs = await AppPrefs.init();
+      _token = prefs.getString('token') ?? '';
+      final response = await http.get(
+        Uri.parse('${Strings.apiURI}signalementsCommunaute'),
+        headers: _headers,
+      );
+      if (response.statusCode != 200) {
+        throw Exception('Erreur ${response.statusCode}');
+      }
+      final decoded = jsonDecode(response.body);
+      final liste = decoded is List ? decoded : const [];
+      if (!mounted) return;
+      setState(() {
+        _autresItems = liste
+            .where((s) => s is Map && s['est_mien'] != true)
+            .toList(growable: false);
+        _autresCharges = true;
+        _recount();
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _loadError =
+          'Impossible de charger les signalements des autres. Réessayez.');
+    } finally {
+      if (mounted) setState(() => _autresChargement = false);
+    }
+  }
+
+  void _choisirPortee(bool autres) {
+    if (autres == _autres) return;
+    setState(() {
+      _autres = autres;
+      _loadError = null;
+      _recount();
+    });
+    if (autres && !_autresCharges) _fetchAutres();
   }
 
   Future<void> _fetchData() async {
@@ -199,49 +259,106 @@ class _HomeScreenState extends State<HomeScreen> {
           const SizedBox(width: 4),
         ],
       ),
-      body: RefreshIndicator(
-        color: SendraTheme.green,
-        onRefresh: _fetchData,
-        child: CustomScrollView(
-          controller: _scroll,
-          physics: const AlwaysScrollableScrollPhysics(),
-          slivers: [
-            SliverToBoxAdapter(child: _header()),
-            SliverToBoxAdapter(child: _filterBar()),
-            ..._content(),
-            SliverToBoxAdapter(
-              child: SizedBox(
-                height: 120,
-                child: _loadingMore
-                    ? const Center(
-                        child: SizedBox.square(
-                          dimension: 24,
-                          child: CircularProgressIndicator(strokeWidth: 2.4),
-                        ),
-                      )
-                    : null,
+      // Accueil : le bouton Signaler occupe le tiers haut de l'écran, la
+      // liste des signalements les deux tiers restants.
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final heroHeight = (constraints.maxHeight / 3).clamp(150.0, 280.0);
+          return Column(
+            children: [
+              SizedBox(
+                height: heroHeight,
+                child: _SignalerHero(
+                  onTap: () => SignalerFlow.demarrer(context),
+                ),
               ),
-            ),
-          ],
+              Expanded(
+                child: RefreshIndicator(
+                  color: SendraTheme.green,
+                  onRefresh: _refresh,
+                  child: CustomScrollView(
+                    controller: _scroll,
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    slivers: [
+                      SliverToBoxAdapter(child: _header()),
+                      if (!_isStaff) SliverToBoxAdapter(child: _porteeBar()),
+                      SliverToBoxAdapter(child: _filterBar()),
+                      ..._content(),
+                      SliverToBoxAdapter(
+                        child: SizedBox(
+                          height: 40,
+                          child: _loadingMore
+                              ? const Center(
+                                  child: SizedBox.square(
+                                    dimension: 24,
+                                    child: CircularProgressIndicator(
+                                        strokeWidth: 2.4),
+                                  ),
+                                )
+                              : null,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  /// Citoyen : bascule entre ses signalements et ceux des autres.
+  Widget _porteeBar() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+      child: SegmentedButton<bool>(
+        showSelectedIcon: false,
+        style: SegmentedButton.styleFrom(
+          selectedBackgroundColor: SendraTheme.greenSoft,
+          selectedForegroundColor: SendraTheme.forest,
+          side: const BorderSide(color: SendraTheme.border),
+          textStyle:
+              const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
         ),
+        segments: const [
+          ButtonSegment(
+            value: false,
+            icon: Icon(Icons.person_rounded, size: 18),
+            label: Text('Mes signalements'),
+          ),
+          ButtonSegment(
+            value: true,
+            icon: Icon(Icons.groups_rounded, size: 18),
+            label: Text('Les autres'),
+          ),
+        ],
+        selected: {_autres},
+        onSelectionChanged: (v) => _choisirPortee(v.first),
       ),
     );
   }
 
   Widget _header() {
-    final n = _items.length;
+    final n = _source.length;
+    final chargement = _autres ? _autresChargement && !_autresCharges : _initialLoading;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 4),
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            _isStaff ? 'Signalements à proximité' : 'Mes signalements',
+            _isStaff
+                ? 'Signalements à proximité'
+                : _autres
+                    ? 'Signalements des autres'
+                    : 'Mes signalements',
             style: Theme.of(context).textTheme.headlineSmall,
           ),
           const SizedBox(height: 4),
           Text(
-            _initialLoading
+            chargement
                 ? 'Chargement…'
                 : '$n dossier${n > 1 ? 's' : ''} disponible${n > 1 ? 's' : ''}',
             style: const TextStyle(color: SendraTheme.muted, fontSize: 14),
@@ -404,7 +521,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   List<Widget> _content() {
-    if (_initialLoading) {
+    if (_autres ? (_autresChargement && !_autresCharges) : _initialLoading) {
       return [
         SliverPadding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -415,8 +532,8 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ];
     }
-    if (_items.isEmpty || _filtered.isEmpty) {
-      final error = _items.isEmpty ? _loadError : null;
+    if (_source.isEmpty || _filtered.isEmpty) {
+      final error = _source.isEmpty ? _loadError : null;
       return [
         SliverToBoxAdapter(
           child: _EmptyState(
@@ -424,10 +541,12 @@ class _HomeScreenState extends State<HomeScreen> {
                 ? Icons.wifi_off_rounded
                 : Icons.inbox_outlined,
             message: error ??
-                (_items.isEmpty
-                    ? 'Aucun signalement pour le moment.'
+                (_source.isEmpty
+                    ? (_autres
+                        ? 'Aucun autre signalement pour le moment.'
+                        : 'Aucun signalement pour le moment.')
                     : 'Aucun signalement dans cette catégorie.'),
-            onRetry: error != null ? _fetchData : null,
+            onRetry: error != null ? _refresh : null,
           ),
         ),
       ];
@@ -439,13 +558,18 @@ class _HomeScreenState extends State<HomeScreen> {
         sliver: SliverList.builder(
           itemCount: list.length,
           itemBuilder: (context, i) => _SignalementCard(
-            key: ValueKey(list[i]['id'] ?? i),
+            key: ValueKey(list[i]['signalementId'] ?? i),
             data: list[i],
-            onTap: () => Navigator.pushNamed(
-              context,
-              '/depositMoneyDetailsScreen',
-              arguments: list[i],
-            ),
+            showAgent: _isStaff,
+            onTap: () async {
+              await Navigator.pushNamed(
+                context,
+                '/depositMoneyDetailsScreen',
+                arguments: list[i],
+              );
+              // La prise en charge ou la constatation a pu changer.
+              if (mounted && _isStaff) _fetchData();
+            },
           ),
         ),
       ),
@@ -456,16 +580,24 @@ class _HomeScreenState extends State<HomeScreen> {
 // ───────────────────────────── Carte d'un signalement ─────────────────────
 
 class _SignalementCard extends StatelessWidget {
-  const _SignalementCard({super.key, required this.data, required this.onTap});
+  const _SignalementCard({
+    super.key,
+    required this.data,
+    required this.onTap,
+    this.showAgent = false,
+  });
 
   final dynamic data;
   final VoidCallback onTap;
+  final bool showAgent;
 
   @override
   Widget build(BuildContext context) {
     final status = SendraTheme.status(data['etat']?.toString());
     final imageUrl = data['image_url']?.toString();
-    final title = (data['titre'] ?? '').toString();
+    final title = (data['vehicle_kind'] ?? data['titre'] ?? '').toString();
+    final agent = data['pris_en_charge_par']?.toString();
+    final parMoi = data['pris_en_charge_par_moi'] == true;
     final commune = (data['commune'] ?? '').toString();
     final date = (data['formatted_date'] ?? '').toString();
     final width = MediaQuery.sizeOf(context).width;
@@ -538,6 +670,17 @@ class _SignalementCard extends StatelessWidget {
                           _InfoLine(
                               icon: Icons.schedule_rounded, text: date),
                         ],
+                        if (showAgent && agent != null && agent.isNotEmpty) ...[
+                          const SizedBox(height: 3),
+                          _InfoLine(
+                            icon: parMoi
+                                ? Icons.lock_open_rounded
+                                : Icons.lock_rounded,
+                            text: parMoi
+                                ? 'Pris en charge par vous'
+                                : 'Pris en charge par $agent',
+                          ),
+                        ],
                       ],
                     ),
                   ),
@@ -545,6 +688,110 @@ class _SignalementCard extends StatelessWidget {
                       color: SendraTheme.muted),
                 ],
               ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Grand bouton « Signaler » du tiers haut de l'accueil.
+class _SignalerHero extends StatelessWidget {
+  const _SignalerHero({required this.onTap});
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 6),
+      child: Material(
+        color: SendraTheme.green,
+        borderRadius: BorderRadius.circular(24),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: Ink(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [SendraTheme.green, SendraTheme.forest],
+              ),
+            ),
+            child: LayoutBuilder(
+              builder: (context, c) {
+                final icone = (c.maxHeight * .42).clamp(52.0, 92.0);
+                return Stack(
+                  children: [
+                    Positioned(
+                      right: -30,
+                      top: -40,
+                      child: Container(
+                        width: 160,
+                        height: 160,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Colors.white.withValues(alpha: .07),
+                        ),
+                      ),
+                    ),
+                    Center(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              width: icone,
+                              height: icone,
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                shape: BoxShape.circle,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: .15),
+                                    blurRadius: 12,
+                                    offset: const Offset(0, 4),
+                                  ),
+                                ],
+                              ),
+                              child: Icon(Icons.add_a_photo_rounded,
+                                  color: SendraTheme.green, size: icone * .48),
+                            ),
+                            SizedBox(height: c.maxHeight > 190 ? 14 : 8),
+                            const FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Text(
+                                'Signaler',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 26,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: -.3,
+                                ),
+                              ),
+                            ),
+                            if (c.maxHeight > 170) ...[
+                              const SizedBox(height: 2),
+                              Text(
+                                'Touchez pour photographier le véhicule',
+                                textAlign: TextAlign.center,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  color: Colors.white.withValues(alpha: .85),
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+              },
             ),
           ),
         ),
