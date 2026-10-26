@@ -51,7 +51,11 @@ class InfractionController extends Controller
     // existante si le client ne l'envoie pas, pour ne pas l'effacer.
     $carPosition->explication_infraction = $request->input('explication_infraction', $carPosition->explication_infraction);
     if ((int) auth()->user()->role_id === 2 && !$carPosition->agent_id) {
+        // Prendre la main sur un signalement vaut prise en charge : les deux
+        // champs doivent rester cohérents, sinon le dossier se retrouve
+        // verrouillé au profit de cet agent sans que l'app l'indique.
         $carPosition->agent_id = auth()->id();
+        $carPosition->pris_en_charge_at = $carPosition->pris_en_charge_at ?: now();
         $carPosition->pris_en_charge_at = now();
     }
 

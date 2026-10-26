@@ -80,7 +80,9 @@ class VehiculeController extends Controller
 
     // Mise à jour du modèle
     if ((int) auth()->user()->role_id === 2 && !$carPosition->agent_id) {
+        // Voir InfractionController : agent_id et pris_en_charge_at vont de pair.
         $fieldsToUpdate['agent_id'] = auth()->id();
+        $fieldsToUpdate['pris_en_charge_at'] = $carPosition->pris_en_charge_at ?: now();
         $fieldsToUpdate['pris_en_charge_at'] = now();
     }
     $carPosition->update($fieldsToUpdate);

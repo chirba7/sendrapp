@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\CarPosition;
 use App\Models\Mission;
+use App\Support\HistoriqueSignalement;
 use App\Models\MissionRemoval;
 use App\Models\MissionTruck;
 use App\Models\MissionReception;
@@ -277,11 +278,54 @@ class MissionController extends Controller
                 $paths[$column]=$this->storeImage($request->file($key),"missions/{$mission->id}/receptions/{$removal->id}");
             }
         }
-        MissionReception::updateOrCreate(['mission_removal_id'=>$removal->id],array_merge([
-            'mission_id'=>$mission->id,'received_by'=>$request->user()->id,'received_at'=>now(),
-        ],$paths));
+        $reception = null;
+        DB::transaction(function () use ($removal, $mission, $request, $paths, &$reception) {
+            $reception = MissionReception::updateOrCreate(['mission_removal_id'=>$removal->id],array_merge([
+                'mission_id'=>$mission->id,'received_by'=>$request->user()->id,'received_at'=>now(),
+            ],$paths));
+
+            // Le véhicule est arrivé en fourrière : le signalement est clos.
+            // Sans cela, un véhicule enlevé et réceptionné restait « EN COURS »
+            // dans l'app de l'agent et dans les listes du back-office, et
+            // pouvait même être réaffecté à une nouvelle mission.
+            $this->cloturerSignalement($removal, $reception->received_at);
+        });
+
         $mission->load($this->agentRelations($request->user()->id));
         return response()->json(['message'=>'Réception du véhicule enregistrée.','data'=>$this->serializeForAgent($mission)]);
+    }
+
+    /**
+     * Clôt le signalement rattaché à un enlèvement réceptionné en fourrière.
+     *
+     * L'état n'est posé qu'à la réception, et non à l'enlèvement : c'est
+     * l'arrivée en fourrière qui fait foi. La mise à jour est conditionnée à
+     * un état encore ouvert, pour ne jamais rouvrir ni écraser un signalement
+     * déjà clôturé ou rejeté.
+     */
+    private function cloturerSignalement(MissionRemoval $removal, $receptionneLe): void
+    {
+        if (! $removal->car_position_id) {
+            return;
+        }
+
+        $signalement = CarPosition::whereKey($removal->car_position_id)
+            ->whereNotIn('etat', ['ENLEVE', 'REJETE'])
+            ->first();
+
+        if (! $signalement) {
+            return;
+        }
+
+        $signalement->forceFill([
+            'etat' => 'ENLEVE',
+            'date_enlevement' => $receptionneLe,
+            // Un non-enlèvement déclaré plus tôt n'a plus lieu d'être.
+            'non_removal_reason' => null,
+            'non_removed_at' => null,
+        ])->save();
+
+        HistoriqueSignalement::enregistrer($signalement, 'enleve', 'Réceptionné en fourrière');
     }
 
     public function completeMission(Request $request, Mission $mission): JsonResponse
