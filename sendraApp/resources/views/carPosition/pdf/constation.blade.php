@@ -172,6 +172,20 @@
         <p><strong>Photos du citoyen :</strong> {{ $carPosition->photo->where('position', '!=', 'agent_constat')->count() }} ·
            <strong>Photos de l’agent :</strong> {{ $carPosition->photo->where('position', 'agent_constat')->count() }}</p>
 
+        @php($signatureAgent = \App\Support\SignatureAgent::dataUri($carPosition))
+        <div style="margin-top:18px;border:1px solid #c8d3cc;border-radius:8px;padding:12px;width:60%;">
+            <p style="margin:0 0 6px;"><strong>Signature de l’agent verbalisateur :</strong>
+                {{ trim(($carPosition->agent?->first_name ?? '').' '.($carPosition->agent?->last_name ?? '')) ?: 'Agent non renseigné' }}</p>
+            @if($signatureAgent)
+                <img src="{{ $signatureAgent }}" alt="Signature de l’agent" style="max-width:260px;max-height:110px;">
+                @if($carPosition->pv_signe_at)
+                    <p style="margin:6px 0 0;font-size:12px;color:#555;">Signé le {{ \Carbon\Carbon::parse($carPosition->pv_signe_at)->format('d/m/Y à H\hi') }}{{ $carPosition->pv_numero ? ' · '.$carPosition->pv_numero : '' }}</p>
+                @endif
+            @else
+                <p style="margin:0;font-size:12px;color:#555;">Procès-verbal pas encore signé par l’agent dans l’application.</p>
+            @endif
+        </div>
+
         <div class="footer">
             PROCEDURES D'INFRACTIONS: FICHE DE SIGNALAMENT AU STATIONNEMENT
         </div>

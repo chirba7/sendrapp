@@ -68,7 +68,10 @@
                                         </div>
                                     </td>
                                     <td>
-                                        <p class="text-sm">{{$signalement->title}}</p>
+                                        <p class="text-sm fw-semibold mb-0">{{ $signalement->vehicle_kind ?: $signalement->title }}</p>
+                                        @if($signalement->marque || $signalement->numero_vehicule)
+                                        <small class="text-muted d-block">{{ collect([trim(($signalement->marque ?? '').' '.($signalement->model ?? '')), $signalement->numero_vehicule])->filter()->join(' · ') }}</small>
+                                        @endif
                                     </td>
                                     <td>
                                         <p class="text-sm">{{$signalement->commune}}</p>

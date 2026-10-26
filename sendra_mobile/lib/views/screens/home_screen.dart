@@ -597,6 +597,10 @@ class _SignalementCard extends StatelessWidget {
     final imageUrl = data['image_url']?.toString();
     final title = (data['vehicle_kind'] ?? data['titre'] ?? '').toString();
     final agent = data['pris_en_charge_par']?.toString();
+    // Après constatation : marque, modèle et plaque à côté du type.
+    final marqueModele =
+        '${data['marque'] ?? ''} ${data['model'] ?? ''}'.trim();
+    final plaque = (data['numero_vehicule'] ?? '').toString().trim();
     final parMoi = data['pris_en_charge_par_moi'] == true;
     final commune = (data['commune'] ?? '').toString();
     final date = (data['formatted_date'] ?? '').toString();
@@ -651,7 +655,10 @@ class _SignalementCard extends StatelessWidget {
                             icon: status.icon),
                         const SizedBox(height: 8),
                         Text(
-                          title.isEmpty ? 'Sans titre' : title,
+                          [
+                            title.isEmpty ? 'Sans titre' : title,
+                            if (marqueModele.isNotEmpty) marqueModele,
+                          ].join(' · '),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
@@ -660,6 +667,10 @@ class _SignalementCard extends StatelessWidget {
                             fontWeight: FontWeight.w700,
                           ),
                         ),
+                        if (plaque.isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          _Plaque(plaque),
+                        ],
                         if (commune.isNotEmpty) ...[
                           const SizedBox(height: 4),
                           _InfoLine(
@@ -696,13 +707,58 @@ class _SignalementCard extends StatelessWidget {
   }
 }
 
-/// Grand bouton « Signaler » du tiers haut de l'accueil.
-class _SignalerHero extends StatelessWidget {
+/// Plaque d'immatriculation, façon plaque réelle.
+class _Plaque extends StatelessWidget {
+  const _Plaque(this.texte);
+  final String texte;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+        decoration: BoxDecoration(
+          color: const Color(0xFF15201A),
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Text(
+          texte.toUpperCase(),
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 1,
+          ),
+        ),
+      );
+}
+
+/// Grand bouton « Signaler » du tiers haut de l'accueil, animé : l'icône
+/// « respire » et des ondes s'en échappent pour inviter à toucher.
+class _SignalerHero extends StatefulWidget {
   const _SignalerHero({required this.onTap});
   final VoidCallback onTap;
 
   @override
+  State<_SignalerHero> createState() => _SignalerHeroState();
+}
+
+class _SignalerHeroState extends State<_SignalerHero>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _anim = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1800),
+  )..repeat();
+  bool _appuye = false;
+
+  @override
+  void dispose() {
+    _anim.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final onTap = widget.onTap;
+    final reduit = MediaQuery.of(context).disableAnimations;
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 6),
       child: Material(
@@ -711,7 +767,11 @@ class _SignalerHero extends StatelessWidget {
         clipBehavior: Clip.antiAlias,
         child: InkWell(
           onTap: onTap,
-          child: Ink(
+          onHighlightChanged: (v) => setState(() => _appuye = v),
+          child: AnimatedScale(
+            scale: _appuye ? .97 : 1,
+            duration: const Duration(milliseconds: 120),
+            child: Ink(
             decoration: const BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
@@ -742,22 +802,59 @@ class _SignalerHero extends StatelessWidget {
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Container(
-                              width: icone,
-                              height: icone,
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                shape: BoxShape.circle,
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withValues(alpha: .15),
-                                    blurRadius: 12,
-                                    offset: const Offset(0, 4),
+                            SizedBox.square(
+                              dimension: icone * 1.35,
+                              child: AnimatedBuilder(
+                                animation: _anim,
+                                builder: (context, child) {
+                                  final t = reduit ? 0.0 : _anim.value;
+                                  // Respiration douce de l'icône.
+                                  final souffle = reduit
+                                      ? 1.0
+                                      : 1 + .06 * (1 - (2 * t - 1).abs());
+                                  return Stack(
+                                    alignment: Alignment.center,
+                                    children: [
+                                      // Deux ondes décalées qui s'élargissent.
+                                      if (!reduit)
+                                        for (final decalage in const [0.0, .5])
+                                          Builder(builder: (_) {
+                                            final p = (t + decalage) % 1;
+                                            return Container(
+                                              width: icone * (1 + .35 * p),
+                                              height: icone * (1 + .35 * p),
+                                              decoration: BoxDecoration(
+                                                shape: BoxShape.circle,
+                                                border: Border.all(
+                                                  color: Colors.white
+                                                      .withValues(alpha: .55 * (1 - p)),
+                                                  width: 2.5,
+                                                ),
+                                              ),
+                                            );
+                                          }),
+                                      Transform.scale(scale: souffle, child: child),
+                                    ],
+                                  );
+                                },
+                                child: Container(
+                                  width: icone,
+                                  height: icone,
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    shape: BoxShape.circle,
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withValues(alpha: .15),
+                                        blurRadius: 12,
+                                        offset: const Offset(0, 4),
+                                      ),
+                                    ],
                                   ),
-                                ],
+                                  child: Icon(Icons.add_a_photo_rounded,
+                                      color: SendraTheme.green, size: icone * .48),
+                                ),
                               ),
-                              child: Icon(Icons.add_a_photo_rounded,
-                                  color: SendraTheme.green, size: icone * .48),
                             ),
                             SizedBox(height: c.maxHeight > 190 ? 14 : 8),
                             const FittedBox(
@@ -793,6 +890,7 @@ class _SignalerHero extends StatelessWidget {
                 );
               },
             ),
+          ),
           ),
         ),
       ),

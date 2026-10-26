@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
@@ -366,6 +367,49 @@ class _PvScreenState extends State<PvScreen> {
     );
   }
 
+  /// Signature de l'agent qui a fait la constatation, telle qu'apposée sur
+  /// le PV.
+  Widget _signatureAgent() {
+    final octets = _decoderDataUri(_pv?['pv_signature']?.toString());
+    final agent = _pv?['pv_agent']?.toString() ??
+        _signalement?['pris_en_charge_par']?.toString();
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: SendraTheme.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Signature de l’agent',
+              style: TextStyle(fontWeight: FontWeight.w800, color: SendraTheme.forest)),
+          if (agent != null && agent.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text(agent, style: const TextStyle(fontWeight: FontWeight.w600)),
+          ],
+          const SizedBox(height: 10),
+          Container(
+            height: 120,
+            width: double.infinity,
+            decoration: BoxDecoration(
+              color: const Color(0xFFFAFCFB),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: SendraTheme.border),
+            ),
+            padding: const EdgeInsets.all(8),
+            child: octets == null
+                ? const Center(
+                    child: Text('Signature indisponible',
+                        style: TextStyle(color: SendraTheme.muted)))
+                : Image.memory(octets, fit: BoxFit.contain),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _vueSigne() {
     final numero = _pv?['pv_numero'] ?? _signalement?['pv_numero'];
     final date = _pv?['pv_signe_at'];
@@ -403,6 +447,8 @@ class _PvScreenState extends State<PvScreen> {
         const SizedBox(height: 16),
         _recapitulatif(),
         const SizedBox(height: 16),
+        _signatureAgent(),
+        const SizedBox(height: 16),
         SizedBox(
           height: 52,
           child: FilledButton.icon(
@@ -422,6 +468,15 @@ class _PvScreenState extends State<PvScreen> {
         ),
       ],
     );
+  }
+}
+
+Uint8List? _decoderDataUri(String? dataUri) {
+  if (dataUri == null || !dataUri.contains(',')) return null;
+  try {
+    return base64Decode(dataUri.substring(dataUri.indexOf(',') + 1));
+  } catch (_) {
+    return null;
   }
 }
 

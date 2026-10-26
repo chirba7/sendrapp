@@ -197,6 +197,11 @@ class SignalementAgentController extends Controller
             'pv_numero' => $s->pv_numero,
             'pv_signe' => (bool) $s->pv_signe_at,
             'pv_signe_at' => $s->pv_signe_at ? \Carbon\Carbon::parse($s->pv_signe_at)->format('d/m/Y à H\hi') : null,
+            // Signature de l'agent, affichée dans l'écran « Consulter le PV ».
+            'pv_signature' => $s->pv_signature && Storage::disk('local')->exists($s->pv_signature)
+                ? 'data:image/png;base64,'.base64_encode(Storage::disk('local')->get($s->pv_signature))
+                : null,
+            'pv_agent' => $s->agent_id ? PriseEnCharge::nomAgent($s) : null,
             'pv_url' => $s->pv_path ? $lien(false) : null,
             'pv_url_telechargement' => $s->pv_path ? $lien(true) : null,
         ];

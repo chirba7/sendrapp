@@ -498,10 +498,32 @@ class _DepositMoneyDetailsScreenState extends State<DepositMoneyDetailsScreen> {
             ],
           ),
           const SizedBox(height: 14),
+          // Après constatation : marque, modèle et plaque à côté du type.
           Text(
-            (data['vehicle_kind'] ?? data['titre'])?.toString() ?? 'Signalement',
+            [
+              (data['vehicle_kind'] ?? data['titre'])?.toString() ?? 'Signalement',
+              '${data['marque'] ?? ''} ${data['model'] ?? ''}'.trim(),
+            ].where((t) => t.isNotEmpty).join(' · '),
             style: const TextStyle(fontSize: 21, fontWeight: FontWeight.w800),
           ),
+          if ((data['numero_vehicule'] ?? '').toString().trim().isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: const Color(0xFF15201A),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Text(
+                data['numero_vehicule'].toString().toUpperCase(),
+                style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 1,
+                    fontSize: 13),
+              ),
+            ),
+          ],
           const SizedBox(height: 5),
           Row(
             children: [

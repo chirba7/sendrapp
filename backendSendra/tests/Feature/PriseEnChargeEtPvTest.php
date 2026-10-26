@@ -178,6 +178,8 @@ class PriseEnChargeEtPvTest extends TestCase
         $reponse = $this->postJson("/api/signalements/{$s->id}/pv/signer", [
             'signature' => 'data:image/png;base64,'.self::PNG,
         ], $h)->assertOk()->assertJsonPath('pv_signe', true);
+        $this->assertStringStartsWith('data:image/png;base64,', $reponse->json('pv_signature'));
+        $this->assertSame('Awa Diop', $reponse->json('pv_agent'));
 
         $s->refresh();
         $this->assertNotNull($s->pv_signe_at);

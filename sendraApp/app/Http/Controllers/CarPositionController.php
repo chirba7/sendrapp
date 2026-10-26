@@ -243,10 +243,18 @@ class CarPositionController extends Controller
             $query->where('etat', 'REJETE');
         }
         if ($recherche !== '') {
-            $query->where(function ($q) use ($recherche) {
+            // Plaque saisie avec ou sans tirets / espaces, en minuscules ou
+            // majuscules : « aa573lp » retrouve « AA-573-LP ».
+            $plaque = strtoupper(preg_replace('/[^A-Za-z0-9]/', '', $recherche));
+            $query->where(function ($q) use ($recherche, $plaque) {
                 if (ctype_digit($recherche)) $q->orWhere('id', (int) $recherche);
                 $q->orWhere('commune', 'like', '%'.$recherche.'%')
-                  ->orWhere('numero_vehicule', 'like', '%'.$recherche.'%');
+                  ->orWhere('numero_vehicule', 'like', '%'.$recherche.'%')
+                  ->orWhere('marque', 'like', '%'.$recherche.'%')
+                  ->orWhere('model', 'like', '%'.$recherche.'%');
+                if ($plaque !== '') {
+                    $q->orWhereRaw("REPLACE(REPLACE(REPLACE(UPPER(numero_vehicule), '-', ''), ' ', ''), '.', '') LIKE ?", ['%'.$plaque.'%']);
+                }
             });
         }
         $signalements = $query->orderByDesc('updated_at')->paginate(30)->withQueryString();
