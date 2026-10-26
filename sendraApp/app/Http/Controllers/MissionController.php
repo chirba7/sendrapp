@@ -18,11 +18,23 @@ class MissionController extends Controller
         // L'historique est la vue par défaut (demande de la direction) : on
         // arrive sur les missions déjà clôturées, et « Missions ouvertes »
         // bascule explicitement avec ?historique=0.
-        $history = request()->boolean('historique', true);
-        $missions = Mission::with(['agents', 'vehicles', 'creator', 'commune', 'trucks'])
-            ->where('status', $history ? '=' : '!=', 'terminee')
-            ->orderByDesc('scheduled_at')->paginate(15);
-        return view('missions.index', compact('missions', 'history'));
+        // Historique complet par défaut (missions ouvertes comprises), avec
+        // l'état de chaque mission ; filtre ?etat=ouvertes|terminees.
+        $etat = in_array(request('etat'), ['ouvertes', 'terminees'], true) ? request('etat') : 'toutes';
+        // Compatibilité avec les anciens liens ?historique=0 / 1.
+        if (request()->has('historique') && ! request()->has('etat')) {
+            $etat = request()->boolean('historique') ? 'terminees' : 'ouvertes';
+        }
+        $missions = Mission::with(['agents', 'vehicles', 'creator', 'commune', 'trucks', 'receptionAgent', 'removals.reception'])
+            ->when($etat === 'ouvertes', fn ($q) => $q->whereNotIn('status', ['terminee', 'annulee']))
+            ->when($etat === 'terminees', fn ($q) => $q->whereIn('status', ['terminee', 'annulee']))
+            ->orderByDesc('scheduled_at')->orderByDesc('id')->paginate(15);
+        $compteurs = [
+            'toutes' => Mission::count(),
+            'ouvertes' => Mission::whereNotIn('status', ['terminee', 'annulee'])->count(),
+            'terminees' => Mission::whereIn('status', ['terminee', 'annulee'])->count(),
+        ];
+        return view('missions.index', compact('missions', 'etat', 'compteurs'));
     }
 
     public function create()
@@ -135,6 +147,17 @@ class MissionController extends Controller
         if (! empty($data['reception_agent_id']) && ! User::where('id',$data['reception_agent_id'])->where('role_id',2)->exists()) {
             throw ValidationException::withMessages(['reception_agent_id'=>'Le réceptionnaire doit être un agent.']);
         }
+        // Un agent est soit sur le terrain, soit à la réception : pas les deux.
+        if (! empty($data['reception_agent_id']) && in_array((int) $data['reception_agent_id'], array_map('intval', $agents), true)) {
+            throw ValidationException::withMessages(['reception_agent_id' => 'L’agent de réception ne peut pas faire partie de l’équipe terrain.']);
+        }
+        // Un véhicule ne peut appartenir qu'à une seule mission (non annulée) :
+        // déjà programmé, enlevé ou en fourrière, il n'est plus disponible.
+        $dejaPris = self::vehiculesPris($mission->exists ? $mission->id : null)
+            ->intersect(array_map('intval', $vehicles));
+        if ($dejaPris->isNotEmpty()) {
+            throw ValidationException::withMessages(['vehicles' => 'Véhicule(s) déjà affecté(s) à une autre mission : n° '.$dejaPris->join(', n° ').'.']);
+        }
 
         $commune = isset($data['commune_id']) ? Commune::find($data['commune_id']) : null;
         $receptionPound = Pound::find($data['reception_pound_id']);
@@ -147,7 +170,7 @@ class MissionController extends Controller
             ->all();
 
         $mission->fill([
-            'title' => $data['title'] ?: ($commune ? 'Mission '.$commune->nomCommune : 'Mission ponctuelle'),
+            'title' => ($data['title'] ?? null) ?: ($commune ? 'Mission '.$commune->nomCommune : 'Mission ponctuelle'),
             'commune_id' => $commune?->id,
             'type' => $data['type'],
             'status' => $mission->status ?: 'planifiee',
@@ -185,12 +208,29 @@ class MissionController extends Controller
         $mission->trucks()->whereNotIn('id', $keptTruckIds)->whereDoesntHave('removals')->delete();
     }
 
+    /** Identifiants des véhicules déjà affectés à une mission non annulée (hors $sauf). */
+    public static function vehiculesPris(?int $sauf = null)
+    {
+        return DB::table('mission_vehicle')
+            ->join('missions', 'missions.id', '=', 'mission_vehicle.mission_id')
+            ->where('missions.status', '!=', 'annulee')
+            ->when($sauf, fn ($q) => $q->where('mission_vehicle.mission_id', '!=', $sauf))
+            ->pluck('mission_vehicle.car_position_id')
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values();
+    }
+
     private function form(Mission $mission)
     {
         $agents = User::where('role_id', 2)->nonArchives()->orderBy('first_name')->get();
+        // Véhicules approuvés encore libres : ceux d'une autre mission (même
+        // enlevés ou déjà en fourrière) n'apparaissent plus. Ceux de la
+        // mission modifiée restent visibles.
         $vehicles = CarPosition::where('is_deleted', false)
             ->where('is_approve', true)
-            ->where('etat', '!=', 'ENLEVE')
+            ->whereNotIn('etat', ['ENLEVE', 'REJETE'])
+            ->whereNotIn('id', self::vehiculesPris($mission->exists ? $mission->id : null))
             ->orderByDesc('created_at')
             ->get();
         $communes = Commune::orderBy('nomCommune')->get();

@@ -172,6 +172,8 @@ class MissionController extends Controller
     {
         $this->assertCheckedIn($request, $mission);
         abort_unless($removal->mission_id === $mission->id, 404);
+        // Enlèvement validé : l'équipe terrain ne peut plus que consulter.
+        abort_if($mission->removal_validated_at || $mission->completed_at, 423, 'L’enlèvement est validé : il n’est plus modifiable.');
         $data = $request->validate([
             'mission_truck_id' => ['required', 'integer', Rule::exists('mission_trucks', 'id')->where('mission_id', $mission->id)],
             'vehicle_label' => ['nullable', 'string', 'max:255'],
@@ -209,6 +211,7 @@ class MissionController extends Controller
     {
         $this->assertCheckedIn($request, $mission);
         abort_unless($truck->mission_id === $mission->id, 404);
+        abort_if($mission->removal_validated_at || $mission->completed_at, 423, 'L’enlèvement est validé : la destination n’est plus modifiable.');
         $data = $request->validate(['pound_name' => ['required', 'string', 'max:255']]);
         if (! empty($mission->pounds) && ! in_array($data['pound_name'], $mission->pounds, true)) {
             abort(422, 'Cette fourrière ne fait pas partie de la mission.');
@@ -260,6 +263,8 @@ class MissionController extends Controller
     {
         $this->assertReceptionReady($request,$mission);
         abort_unless($removal->mission_id===$mission->id,404);
+        // Réception terminée : le réceptionniste ne peut plus que consulter.
+        abort_if($mission->completed_at || $mission->status === 'terminee', 423, 'La mission est terminée : la réception n’est plus modifiable.');
         $existing=MissionReception::where('mission_removal_id',$removal->id)->first();
         $rule=$existing?'nullable':'required';
         $request->validate(['front'=>[$rule,'image','max:10240'],'back'=>[$rule,'image','max:10240'],'left'=>[$rule,'image','max:10240'],'right'=>[$rule,'image','max:10240'],'sheet'=>[$rule,'image','max:10240']]);
@@ -282,6 +287,7 @@ class MissionController extends Controller
     public function completeMission(Request $request, Mission $mission): JsonResponse
     {
         $this->assertReceptionReady($request,$mission);
+        abort_if($mission->completed_at, 423, 'La mission est déjà terminée.');
         abort_if($mission->removals()->doesntExist() &&
             $mission->vehicles()->wherePivotNotNull('non_removed_at')->doesntExist(),
             422, 'Aucun véhicule traité.');
@@ -328,6 +334,11 @@ class MissionController extends Controller
             'removal_validated' => (bool)$mission->removal_validated_at,
             'reception_pound_name' => $mission->receptionPound?->name,
             'completed' => (bool)$mission->completed_at,
+            // Lecture seule : l'équipe terrain après validation de
+            // l'enlèvement, le réceptionniste après la fin de mission.
+            'read_only' => $isReceiver ? (bool) $mission->completed_at : ((bool) $mission->removal_validated_at || (bool) $mission->completed_at),
+            'removal_validated_at' => $mission->removal_validated_at?->toIso8601String(),
+            'completed_at' => $mission->completed_at?->toIso8601String(),
             'vehicles' => $unlocked ? $mission->vehicles->map(fn ($vehicle) => [
                 'id' => $vehicle->id,
                 'label' => trim(($vehicle->marque ?? '').' '.($vehicle->model ?? '')) ?: ($vehicle->title ?? 'Véhicule'),

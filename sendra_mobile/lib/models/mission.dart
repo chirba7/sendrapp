@@ -20,6 +20,9 @@ class Mission {
     required this.receptionCheckedIn,
     required this.removalValidated,
     required this.completed,
+    required this.readOnly,
+    this.removalValidatedAt,
+    this.completedAt,
     this.receptionPoundName,
     this.providerName,
     this.trailerBrand,
@@ -46,6 +49,12 @@ class Mission {
   final bool receptionCheckedIn;
   final bool removalValidated;
   final bool completed;
+
+  /// Lecture seule : l'équipe terrain après validation de l'enlèvement, le
+  /// réceptionniste après la fin de la mission (verrou aussi côté serveur).
+  final bool readOnly;
+  final DateTime? removalValidatedAt;
+  final DateTime? completedAt;
   final String? receptionPoundName;
   final String? providerName;
   final String? trailerBrand;
@@ -98,6 +107,14 @@ class Mission {
       receptionCheckedIn: json['reception_checked_in'] == true,
       removalValidated: json['removal_validated'] == true,
       completed: json['completed'] == true,
+      readOnly: json['read_only'] is bool
+          ? json['read_only'] == true
+          : (json['is_receiver'] == true
+              ? json['completed'] == true
+              : json['removal_validated'] == true || json['completed'] == true),
+      removalValidatedAt:
+          DateTime.tryParse('${json['removal_validated_at'] ?? ''}'),
+      completedAt: DateTime.tryParse('${json['completed_at'] ?? ''}'),
       receptionPoundName: json['reception_pound_name']?.toString(),
       providerName: json['provider_name']?.toString(),
       trailerBrand: json['trailer_brand']?.toString() ??

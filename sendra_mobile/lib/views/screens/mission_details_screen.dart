@@ -7,6 +7,11 @@ import 'package:walletium/models/mission.dart';
 import 'package:walletium/services/mission_service.dart';
 import 'package:walletium/utils/sendra_theme.dart';
 
+/// Fiche d'une mission pour l'agent de terrain ou le réceptionniste.
+///
+/// Après validation de l'enlèvement (terrain) ou fin de mission (réception),
+/// tout passe en lecture seule : on consulte, on ne modifie plus — le serveur
+/// refuse aussi toute modification.
 class MissionDetailsScreen extends StatefulWidget {
   const MissionDetailsScreen({
     super.key,
@@ -19,10 +24,38 @@ class MissionDetailsScreen extends StatefulWidget {
   State<MissionDetailsScreen> createState() => _MissionDetailsScreenState();
 }
 
+const _violet = Color(0xFF6847B8);
+const _bleu = Color(0xFF1769AA);
+
+TextStyle _titreStyle([double taille = 16]) => TextStyle(
+      fontFamily: SendraTheme.fontFamily,
+      fontSize: taille,
+      fontWeight: FontWeight.w800,
+      color: SendraTheme.ink,
+    );
+
+const _texteDiscret = TextStyle(
+  fontFamily: SendraTheme.fontFamily,
+  color: SendraTheme.muted,
+  fontSize: 13.5,
+  height: 1.35,
+);
+
+String _date(DateTime? d) {
+  if (d == null) return 'Date à préciser';
+  final l = d.toLocal();
+  String deux(int v) => v.toString().padLeft(2, '0');
+  return '${deux(l.day)}/${deux(l.month)}/${l.year} à ${deux(l.hour)}h${deux(l.minute)}';
+}
+
 class _MissionDetailsScreenState extends State<MissionDetailsScreen> {
   final _service = MissionService();
   late Mission _mission = widget.initialMission;
   bool _busy = false;
+
+  bool get _pointe =>
+      _mission.isReceiver ? _mission.receptionCheckedIn : _mission.checkedIn;
+  bool get _lectureSeule => _mission.readOnly;
 
   @override
   void initState() {
@@ -39,28 +72,25 @@ class _MissionDetailsScreenState extends State<MissionDetailsScreen> {
     }
   }
 
-  Future<void> _checkIn() async {
+  Future<Position> _position() async {
+    if (!await Geolocator.isLocationServiceEnabled()) {
+      throw Exception('Activez la localisation du téléphone pour pointer.');
+    }
+    var permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+    }
+    if (permission == LocationPermission.denied ||
+        permission == LocationPermission.deniedForever) {
+      throw Exception('L’autorisation de localisation est nécessaire pour pointer.');
+    }
+    return Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
+  }
+
+  Future<void> _action(Future<Mission> Function() appel) async {
     setState(() => _busy = true);
     try {
-      if (!await Geolocator.isLocationServiceEnabled())
-        throw Exception('Activez la localisation du téléphone pour pointer.');
-      var permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied)
-        permission = await Geolocator.requestPermission();
-      if (permission == LocationPermission.denied ||
-          permission == LocationPermission.deniedForever)
-        throw Exception(
-          'L’autorisation de localisation est nécessaire pour pointer.',
-        );
-      final position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
-      );
-      final mission = await _service.checkIn(
-        _mission.id,
-        position.latitude,
-        position.longitude,
-        position.accuracy,
-      );
+      final mission = await appel();
       if (mounted) setState(() => _mission = mission);
     } catch (e) {
       if (mounted) _error(e);
@@ -69,46 +99,53 @@ class _MissionDetailsScreenState extends State<MissionDetailsScreen> {
     }
   }
 
-  Future<void> _checkInReception() async {
-    setState(() => _busy = true);
-    try {
-      if (!await Geolocator.isLocationServiceEnabled()) {
-        throw Exception('Activez la localisation pour pointer.');
-      }
-      var permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-      }
-      if (permission == LocationPermission.denied ||
-          permission == LocationPermission.deniedForever) {
-        throw Exception('L’autorisation de localisation est nécessaire.');
-      }
-      final position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
-      );
-      final mission = await _service.checkInReception(
-        _mission.id,
-        position.latitude,
-        position.longitude,
-      );
-      if (mounted) setState(() => _mission = mission);
-    } catch (e) {
-      if (mounted) _error(e);
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
+  Future<void> _checkIn() => _action(() async {
+        final p = await _position();
+        return _service.checkIn(_mission.id, p.latitude, p.longitude, p.accuracy);
+      });
+
+  Future<void> _checkInReception() => _action(() async {
+        final p = await _position();
+        return _service.checkInReception(_mission.id, p.latitude, p.longitude);
+      });
+
+  Future<bool> _confirmer(String titre, String texte, String bouton) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        icon: const Icon(Icons.lock_outline_rounded, color: SendraTheme.green),
+        title: Text(titre),
+        content: Text(texte),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Annuler')),
+          FilledButton(
+              onPressed: () => Navigator.pop(ctx, true), child: Text(bouton)),
+        ],
+      ),
+    );
+    return ok == true;
   }
 
   Future<void> _validateRemoval() async {
-    setState(() => _busy = true);
-    try {
-      final mission = await _service.validateRemoval(_mission.id);
-      if (mounted) setState(() => _mission = mission);
-    } catch (e) {
-      if (mounted) _error(e);
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
+    if (!await _confirmer(
+      'Valider l’enlèvement ?',
+      'Après validation, les enlèvements, les camions et les motifs ne seront '
+          'plus modifiables : vous pourrez seulement les consulter.',
+      'Valider',
+    )) return;
+    await _action(() => _service.validateRemoval(_mission.id));
+  }
+
+  Future<void> _completeMission() async {
+    if (!await _confirmer(
+      'Terminer la mission ?',
+      'Après validation, les réceptions ne seront plus modifiables : vous '
+          'pourrez seulement les consulter.',
+      'Terminer',
+    )) return;
+    await _action(() => _service.completeMission(_mission.id));
   }
 
   Future<void> _markNotRemoved(MissionVehicle vehicle) async {
@@ -121,8 +158,9 @@ class _MissionDetailsScreenState extends State<MissionDetailsScreen> {
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(vehicle.label),
+                Text(vehicle.label, style: _titreStyle(15)),
                 const SizedBox(height: 12),
                 TextFormField(
                   initialValue: reasonText,
@@ -132,7 +170,6 @@ class _MissionDetailsScreenState extends State<MissionDetailsScreen> {
                   decoration: const InputDecoration(
                     labelText: 'Motif obligatoire',
                     hintText: 'Ex. : le véhicule n’est plus sur les lieux',
-                    border: OutlineInputBorder(),
                   ),
                 ),
               ],
@@ -154,406 +191,539 @@ class _MissionDetailsScreenState extends State<MissionDetailsScreen> {
       ),
     );
     if (reason == null || !mounted) return;
-    setState(() => _busy = true);
-    try {
-      final mission = await _service.markNotRemoved(
-        _mission.id,
-        vehicle.id,
-        reason,
-      );
-      if (mounted) setState(() => _mission = mission);
-    } catch (e) {
-      if (mounted) _error(e);
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
-  }
-
-  Future<void> _completeMission() async {
-    setState(() => _busy = true);
-    try {
-      final mission = await _service.completeMission(_mission.id);
-      if (mounted) setState(() => _mission = mission);
-    } catch (e) {
-      if (mounted) _error(e);
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
+    await _action(() => _service.markNotRemoved(_mission.id, vehicle.id, reason));
   }
 
   void _error(Object error) => ScaffoldMessenger.of(context).showSnackBar(
-    SnackBar(content: Text(error.toString().replaceFirst('Exception: ', ''))),
-  );
+        SnackBar(content: Text(error.toString().replaceFirst('Exception: ', ''))),
+      );
+
+  // ───────────────────────────── Écran ──────────────────────────────────
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(
-      title: Text(_mission.code.isEmpty ? 'Mission' : _mission.code),
-      actions: [
-        IconButton(onPressed: _refresh, icon: const Icon(Icons.refresh)),
-      ],
-    ),
-    body: ListView(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 110),
-      children: [
-        _nextActionCard(),
-        _section('Informations', [
-          _line(
-            Icons.assignment_outlined,
-            _mission.isProgrammed ? 'Mission programmée' : 'Mission ponctuelle',
+        backgroundColor: SendraTheme.surface,
+        appBar: AppBar(
+          title: Text(_mission.code.isEmpty ? 'Mission' : _mission.code),
+          actions: [
+            IconButton(
+              tooltip: 'Actualiser',
+              onPressed: _refresh,
+              icon: const Icon(Icons.refresh_rounded),
+            ),
+          ],
+        ),
+        body: DefaultTextStyle.merge(
+          style: const TextStyle(fontFamily: SendraTheme.fontFamily),
+          child: RefreshIndicator(
+            color: SendraTheme.green,
+            onRefresh: _refresh,
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
+              children: [
+                _entete(),
+                const SizedBox(height: 12),
+                if (_lectureSeule) _bandeauLectureSeule() else _nextActionCard(),
+                ..._contenu(),
+              ],
+            ),
           ),
-          if (_mission.address.isNotEmpty)
-            _line(Icons.place_outlined, _mission.address),
-          if ((_mission.providerName ?? '').isNotEmpty)
-            _line(Icons.business_outlined, _mission.providerName!),
-        ]),
-        if (_mission.isReceiver && _mission.removalValidated)
-          _section('Véhicules non enlevés', [
-            if (_mission.vehicles.where((v) =>
-                (v.nonRemovalReason ?? '').trim().isNotEmpty).isEmpty)
-              const Text('Aucun véhicule déclaré non enlevé.'),
-            ..._mission.vehicles
-                .where((v) => (v.nonRemovalReason ?? '').trim().isNotEmpty)
-                .map((v) => Card(
-                      color: const Color(0xFFFFF4E5),
-                      child: ListTile(
-                        leading: const Icon(Icons.report_problem_outlined,
-                            color: SendraTheme.amber),
-                        title: Text(v.label),
-                        subtitle: Text([
-                          if ((v.plate ?? '').isNotEmpty) v.plate!,
-                          'Motif : ${v.nonRemovalReason}',
-                        ].join('\n')),
-                        isThreeLine: (v.plate ?? '').isNotEmpty,
-                      ),
-                    )),
-            if (_mission.removals.isEmpty)
-              const Padding(
-                padding: EdgeInsets.only(top: 8),
-                child: Text('Aucun véhicule à réceptionner pour cette mission.'),
-              ),
-          ]),
-        if (_mission.isReceiver && !_mission.removalValidated) ...[
-          _section('Réception en attente', [
-            const Icon(
-              Icons.hourglass_top_rounded,
-              color: SendraTheme.amber,
-              size: 38,
-            ),
-            const SizedBox(height: 10),
-            const Text(
+        ),
+      );
+
+  List<Widget> _contenu() {
+    if (_mission.isReceiver && !_mission.removalValidated) {
+      return [
+        _Carte(
+          titre: 'Réception en attente',
+          icone: Icons.hourglass_top_rounded,
+          couleur: SendraTheme.amber,
+          children: const [
+            Text(
               'L’équipe terrain doit d’abord valider la phase d’enlèvement.',
+              style: _texteDiscret,
             ),
-          ]),
-        ] else if (!(_mission.isReceiver
-            ? _mission.receptionCheckedIn
-            : _mission.checkedIn)) ...[
-          _section('Pointage obligatoire', [
+          ],
+        ),
+      ];
+    }
+    if (!_pointe) {
+      return [
+        _Carte(
+          titre: 'Pointage obligatoire',
+          icone: Icons.my_location_rounded,
+          couleur: _bleu,
+          children: [
             Text(
               _mission.isReceiver
                   ? 'Pointez au poste ${_mission.receptionPoundName ?? 'de fourrière'} pour commencer la réception.'
-                  : 'Votre position sera comparée à la zone de la commune avant de déverrouiller la mission.',
+                  : 'Votre position est comparée à la zone de la commune avant de déverrouiller la mission.',
+              style: _texteDiscret,
             ),
             const SizedBox(height: 14),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: _busy
-                    ? null
-                    : (_mission.isReceiver ? _checkInReception : _checkIn),
-                icon: _busy
-                    ? const SizedBox.square(
-                        dimension: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.my_location),
-                label: Text(_busy ? 'Vérification…' : 'Pointer'),
+            _GrosBouton(
+              onPressed: _busy
+                  ? null
+                  : (_mission.isReceiver ? _checkInReception : _checkIn),
+              icone: Icons.my_location_rounded,
+              libelle: _busy ? 'Vérification…' : 'Pointer maintenant',
+              chargement: _busy,
+            ),
+          ],
+        ),
+      ];
+    }
+
+    final nonEnleves = _mission.vehicles
+        .where((v) => (v.nonRemovalReason ?? '').trim().isNotEmpty)
+        .toList();
+
+    return [
+      if (_mission.isReceiver)
+        _Carte(
+          titre: 'Véhicules non enlevés',
+          icone: Icons.report_problem_outlined,
+          couleur: SendraTheme.amber,
+          compteur: nonEnleves.length,
+          children: [
+            if (nonEnleves.isEmpty)
+              const Text('Aucun véhicule déclaré non enlevé.', style: _texteDiscret),
+            for (final v in nonEnleves)
+              _TuileVehicule(
+                icone: Icons.cancel_outlined,
+                couleur: SendraTheme.amber,
+                titre: v.label,
+                sousTitre: [
+                  if ((v.plate ?? '').isNotEmpty) v.plate!,
+                  'Motif : ${v.nonRemovalReason}',
+                ].join('\n'),
+              ),
+          ],
+        ),
+      _Carte(
+        titre: 'Camions',
+        icone: Icons.local_shipping_outlined,
+        couleur: _bleu,
+        compteur: _mission.trucks.length,
+        children: [
+          if (_mission.trucks.isEmpty)
+            const Text('Aucun camion renseigné.', style: _texteDiscret),
+          for (final t in _mission.trucks)
+            _TuileVehicule(
+              icone: Icons.local_shipping_rounded,
+              couleur: _bleu,
+              titre: [t.brand, t.registration]
+                  .where((v) => (v ?? '').isNotEmpty)
+                  .join(' · '),
+              sousTitre: [
+                if ((t.driverName ?? '').isNotEmpty) t.driverName!,
+                t.destinationPoundName ?? 'Fourrière à préciser',
+              ].join(' · '),
+              statut: t.destinationPoundName == null
+                  ? ('À préciser', SendraTheme.amber)
+                  : ('Destination OK', SendraTheme.green),
+              onTap: _mission.isReceiver ||
+                      _lectureSeule ||
+                      _mission.pounds.isEmpty
+                  ? null
+                  : () => _openTruckDestination(t),
+              trailing: _mission.isReceiver || _lectureSeule
+                  ? null
+                  : const Icon(Icons.edit_outlined, color: SendraTheme.muted),
+            ),
+        ],
+      ),
+      _Carte(
+        titre: 'Fourrières prêtes',
+        icone: Icons.warehouse_outlined,
+        couleur: _violet,
+        compteur: _mission.pounds.length,
+        children: [
+          if (_mission.pounds.isEmpty)
+            const Text('Aucune fourrière renseignée.', style: _texteDiscret),
+          for (final p in _mission.pounds)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: Row(children: [
+                const Icon(Icons.local_parking_rounded, size: 18, color: _violet),
+                const SizedBox(width: 8),
+                Expanded(child: Text(p, style: const TextStyle(fontWeight: FontWeight.w600))),
+              ]),
+            ),
+        ],
+      ),
+      if (_mission.vehicles.isNotEmpty && !_mission.isReceiver)
+        _Carte(
+          titre: _mission.isProgrammed ? 'Véhicules programmés' : 'Véhicules ciblés',
+          icone: Icons.directions_car_outlined,
+          couleur: SendraTheme.green,
+          compteur: _mission.vehicles.length,
+          children: [
+            for (final v in _mission.vehicles) _tuileVehiculeCible(v),
+          ],
+        ),
+      _Carte(
+        titre: _mission.isReceiver ? 'Véhicules à réceptionner' : 'Enlèvements',
+        icone: _mission.isReceiver ? Icons.inventory_2_outlined : Icons.photo_camera_outlined,
+        couleur: _mission.isReceiver ? _violet : const Color(0xFF00897B),
+        compteur: _mission.removals.length,
+        children: [
+          if (_mission.removals.isEmpty)
+            Text(
+              _mission.isReceiver
+                  ? 'Aucun véhicule à réceptionner pour cette mission.'
+                  : 'Aucun véhicule photographié pour le moment.',
+              style: _texteDiscret,
+            ),
+          for (final r in _mission.removals)
+            _TuileVehicule(
+              icone: Icons.directions_car_rounded,
+              couleur: _mission.isReceiver ? _violet : const Color(0xFF00897B),
+              titre: r.label,
+              sousTitre: _removalSubtitle(r),
+              statut: _mission.isReceiver
+                  ? (r.received
+                      ? ('Réceptionné', SendraTheme.green)
+                      : ('À réceptionner', SendraTheme.amber))
+                  : (r.sheetPhotoUrl == null
+                      ? ('Fiche manquante', SendraTheme.amber)
+                      : ('Fiche ajoutée', SendraTheme.green)),
+              onTap: () => _mission.isReceiver
+                  ? _openReception(r)
+                  : _openRemoval(existingRemoval: r),
+              trailing: Icon(
+                _lectureSeule ? Icons.visibility_outlined : Icons.chevron_right_rounded,
+                color: SendraTheme.muted,
               ),
             ),
-          ]),
-        ] else ...[
-          _section(
-            'Camions',
-            _mission.trucks.isEmpty
-                ? [const Text('Aucun camion renseigné.')]
-                : _mission.trucks
-                      .map(
-                        (t) => ListTile(
-                          onTap: _mission.isReceiver || _mission.pounds.isEmpty
-                              ? null
-                              : () => _openTruckDestination(t),
-                          contentPadding: EdgeInsets.zero,
-                          leading: const CircleAvatar(
-                            child: Icon(Icons.local_shipping_outlined),
-                          ),
-                          title: Text(
-                            [
-                              t.brand,
-                              t.registration,
-                            ].where((v) => (v ?? '').isNotEmpty).join(' • '),
-                          ),
-                          subtitle: Text(
-                            [
-                              if ((t.driverName ?? '').isNotEmpty)
-                                t.driverName!,
-                              t.destinationPoundName ?? 'Fourrière à préciser',
-                            ].join(' • '),
-                          ),
-                          trailing: const Icon(Icons.edit_outlined),
-                        ),
-                      )
-                      .toList(),
-          ),
-          _section(
-            'Fourrières prêtes',
-            _mission.pounds.isEmpty
-                ? [const Text('Aucune fourrière renseignée.')]
-                : _mission.pounds
-                      .map((p) => _line(Icons.local_parking_outlined, p))
-                      .toList(),
-          ),
-          if (_mission.vehicles.isNotEmpty && !_mission.isReceiver)
-            _section(
-              _mission.isProgrammed
-                  ? 'Véhicules programmés'
-                  : 'Véhicules ciblés',
-              _mission.vehicles.map((v) {
-                final matches = _mission.removals
-                    .where((r) => r.carPositionId == v.id)
-                    .toList();
-                final removal = matches.isEmpty ? null : matches.first;
-                final done = removal != null;
-                final notRemoved = (v.nonRemovalReason ?? '').isNotEmpty;
-                return ListTile(
-                  onTap: _mission.removalValidated || _busy
-                      ? null
-                      : done
-                      ? () => _openRemoval(existingRemoval: removal)
-                      : (_mission.trucks.isEmpty
-                            ? null
-                            : () => _openRemoval(vehicle: v)),
-                  contentPadding: EdgeInsets.zero,
-                  leading: Icon(
-                    notRemoved
-                        ? Icons.cancel_outlined
-                        : done
-                        ? Icons.check_circle
-                        : Icons.directions_car,
-                    color: notRemoved
-                        ? Colors.orange
-                        : done
-                        ? SendraTheme.green
-                        : null,
-                  ),
-                  title: Text(v.label),
-                  subtitle: Text(
-                    [
-                      if (v.plate != null) v.plate!,
-                      if (notRemoved) 'Non enlevé : ${v.nonRemovalReason}',
-                    ].join(' • '),
-                  ),
-                  trailing: !done && !_mission.removalValidated
-                      ? IconButton(
-                          tooltip: notRemoved
-                              ? 'Modifier le motif'
-                              : 'Déclarer non enlevé',
-                          icon: const Icon(Icons.report_problem_outlined),
-                          onPressed: _busy ? null : () => _markNotRemoved(v),
-                        )
-                      : done
-                      ? Icon(
-                          removal.sheetPhotoUrl == null
-                              ? Icons.assignment_add
-                              : Icons.assignment_turned_in,
-                        )
-                      : null,
-                );
-              }).toList(),
-            ),
-          _section('Enlèvements (${_mission.removals.length})', [
-            if (_mission.removals.isEmpty)
-              const Text('Aucun véhicule photographié pour le moment.'),
-            ..._mission.removals.map(
-              (r) => ListTile(
-                onTap: () => _mission.isReceiver
-                    ? _openReception(r)
-                    : _openRemoval(existingRemoval: r),
-                contentPadding: EdgeInsets.zero,
-                leading: const CircleAvatar(child: Icon(Icons.directions_car)),
-                title: Text(r.label),
-                subtitle: Text(_removalSubtitle(r)),
-                trailing: _mission.isReceiver
-                    ? Icon(
-                        r.received
-                            ? Icons.check_circle
-                            : Icons.add_a_photo_outlined,
-                        color: r.received ? SendraTheme.green : null,
-                      )
-                    : const Icon(Icons.chevron_right),
-              ),
-            ),
-            const SizedBox(height: 10),
+          if (!_mission.isReceiver && !_lectureSeule) ...[
             if (_mission.trucks.isEmpty)
               const Padding(
-                padding: EdgeInsets.only(top: 10),
+                padding: EdgeInsets.only(top: 6, bottom: 8),
                 child: Text(
                   'Un camion doit être ajouté par l’administration avant de commencer un enlèvement.',
-                  style: TextStyle(color: Colors.redAccent),
+                  style: TextStyle(color: SendraTheme.statusSignale),
                 ),
               ),
-            if (!_mission.isReceiver)
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: _mission.trucks.isEmpty
-                      ? null
-                      : () => _openRemoval(extraVehicle: true),
-                  icon: const Icon(Icons.add_a_photo_outlined),
-                  label: Text(
-                    _mission.isProgrammed
-                        ? 'Ajouter un autre véhicule'
-                        : 'Nouvel enlèvement',
+            const SizedBox(height: 6),
+            _GrosBouton(
+              onPressed: _mission.trucks.isEmpty || _busy
+                  ? null
+                  : () => _openRemoval(extraVehicle: true),
+              icone: Icons.add_a_photo_outlined,
+              libelle: _mission.isProgrammed
+                  ? 'Ajouter un autre véhicule'
+                  : 'Nouvel enlèvement',
+              secondaire: true,
+            ),
+          ],
+        ],
+      ),
+      _carteFin(),
+    ];
+  }
+
+  Widget _tuileVehiculeCible(MissionVehicle v) {
+    final matches = _mission.removals.where((r) => r.carPositionId == v.id).toList();
+    final removal = matches.isEmpty ? null : matches.first;
+    final done = removal != null;
+    final notRemoved = (v.nonRemovalReason ?? '').isNotEmpty;
+    final modifiable = !_lectureSeule && !_busy;
+    return _TuileVehicule(
+      icone: notRemoved
+          ? Icons.cancel_outlined
+          : done
+              ? Icons.check_circle_rounded
+              : Icons.directions_car_rounded,
+      couleur: notRemoved
+          ? SendraTheme.amber
+          : done
+              ? SendraTheme.green
+              : SendraTheme.muted,
+      titre: v.label,
+      sousTitre: [
+        if ((v.plate ?? '').isNotEmpty) v.plate!,
+        if (notRemoved) 'Motif : ${v.nonRemovalReason}',
+      ].join('\n'),
+      statut: notRemoved
+          ? ('Non enlevé', SendraTheme.amber)
+          : done
+              ? ('Enlevé', SendraTheme.green)
+              : ('À enlever', _bleu),
+      onTap: done
+          ? () => _openRemoval(existingRemoval: removal)
+          : (!modifiable || _mission.trucks.isEmpty)
+              ? null
+              : () => _openRemoval(vehicle: v),
+      trailing: !done && modifiable
+          ? IconButton(
+              tooltip: notRemoved ? 'Modifier le motif' : 'Déclarer non enlevé',
+              icon: const Icon(Icons.report_problem_outlined, color: SendraTheme.amber),
+              onPressed: () => _markNotRemoved(v),
+            )
+          : null,
+    );
+  }
+
+  Widget _carteFin() {
+    final recus = _mission.removals.where((r) => r.received).length;
+    if (_lectureSeule) {
+      return _Carte(
+        titre: _mission.completed ? 'Mission terminée' : 'Enlèvement validé',
+        icone: Icons.verified_rounded,
+        couleur: SendraTheme.green,
+        children: [
+          if (_mission.removalValidatedAt != null)
+            _ligneInfo(Icons.outbox_rounded, 'Enlèvement validé le ${_date(_mission.removalValidatedAt)}'),
+          if (_mission.completedAt != null)
+            _ligneInfo(Icons.flag_rounded, 'Mission terminée le ${_date(_mission.completedAt)}'),
+          if (_mission.isReceiver)
+            _ligneInfo(Icons.inventory_2_outlined, '$recus/${_mission.removals.length} véhicule(s) réceptionné(s)'),
+        ],
+      );
+    }
+    return _Carte(
+      titre: _mission.isReceiver ? 'Finaliser la réception' : 'Fin de l’enlèvement',
+      icone: Icons.task_alt_rounded,
+      couleur: SendraTheme.green,
+      children: [
+        Text(
+          _mission.isReceiver
+              ? '$recus/${_mission.removals.length} véhicule(s) réceptionné(s).'
+              : 'Pour chaque véhicule programmé, enregistrez un enlèvement ou indiquez pourquoi il n’a pas été enlevé.',
+          style: _texteDiscret,
+        ),
+        const SizedBox(height: 12),
+        _GrosBouton(
+          onPressed: _busy
+              ? null
+              : (_mission.isReceiver ? _completeMission : _validateRemoval),
+          icone: Icons.task_alt_rounded,
+          libelle: _mission.isReceiver
+              ? 'Valider et terminer la mission'
+              : 'Valider l’enlèvement',
+          chargement: _busy,
+        ),
+      ],
+    );
+  }
+
+  Widget _ligneInfo(IconData icone, String texte) => Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: Row(
+          children: [
+            Icon(icone, size: 18, color: SendraTheme.green),
+            const SizedBox(width: 8),
+            Expanded(child: Text(texte, style: const TextStyle(fontWeight: FontWeight.w600))),
+          ],
+        ),
+      );
+
+  /// En-tête : code, rôle, état et progression de la mission.
+  Widget _entete() {
+    final etapes = _mission.isReceiver
+        ? const ['Terrain', 'Pointage', 'Réception', 'Terminée']
+        : const ['Pointage', 'Enlèvements', 'Validation', 'Réception'];
+    final int atteinte;
+    if (_mission.isReceiver) {
+      atteinte = _mission.completed
+          ? 4
+          : _mission.receptionCheckedIn
+              ? 2
+              : _mission.removalValidated
+                  ? 1
+                  : 0;
+    } else {
+      atteinte = _mission.completed
+          ? 4
+          : _mission.removalValidated
+              ? 3
+              : _mission.checkedIn
+                  ? 1
+                  : 0;
+    }
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [SendraTheme.forest, SendraTheme.green],
+        ),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              _Pastille(_mission.isReceiver ? 'Réception en fourrière' : 'Équipe terrain'),
+              _Pastille(_mission.isProgrammed ? 'Programmée' : 'Ponctuelle'),
+              if (_lectureSeule) const _Pastille('Lecture seule', icone: Icons.lock_rounded),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            _mission.title,
+            style: const TextStyle(
+              fontFamily: SendraTheme.fontFamily,
+              color: Colors.white,
+              fontSize: 20,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 6),
+          _ligneBlanche(Icons.event_rounded, _date(_mission.scheduledAt)),
+          if (_mission.address.isNotEmpty)
+            _ligneBlanche(Icons.place_rounded, _mission.address),
+          if ((_mission.providerName ?? '').isNotEmpty)
+            _ligneBlanche(Icons.business_rounded, _mission.providerName!),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              for (var i = 0; i < etapes.length; i++) ...[
+                Expanded(
+                  child: Column(
+                    children: [
+                      Container(
+                        width: 24,
+                        height: 24,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: i < atteinte ? Colors.white : Colors.white.withValues(alpha: .18),
+                          border: Border.all(
+                            color: Colors.white,
+                            width: i == atteinte ? 2 : 0,
+                          ),
+                        ),
+                        child: i < atteinte
+                            ? const Icon(Icons.check_rounded, size: 16, color: SendraTheme.green)
+                            : null,
+                      ),
+                      const SizedBox(height: 5),
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          etapes[i],
+                          style: TextStyle(
+                            fontFamily: SendraTheme.fontFamily,
+                            color: Colors.white.withValues(alpha: i <= atteinte ? 1 : .7),
+                            fontSize: 11.5,
+                            fontWeight: i == atteinte ? FontWeight.w800 : FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-              ),
-          ]),
-          _section(
-            _mission.isReceiver
-                ? 'Finaliser la réception'
-                : 'Fin de l’enlèvement',
-            [
-              Text(
-                _mission.isReceiver
-                    ? '${_mission.removals.where((r) => r.received).length}/${_mission.removals.length} véhicule(s) réceptionné(s).'
-                    : 'Pour chaque véhicule programmé, enregistrez un enlèvement ou indiquez pourquoi il n’a pas été enlevé.',
-              ),
-              const SizedBox(height: 12),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed:
-                      _busy ||
-                          _mission.completed ||
-                          (!_mission.isReceiver && _mission.removalValidated)
-                      ? null
-                      : (_mission.isReceiver
-                            ? _completeMission
-                            : _validateRemoval),
-                  icon: Icon(
-                    _mission.completed ? Icons.verified : Icons.task_alt,
-                  ),
-                  label: Text(
-                    _mission.completed
-                        ? 'Mission terminée'
-                        : _mission.isReceiver
-                        ? 'Valider et terminer la mission'
-                        : _mission.removalValidated
-                        ? 'Enlèvement validé'
-                        : 'Valider l’enlèvement',
-                  ),
-                ),
-              ),
+              ],
             ],
           ),
         ],
-      ],
-    ),
-  );
+      ),
+    );
+  }
+
+  Widget _ligneBlanche(IconData icone, String texte) => Padding(
+        padding: const EdgeInsets.only(top: 3),
+        child: Row(
+          children: [
+            Icon(icone, size: 16, color: Colors.white70),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text(
+                texte,
+                style: const TextStyle(
+                    fontFamily: SendraTheme.fontFamily, color: Colors.white, fontSize: 13.5),
+              ),
+            ),
+          ],
+        ),
+      );
+
+  Widget _bandeauLectureSeule() => Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: const Color(0xFFEAF1ED),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: const Color(0xFFB7DEC4)),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.lock_rounded, color: SendraTheme.forest),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                _mission.isReceiver
+                    ? 'Mission terminée : la réception est en lecture seule.'
+                    : 'Enlèvement validé : vous pouvez consulter, mais plus modifier.',
+                style: const TextStyle(fontWeight: FontWeight.w700, color: SendraTheme.forest),
+              ),
+            ),
+          ],
+        ),
+      );
 
   Widget _nextActionCard() {
     late final String title;
     late final String message;
     late final IconData icon;
     late final Color color;
-    if (_mission.completed) {
-      title = 'Mission terminée';
-      message = 'Toutes les étapes ont été validées.';
-      icon = Icons.verified_rounded;
-      color = SendraTheme.green;
-    } else if (_mission.isReceiver && !_mission.removalValidated) {
+    if (_mission.isReceiver && !_mission.removalValidated) {
       title = 'En attente de l’équipe terrain';
-      message =
-          'La réception sera disponible après validation de l’enlèvement.';
+      message = 'La réception sera disponible après validation de l’enlèvement.';
       icon = Icons.hourglass_top_rounded;
-      color = const Color(0xFF7C4DFF);
-    } else if (!(_mission.isReceiver
-        ? _mission.receptionCheckedIn
-        : _mission.checkedIn)) {
+      color = _violet;
+    } else if (!_pointe) {
       title = 'Prochaine action : pointer';
       message = _mission.isReceiver
           ? 'Rendez-vous à ${_mission.receptionPoundName ?? 'la fourrière'}.'
           : 'Rendez-vous dans la zone de la mission.';
       icon = Icons.my_location_rounded;
-      color = const Color(0xFF1976D2);
+      color = _bleu;
     } else if (_mission.isReceiver) {
       final left = _mission.removals.where((r) => !r.received).length;
-      title = left == 0
-          ? 'Prête à être terminée'
-          : 'Réceptionner les véhicules';
+      title = left == 0 ? 'Prête à être terminée' : 'Réceptionner les véhicules';
       message = left == 0
-          ? _mission.removals.isEmpty
-              ? 'Aucun véhicule à réceptionner. Consultez les motifs puis validez la mission.'
-              : 'Validez la fin de mission.'
+          ? (_mission.removals.isEmpty
+              ? 'Aucun véhicule à réceptionner. Consultez les motifs puis terminez la mission.'
+              : 'Terminez la mission.')
           : '$left véhicule(s) restent à photographier.';
       icon = Icons.warehouse_outlined;
-      color = const Color(0xFF7C4DFF);
-    } else if (_mission.removalValidated) {
-      title = 'Enlèvement transmis';
-      message = 'Le réceptionniste peut poursuivre la mission.';
-      icon = Icons.outbox_rounded;
-      color = SendraTheme.green;
+      color = _violet;
     } else {
       title = 'Photographier et affecter';
-      message = 'Complétez les véhicules, les camions et leurs destinations.';
+      message = 'Complétez les véhicules, les camions et leurs destinations, puis validez.';
       icon = Icons.add_a_photo_outlined;
       color = SendraTheme.amber;
     }
     return Container(
-      margin: const EdgeInsets.only(bottom: 14),
-      padding: const EdgeInsets.all(18),
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        gradient: LinearGradient(colors: [color, color.withValues(alpha: .76)]),
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: color.withValues(alpha: .22),
-            blurRadius: 18,
-            offset: const Offset(0, 7),
-          ),
-        ],
+        color: color.withValues(alpha: .08),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: color.withValues(alpha: .3)),
       ),
       child: Row(
         children: [
           Container(
-            width: 54,
-            height: 54,
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: .2),
-              borderRadius: BorderRadius.circular(17),
-            ),
-            child: Icon(icon, color: Colors.white, size: 29),
+            width: 46,
+            height: 46,
+            decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(14)),
+            child: Icon(icon, color: Colors.white, size: 24),
           ),
-          const SizedBox(width: 14),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  message,
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: .88),
-                    height: 1.3,
-                  ),
-                ),
+                Text(title, style: _titreStyle(16)),
+                const SizedBox(height: 2),
+                Text(message, style: _texteDiscret),
               ],
             ),
           ),
@@ -561,129 +731,15 @@ class _MissionDetailsScreenState extends State<MissionDetailsScreen> {
       ),
     );
   }
-
-  ({Color color, IconData icon, Color background}) _sectionTone(String title) {
-    if (title.startsWith('Camions'))
-      return (
-        color: const Color(0xFF1976D2),
-        icon: Icons.local_shipping_outlined,
-        background: const Color(0xFFF7FAFF),
-      );
-    if (title.startsWith('Fourrières'))
-      return (
-        color: const Color(0xFF7C4DFF),
-        icon: Icons.warehouse_outlined,
-        background: const Color(0xFFFBF9FF),
-      );
-    if (title.startsWith('Véhicules'))
-      return (
-        color: SendraTheme.amber,
-        icon: Icons.directions_car_outlined,
-        background: const Color(0xFFFFFCF5),
-      );
-    if (title.startsWith('Enlèvements'))
-      return (
-        color: const Color(0xFF00897B),
-        icon: Icons.photo_camera_outlined,
-        background: const Color(0xFFF5FCFB),
-      );
-    if (title.contains('réception') || title.contains('Réception'))
-      return (
-        color: const Color(0xFF7C4DFF),
-        icon: Icons.inventory_2_outlined,
-        background: const Color(0xFFFBF9FF),
-      );
-    if (title.contains('Pointage'))
-      return (
-        color: const Color(0xFF1976D2),
-        icon: Icons.my_location,
-        background: const Color(0xFFF7FAFF),
-      );
-    if (title.contains('Fin'))
-      return (
-        color: SendraTheme.green,
-        icon: Icons.task_alt,
-        background: const Color(0xFFF6FCF8),
-      );
-    return (
-      color: SendraTheme.green,
-      icon: Icons.info_outline,
-      background: const Color(0xFFFCFEFD),
-    );
-  }
-
-  Widget _section(String title, List<Widget> children) {
-    final tone = _sectionTone(title);
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      color: tone.background,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(18),
-        side: BorderSide(color: tone.color.withValues(alpha: .18)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  width: 42,
-                  height: 42,
-                  decoration: BoxDecoration(
-                    color: tone.color.withValues(alpha: .12),
-                    borderRadius: BorderRadius.circular(13),
-                  ),
-                  child: Icon(tone.icon, color: tone.color, size: 22),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    title,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            ...children,
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _line(IconData icon, String text) => Padding(
-    padding: const EdgeInsets.only(bottom: 8),
-    child: Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Icon(icon, size: 19, color: SendraTheme.muted),
-        const SizedBox(width: 9),
-        Expanded(child: Text(text)),
-      ],
-    ),
-  );
 
   String _removalSubtitle(MissionRemoval removal) {
     final trucks = _mission.trucks.where((t) => t.id == removal.truckId);
     final truck = trucks.isEmpty ? null : trucks.first;
     return [
       if ((removal.plate ?? '').isNotEmpty) removal.plate!,
-      if (truck != null)
-        'Camion ${truck.registration ?? truck.brand ?? truck.id}',
-      if (truck?.destinationPoundName != null)
-        truck!.destinationPoundName!
-      else
-        'Fourrière à préciser sur le camion',
-      removal.sheetPhotoUrl == null
-          ? 'Fiche facultative à ajouter'
-          : 'Fiche ajoutée',
-    ].join(' • ');
+      if (truck != null) 'Camion ${truck.registration ?? truck.brand ?? truck.id}',
+      truck?.destinationPoundName ?? 'Fourrière à préciser sur le camion',
+    ].join(' · ');
   }
 
   Future<void> _openRemoval({
@@ -700,6 +756,7 @@ class _MissionDetailsScreenState extends State<MissionDetailsScreen> {
           selectedVehicle: vehicle,
           existingRemoval: existingRemoval,
           extraVehicle: extraVehicle,
+          readOnly: _lectureSeule,
         ),
       ),
     );
@@ -729,11 +786,234 @@ class _MissionDetailsScreenState extends State<MissionDetailsScreen> {
           mission: _mission,
           removal: removal,
           service: _service,
+          readOnly: _lectureSeule,
         ),
       ),
     );
     if (result != null && mounted) setState(() => _mission = result);
   }
+}
+
+// ───────────────────────────── Composants ───────────────────────────────
+
+class _Carte extends StatelessWidget {
+  const _Carte({
+    required this.titre,
+    required this.icone,
+    required this.couleur,
+    required this.children,
+    this.compteur,
+  });
+
+  final String titre;
+  final IconData icone;
+  final Color couleur;
+  final List<Widget> children;
+  final int? compteur;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(SendraTheme.radius),
+          border: Border.all(color: SendraTheme.border),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: couleur.withValues(alpha: .12),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(icone, color: couleur, size: 22),
+                ),
+                const SizedBox(width: 10),
+                Expanded(child: Text(titre, style: _titreStyle(16))),
+                if (compteur != null)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: couleur.withValues(alpha: .12),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text('$compteur',
+                        style: TextStyle(
+                            fontFamily: SendraTheme.fontFamily,
+                            color: couleur,
+                            fontWeight: FontWeight.w800,
+                            fontSize: 13)),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            ...children,
+          ],
+        ),
+      );
+}
+
+class _TuileVehicule extends StatelessWidget {
+  const _TuileVehicule({
+    required this.icone,
+    required this.couleur,
+    required this.titre,
+    this.sousTitre,
+    this.statut,
+    this.onTap,
+    this.trailing,
+  });
+
+  final IconData icone;
+  final Color couleur;
+  final String titre;
+  final String? sousTitre;
+  final (String, Color)? statut;
+  final VoidCallback? onTap;
+  final Widget? trailing;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: Material(
+          color: SendraTheme.surface,
+          borderRadius: BorderRadius.circular(14),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(14),
+            onTap: onTap,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(12, 10, 6, 10),
+              child: Row(
+                children: [
+                  Icon(icone, color: couleur, size: 26),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(titre.isEmpty ? 'Véhicule' : titre,
+                            style: const TextStyle(
+                                fontFamily: SendraTheme.fontFamily,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 15,
+                                color: SendraTheme.ink)),
+                        if ((sousTitre ?? '').isNotEmpty) ...[
+                          const SizedBox(height: 2),
+                          Text(sousTitre!, style: _texteDiscret),
+                        ],
+                        if (statut != null) ...[
+                          const SizedBox(height: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: statut!.$2.withValues(alpha: .12),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(statut!.$1,
+                                style: TextStyle(
+                                    fontFamily: SendraTheme.fontFamily,
+                                    color: statut!.$2,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700)),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  if (trailing != null) trailing!,
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+}
+
+class _Pastille extends StatelessWidget {
+  const _Pastille(this.texte, {this.icone});
+  final String texte;
+  final IconData? icone;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: .18),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (icone != null) ...[
+              Icon(icone, size: 13, color: Colors.white),
+              const SizedBox(width: 4),
+            ],
+            Text(texte,
+                style: const TextStyle(
+                    fontFamily: SendraTheme.fontFamily,
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700)),
+          ],
+        ),
+      );
+}
+
+class _GrosBouton extends StatelessWidget {
+  const _GrosBouton({
+    required this.onPressed,
+    required this.icone,
+    required this.libelle,
+    this.chargement = false,
+    this.secondaire = false,
+  });
+
+  final VoidCallback? onPressed;
+  final IconData icone;
+  final String libelle;
+  final bool chargement;
+  final bool secondaire;
+
+  @override
+  Widget build(BuildContext context) {
+    final icon = chargement
+        ? const SizedBox.square(
+            dimension: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+        : Icon(icone);
+    final label = Text(libelle, style: const TextStyle(fontSize: 15.5, fontWeight: FontWeight.w700));
+    return SizedBox(
+      height: 52,
+      width: double.infinity,
+      child: secondaire
+          ? OutlinedButton.icon(onPressed: onPressed, icon: icon, label: label)
+          : FilledButton.icon(onPressed: onPressed, icon: icon, label: label),
+    );
+  }
+}
+
+/// Photo en plein écran, zoomable (consultation en lecture seule).
+void _voirPhoto(BuildContext context, ImageProvider image, String titre) {
+  Navigator.of(context).push(MaterialPageRoute<void>(
+    fullscreenDialog: true,
+    builder: (_) => Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        backgroundColor: Colors.black,
+        foregroundColor: Colors.white,
+        title: Text(titre),
+      ),
+      body: InteractiveViewer(
+        maxScale: 5,
+        child: Center(child: Image(image: image, fit: BoxFit.contain)),
+      ),
+    ),
+  ));
 }
 
 class _RemovalScreen extends StatefulWidget {
@@ -743,12 +1023,16 @@ class _RemovalScreen extends StatefulWidget {
     required this.extraVehicle,
     this.selectedVehicle,
     this.existingRemoval,
+    this.readOnly = false,
   });
   final Mission mission;
   final MissionService service;
   final MissionVehicle? selectedVehicle;
   final MissionRemoval? existingRemoval;
   final bool extraVehicle;
+
+  /// Enlèvement validé : consultation seulement.
+  final bool readOnly;
   @override
   State<_RemovalScreen> createState() => _RemovalScreenState();
 }
@@ -788,6 +1072,11 @@ class _RemovalScreenState extends State<_RemovalScreen> {
   }
 
   Future<void> _take(String angle) async {
+    if (widget.readOnly) {
+      final image = _photoProvider(angle);
+      if (image != null) _voirPhoto(context, image, _angles[angle] ?? angle);
+      return;
+    }
     final file = await _picker.pickImage(
       source: ImageSource.camera,
       imageQuality: 85,
@@ -797,6 +1086,7 @@ class _RemovalScreenState extends State<_RemovalScreen> {
   }
 
   Future<void> _save() async {
+    if (widget.readOnly) return;
     if (_truckId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -861,9 +1151,13 @@ class _RemovalScreenState extends State<_RemovalScreen> {
               : 'Détail de l’enlèvement',
         ),
       ),
+      backgroundColor: SendraTheme.surface,
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          if (widget.readOnly) const _BandeauConsultation(
+            'Enlèvement validé : consultation seule. Touchez une photo pour l’agrandir.',
+          ),
           if (widget.selectedVehicle != null ||
               widget.existingRemoval?.carPositionId != null)
             ListTile(
@@ -901,6 +1195,7 @@ class _RemovalScreenState extends State<_RemovalScreen> {
             const SizedBox(height: 12),
             TextField(
               controller: _label,
+              readOnly: widget.readOnly,
               decoration: const InputDecoration(
                 labelText: 'Description du véhicule',
               ),
@@ -908,6 +1203,7 @@ class _RemovalScreenState extends State<_RemovalScreen> {
             const SizedBox(height: 12),
             TextField(
               controller: _plate,
+              readOnly: widget.readOnly,
               decoration: const InputDecoration(
                 labelText: 'Immatriculation (facultative)',
               ),
@@ -932,11 +1228,11 @@ class _RemovalScreenState extends State<_RemovalScreen> {
                   ),
                 )
                 .toList(),
-            onChanged: (v) => setState(() => _truckId = v),
+            onChanged: widget.readOnly ? null : (v) => setState(() => _truckId = v),
           ),
           const SizedBox(height: 20),
-          const Text(
-            '4 photos obligatoires',
+          Text(
+            widget.readOnly ? 'Photos de l’enlèvement' : '4 photos obligatoires',
             style: TextStyle(fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: 10),
@@ -993,6 +1289,18 @@ class _RemovalScreenState extends State<_RemovalScreen> {
                 .toList(),
           ),
           const SizedBox(height: 16),
+          if (widget.readOnly)
+            OutlinedButton.icon(
+              onPressed: widget.existingRemoval?.sheetPhotoUrl == null
+                  ? null
+                  : () => _voirPhoto(context,
+                      NetworkImage(widget.existingRemoval!.sheetPhotoUrl!), 'Fiche'),
+              icon: const Icon(Icons.assignment_outlined),
+              label: Text(widget.existingRemoval?.sheetPhotoUrl == null
+                  ? 'Aucune fiche ajoutée'
+                  : 'Voir la fiche'),
+            )
+          else ...[
           OutlinedButton.icon(
             onPressed: () async {
               final image = await _picker.pickImage(
@@ -1030,6 +1338,7 @@ class _RemovalScreenState extends State<_RemovalScreen> {
                   : 'Enregistrer les modifications',
             ),
           ),
+          ],
         ],
       ),
     );
@@ -1048,10 +1357,14 @@ class _ReceptionPhotoScreen extends StatefulWidget {
     required this.mission,
     required this.removal,
     required this.service,
+    this.readOnly = false,
   });
   final Mission mission;
   final MissionRemoval removal;
   final MissionService service;
+
+  /// Mission terminée : consultation seulement.
+  final bool readOnly;
   @override
   State<_ReceptionPhotoScreen> createState() => _ReceptionPhotoScreenState();
 }
@@ -1075,6 +1388,11 @@ class _ReceptionPhotoScreenState extends State<_ReceptionPhotoScreen> {
   }
 
   Future<void> _take(String angle) async {
+    if (widget.readOnly) {
+      final image = _provider(angle);
+      if (image != null) _voirPhoto(context, image, _labels[angle] ?? angle);
+      return;
+    }
     final image = await _picker.pickImage(
       source: ImageSource.camera,
       imageQuality: 85,
@@ -1084,6 +1402,7 @@ class _ReceptionPhotoScreenState extends State<_ReceptionPhotoScreen> {
   }
 
   Future<void> _save() async {
+    if (widget.readOnly) return;
     if ({...widget.removal.receptionPhotos, ..._photos}.length != 5) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -1116,10 +1435,14 @@ class _ReceptionPhotoScreenState extends State<_ReceptionPhotoScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: Text('Réception • ${widget.removal.label}')),
+    appBar: AppBar(title: Text('Réception · ${widget.removal.label}')),
+    backgroundColor: SendraTheme.surface,
     body: ListView(
       padding: const EdgeInsets.all(16),
       children: [
+        if (widget.readOnly) const _BandeauConsultation(
+          'Mission terminée : consultation seule. Touchez une photo pour l’agrandir.',
+        ),
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
@@ -1204,6 +1527,7 @@ class _ReceptionPhotoScreenState extends State<_ReceptionPhotoScreen> {
           }).toList(),
         ),
         const SizedBox(height: 20),
+        if (!widget.readOnly)
         ElevatedButton.icon(
           onPressed: _saving ? null : _save,
           icon: const Icon(Icons.check_circle_outline),
@@ -1385,4 +1709,31 @@ class _TruckDestinationSheetState extends State<_TruckDestinationSheet> {
       ),
     ),
   );
+}
+
+class _BandeauConsultation extends StatelessWidget {
+  const _BandeauConsultation(this.texte);
+  final String texte;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        margin: const EdgeInsets.only(bottom: 14),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: const Color(0xFFEAF1ED),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: const Color(0xFFB7DEC4)),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.lock_rounded, color: SendraTheme.forest, size: 20),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(texte,
+                  style: const TextStyle(
+                      fontWeight: FontWeight.w700, color: SendraTheme.forest)),
+            ),
+          ],
+        ),
+      );
 }

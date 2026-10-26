@@ -94,7 +94,7 @@
             <div class="mb-2"><button type="button" class="btn btn-sm btn-outline-success" data-tout="agents">Tout cocher</button> <button type="button" class="btn btn-sm btn-outline-secondary" data-rien="agents">Tout décocher</button></div>
             <div class="pick-grid" id="grid-agents">
                 @forelse($agents as $agent)
-                <label class="pick">
+                <label class="pick" data-agent="{{$agent->id}}">
                     <input type="checkbox" name="agents[]" value="{{$agent->id}}" data-groupe="agents" @checked(in_array($agent->id,$selectedAgents))>
                     <span class="pick-body">
                         <span class="avatar">👤</span>
@@ -115,13 +115,13 @@
             <p class="text-muted small mb-3">Qui réceptionne les épaves, et où.</p>
             <div class="mb-3">
                 <label class="form-label">Agent chargé de réceptionner *</label>
-                <select class="form-select" name="reception_agent_id" required>
+                <select class="form-select" name="reception_agent_id" id="reception-agent" required>
                     <option value="">Sélectionner</option>
                     @foreach($agents as $agent)
                     <option value="{{$agent->id}}" @selected(old('reception_agent_id',$mission->reception_agent_id)==$agent->id)>{{trim($agent->first_name.' '.$agent->last_name)}} — {{$agent->telephone}}</option>
                     @endforeach
                 </select>
-                <small class="text-muted">Il peut aussi faire partie de l’équipe terrain ci-contre : les deux rôles sont indépendants.</small>
+                <small class="text-muted">Un agent est soit sur le terrain, soit à la réception : celui choisi ici n’est plus sélectionnable dans l’équipe terrain, et inversement.</small>
             </div>
             <div class="mb-3">
                 <label class="form-label">Poste de fourrière *</label>
@@ -155,6 +155,7 @@
 <div class="form-card mb-4" id="vehicles-field">
     <h5><span class="ico" style="background:#e7f8f0;color:#087844">🚗</span> Véhicules approuvés à emporter <span class="compteur ms-auto" id="compteur-vehicles">0</span></h5>
     <p class="text-muted small mb-2" id="vehicles-help">Obligatoire pour une mission programmée.</p>
+    <p class="text-muted small mb-2">Un véhicule déjà affecté à une autre mission (programmé, enlevé ou en fourrière) n’est plus proposé.</p>
     <div class="mb-2"><button type="button" class="btn btn-sm btn-outline-success" data-tout="vehicles">Tout cocher</button> <button type="button" class="btn btn-sm btn-outline-secondary" data-rien="vehicles">Tout décocher</button></div>
     <div class="pick-grid" id="grid-vehicles">
         @forelse($vehicles as $vehicle)
@@ -166,7 +167,7 @@
             </span>
         </label>
         @empty
-        <div class="pick-vide">Aucun véhicule approuvé disponible.</div>
+        <div class="pick-vide">Aucun véhicule approuvé disponible : ceux déjà affectés à une autre mission n’apparaissent pas.</div>
         @endforelse
     </div>
 </div>
@@ -230,6 +231,28 @@ document.addEventListener('DOMContentLoaded', () => {
         if (c) c.checked = true;
     };
     receptionPound.addEventListener('change', coherencePound); coherencePound();
+
+    // --- un agent : terrain OU réception, jamais les deux ------------------
+    const receptionAgent = document.getElementById('reception-agent');
+    const exclusivite = () => {
+        const recepteur = receptionAgent.value;
+        const terrain = cases('agents').filter(c => c.checked).map(c => c.value);
+        cases('agents').forEach(c => {
+            const bloque = recepteur !== '' && c.value === recepteur;
+            if (bloque) c.checked = false;
+            c.disabled = bloque;
+            c.closest('.pick').style.opacity = bloque ? .45 : 1;
+            c.closest('.pick').title = bloque ? 'Agent de réception de cette mission' : '';
+        });
+        [...receptionAgent.options].forEach(o => {
+            o.disabled = o.value !== '' && terrain.includes(o.value);
+        });
+        majCompteur('agents');
+    };
+    receptionAgent.addEventListener('change', exclusivite);
+    cases('agents').forEach(c => c.addEventListener('change', exclusivite));
+    document.querySelectorAll('[data-tout="agents"],[data-rien="agents"]').forEach(b => b.addEventListener('click', exclusivite));
+    exclusivite();
 
     // --- obligations selon le type de mission ----------------------------
     const type = document.getElementById('mission-type');

@@ -80,9 +80,10 @@ class _MissionsScreenState extends State<MissionsScreen> {
             missions
                 .where(
                   (mission) =>
-                      (_showHistory
-                          ? _missionStage(mission, now) == 'terminee'
-                          : _missionStage(mission, now) != 'terminee') &&
+                      // L'historique montre toutes les missions, ouvertes
+                      // comprises, avec leur état.
+                      (_showHistory ||
+                          _missionStage(mission, now) != 'terminee') &&
                       (_typeFilter == 'all' ||
                           (_typeFilter == 'programmee' &&
                               mission.isProgrammed) ||
@@ -162,7 +163,7 @@ class _MissionsScreenState extends State<MissionsScreen> {
                     const Padding(
                       padding: EdgeInsets.only(left: 4),
                       child: Text(
-                        'Missions terminées',
+                        'Toutes les missions, ouvertes et terminées',
                         style: TextStyle(
                             fontSize: 15, fontWeight: FontWeight.w700),
                       ),
@@ -192,7 +193,7 @@ class _MissionsScreenState extends State<MissionsScreen> {
                   ? Center(
                       child: Text(
                         _showHistory
-                            ? 'Aucune mission terminée dans cet historique.'
+                            ? 'Aucune mission dans cet historique.'
                             : 'Aucune mission en cours ou à venir dans ce filtre.',
                       ),
                     )
@@ -207,9 +208,16 @@ class _MissionsScreenState extends State<MissionsScreen> {
                           final hasPointed = mission.isReceiver
                               ? mission.receptionCheckedIn
                               : mission.checkedIn;
+                          final etat = _etat(mission, now);
                           return Card(
+                            shape: RoundedRectangleBorder(
+                              borderRadius:
+                                  BorderRadius.circular(SendraTheme.radius),
+                              side: const BorderSide(color: SendraTheme.border),
+                            ),
                             child: InkWell(
-                              borderRadius: BorderRadius.circular(12),
+                              borderRadius:
+                                  BorderRadius.circular(SendraTheme.radius),
                               onTap: () async {
                                 await Navigator.of(context).push(
                                   MaterialPageRoute(
@@ -243,19 +251,37 @@ class _MissionsScreenState extends State<MissionsScreen> {
                                           ),
                                         ),
                                         _Badge(
-                                          label: mission.completed
-                                              ? 'Terminée'
-                                              : mission.isReceiver
-                                              ? 'Réception'
-                                              : mission.isProgrammed
+                                          label: etat.$1,
+                                          color: etat.$2,
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Wrap(
+                                      spacing: 6,
+                                      runSpacing: 6,
+                                      children: [
+                                        _Badge(
+                                          label: mission.isReceiver
+                                              ? 'Réception en fourrière'
+                                              : 'Équipe terrain',
+                                          color: mission.isReceiver
+                                              ? const Color(0xFF6847B8)
+                                              : const Color(0xFF1769AA),
+                                        ),
+                                        _Badge(
+                                          label: mission.isProgrammed
                                               ? 'Programmée'
                                               : 'Ponctuelle',
-                                          color: mission.completed
-                                              ? SendraTheme.muted
-                                              : mission.isProgrammed
+                                          color: mission.isProgrammed
                                               ? SendraTheme.green
                                               : SendraTheme.amber,
                                         ),
+                                        if (mission.readOnly)
+                                          const _Badge(
+                                            label: 'Lecture seule',
+                                            color: SendraTheme.muted,
+                                          ),
                                       ],
                                     ),
                                     const SizedBox(height: 12),
@@ -311,6 +337,21 @@ class _MissionsScreenState extends State<MissionsScreen> {
       },
     ),
   );
+
+  /// État affiché d'une mission (historique compris).
+  (String, Color) _etat(Mission mission, DateTime now) {
+    if (mission.completed || mission.status == 'terminee') {
+      return ('Terminée', SendraTheme.green);
+    }
+    if (mission.status == 'annulee') return ('Annulée', SendraTheme.statusSignale);
+    if (mission.removalValidated || mission.status == 'en_reception') {
+      return ('En réception', const Color(0xFF6847B8));
+    }
+    if (_missionStage(mission, now) == 'en_cours') {
+      return ('En cours', SendraTheme.statusEnCours);
+    }
+    return ('À venir', const Color(0xFF1769AA));
+  }
 
   Widget _filterChip(String value, String label, IconData icon, Color color) {
     final selected = _typeFilter == value;
