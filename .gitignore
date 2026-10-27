@@ -2,3 +2,8 @@
 /app_pointage_sendra/releases/*.apk
 output/apk/
 *.apk
+
+# Archives de travail et sorties de build : volumineuses, régénérables, et
+# elles ne se compressent pas — six archives pesaient déjà 39 Mo dans le dépôt.
+tmp/
+output/pdf/
