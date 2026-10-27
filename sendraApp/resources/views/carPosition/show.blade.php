@@ -34,8 +34,16 @@
     .decision-choix { display:grid; grid-template-columns:repeat(2,minmax(140px,1fr)); gap:12px; max-width:520px; }
     .decision-choix input { position:absolute; opacity:0; pointer-events:none; }
     .decision-choix span { display:flex; align-items:center; justify-content:center; gap:8px; min-height:64px; border:2px solid #dce5df; border-radius:16px; font-weight:700; font-size:16px; cursor:pointer; transition:.15s; }
-    .decision-choix input:checked + span.ok { border-color:#188038; background:#e8f5ed; color:#0b6b30; }
-    .decision-choix input:checked + span.refus { border-color:#d93025; background:#fdecea; color:#b3261e; }
+    /* Les deux choix sont colorés d'emblée — vert pour approuver, rouge pour
+       rejeter — et non plus seulement une fois cochés : l'autorité doit voir
+       du premier coup d'œil quel bouton fait quoi. */
+    .decision-choix span.ok { border-color:#188038; color:#0b6b30; background:#f3faf5; }
+    .decision-choix span.refus { border-color:#d93025; color:#b3261e; background:#fef6f5; }
+    .decision-choix label:hover span.ok { background:#e8f5ed; }
+    .decision-choix label:hover span.refus { background:#fdecea; }
+    /* Cochée, l'option choisie est pleine : aucun doute sur la décision. */
+    .decision-choix input:checked + span.ok { background:#188038; border-color:#188038; color:#fff; box-shadow:0 6px 16px rgba(24,128,56,.28); }
+    .decision-choix input:checked + span.refus { background:#d93025; border-color:#d93025; color:#fff; box-shadow:0 6px 16px rgba(217,48,37,.28); }
     .decision-choix input:focus-visible + span { outline:2px solid #0b8f55; outline-offset:2px; }
     .decision-resultat { border-radius:14px; padding:14px 16px; }
     .decision-resultat.ok { background:#e8f5ed; color:#0b6b30; }
