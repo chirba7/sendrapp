@@ -110,8 +110,18 @@
             @endif
         @endforeach
         @if ($r === 1)
+        @php($messagesNonTraites = \Illuminate\Support\Facades\Schema::hasTable('contact_messages') ? \App\Models\ContactMessage::where('statut', 'nouveau')->count() : 0)
         <p class="nav-section">Administration</p>
         <ul class="nav-group">
+            <li class="nav-item {{ request()->is('dashboard/messages-site*') ? 'active' : '' }}">
+                <a href="{{ route('contact-messages.index') }}">
+                    <span class="icon"><i class="lni lni-envelope"></i></span>
+                    <span class="text">Messages du site</span>
+                    @if ($messagesNonTraites > 0)
+                        <span class="badge rounded-pill bg-danger ms-auto me-3" title="Messages non traités">{{ $messagesNonTraites }}</span>
+                    @endif
+                </a>
+            </li>
             <li class="nav-item nav-item-has-children {{ $comptesActif ? 'active' : '' }}">
                 <a href="#0" class="{{ $comptesActif ? '' : 'collapsed' }}" data-bs-toggle="collapse" data-bs-target="#ddmenu_comptes" aria-controls="ddmenu_comptes" aria-expanded="{{ $comptesActif ? 'true' : 'false' }}">
                     <span class="icon"><i class="lni lni-users"></i></span>

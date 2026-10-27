@@ -1,0 +1,200 @@
+<?php
+
+use App\Http\Controllers\CarPositionController;
+use App\Http\Controllers\UserController;
+use App\Http\Controllers\MissionController;
+use App\Http\Controllers\CommuneController;
+use App\Http\Controllers\PoundController;
+use App\Models\CarPosition;
+use App\Models\User;
+use Illuminate\Support\Facades\Route;
+
+/*
+|--------------------------------------------------------------------------
+| Web Routes
+|--------------------------------------------------------------------------
+|
+| Here is where you can register web routes for your application. These
+| routes are loaded by the RouteServiceProvider and all of them will
+| be assigned to the "web" middleware group. Make something great!
+|
+*/
+
+
+
+// Correction WEB-H-1 : le middleware 'verified' ne faisait rien (User
+// n'implémente pas MustVerifyEmail, et ce back-office n'a aucun flux
+// d'e-mail de vérification — les comptes sont créés par un Admin). Retiré
+// des groupes ci-dessous plutôt que de simuler une vérification qui n'a
+// pas de sens dans ce produit.
+//
+// Correction (ACL) : rien n'empêchait un compte citoyen (role_id=5, créé
+// depuis l'app mobile, même table `users` que ce back-office) de se
+// connecter ici — Fortify ne vérifie que l'email/mot de passe, aucun rôle.
+// 'role:1,2,3,4' est donc ajouté sur tous les groupes authentifiés
+// ci-dessous pour réserver le back-office au personnel (Admin/Agent/
+// Autorité commune/Autorité préfecture).
+Route::middleware([
+    'auth:sanctum', 'notArchived', 'isActived',
+    config('jetstream.auth_session'),
+    // 7 = Operateur : accède au tableau de bord et aux missions, pas aux comptes.
+    'role:1,2,3,4,7',
+])->group(function () {
+    Route::get('/dashboard/signalement/signales', [CarPositionController::class, 'index'])->name('signales');
+    Route::get('/dashboard/signalement/enleves', [CarPositionController::class, 'index2'])->name('enleves');
+    Route::get('/dashboard/signalement/encours', [CarPositionController::class, 'index3'])->name('encours');
+    Route::get('/dashboard/signalement/non-resolus', [CarPositionController::class, 'nonResolus'])->name('non_resolus');
+    Route::get('/dashboard/signalement/rejetes', [CarPositionController::class, 'rejetes'])->name('rejetes');
+    Route::get('/dashboard/signalement/{carPosition}', [CarPositionController::class, 'show'])->name('details');
+    Route::get('/dashboard/locatlisation/{carPosition}', [CarPositionController::class, 'locatlisation'])->name('locatlisation');
+    Route::get('/signalements/{carPosition}/pdf', [CarPositionController::class, 'pdf'])->name('pdf');
+    Route::get('/signalements/{carPosition}/pdf_constation', [CarPositionController::class, 'pdf_constation'])->name('pdf_constation');
+    Route::get('/dashboard', [CarPositionController::class, 'infos'])->name('dashboard');
+    // Même écran que /dashboard : doit suivre les mêmes rôles.
+    Route::get('/', [CarPositionController::class, 'infos']);
+});
+
+Route::middleware([
+    'auth:sanctum', 'notArchived', 'isActived',
+    config('jetstream.auth_session'),
+    'role:1,2,3,4',
+])->group(function () {
+
+
+    Route::get('/dashboard/cartographie', [CarPositionController::class, 'maps'])->name('maps');
+    Route::patch('/dashboard/vehicule/{carPosition}', [CarPositionController::class, 'vehicule'])->name('vehicule')->middleware('role:1,2');
+    Route::patch('/dashboard/enlevement/{carPosition}', [CarPositionController::class, 'enlevement'])->name('enlevement')->middleware('role:1,2');
+    Route::patch('/dashboard/infraction/{carPosition}', [CarPositionController::class, 'infraction'])->name('infraction')->middleware('role:1,2');
+    // Route::get('/modifier/motDePasse', [UserController::class, 'modifierMotDePasse']);
+
+
+    // Correction WEB-L-4 : /signature (page autonome, jamais liée depuis
+    // aucun menu/vue) supprimée — dupliquait l'onglet signature déjà
+    // intégré dans show.blade.php, qui utilise signature.store ci-dessous.
+    Route::post('/signature/store/{carPosition}', [CarPositionController::class, 'signaturestore'])->name('signature.store')->middleware('role:1,2');
+});
+
+// Correction ACL : l'approbation est réservée à Admin/Autorité commune/
+// Autorité préfecture — le spec fonctionnel (AUDIT_SENDRA.md §1.1) exclut
+// explicitement l'Agent ("traite les signalements, pas d'accès à
+// l'approbation"), qui pouvait pourtant approuver comme n'importe quel
+// autre rôle staff avant ce correctif.
+Route::middleware([
+    'auth:sanctum', 'notArchived', 'isActived',
+    config('jetstream.auth_session'),
+    'role:1,3,4',
+])->group(function () {
+    Route::get('/dashboard/approbations', [CarPositionController::class, 'approbations'])->name('approbations.index');
+    Route::patch('/dashboard/approbation/{carPosition}', [CarPositionController::class, 'approbation'])->name('approbation');
+});
+
+// Correction WEB-C-1 : ajout de 'role:1' (Admin uniquement) — auparavant
+// n'importe quel compte actif (Agent, Autorité...) pouvait créer ou
+// promouvoir un compte Admin en atteignant ces routes directement.
+Route::middleware([
+    'auth:sanctum', 'notArchived', 'isActived',
+    config('jetstream.auth_session'),
+    'role:1',
+])->group(function () {
+    Route::get('/dashboard/comptes/ajouter', [UserController::class, 'ajouter'])->name('ajouter');
+    Route::get('/dashboard/comptes/admin', [UserController::class, 'admin'])->name('admin');
+    Route::get('/dashboard/comptes/agents', [UserController::class, 'agents'])->name('agents');
+    Route::get('/dashboard/comptes/autorites', [UserController::class, 'autorites'])->name('autorites');
+    Route::get('/dashboard/comptes/utilisateurs', [UserController::class, 'utilisateurs'])->name('utilisateurs');
+    Route::get('/dashboard/comptes/operateurs', [UserController::class, 'operateurs'])->name('operateurs');
+    // Correction WEB-M-1 : route déclarée avant le wildcard {user} ci-dessous,
+    // sinon "citoyens" serait interprété comme un id de compte.
+    Route::get('/dashboard/comptes/citoyens', [UserController::class, 'citoyens'])->name('citoyens');
+    Route::post('/ajouter', [UserController::class, 'store'])->name('ajouter.compte');
+
+    Route::resource('/dashboard/communes', CommuneController::class);
+    Route::prefix('/dashboard/pointage')->name('attendance.')->controller(\App\Http\Controllers\AttendanceController::class)->group(function () {
+        Route::get('/', 'index')->name('index');
+        Route::get('/sites', 'sites')->name('sites');
+        Route::get('/sites/creer', 'createSite')->name('sites.create');
+        Route::post('/sites', 'storeSite')->name('sites.store');
+        Route::get('/sites/{site}/modifier', 'editSite')->name('sites.edit');
+        Route::put('/sites/{site}', 'updateSite')->name('sites.update');
+        Route::get('/affectations', 'assignments')->name('assignments');
+        Route::post('/affectations', 'storeAssignment')->name('assignments.store');
+        Route::patch('/affectations/{assignment}/desactiver', 'disableAssignment')->name('assignments.disable');
+        Route::patch('/inscriptions/{enrollment}/valider', 'approveEnrollment')->name('enrollments.approve');
+        Route::patch('/inscriptions/{enrollment}/reinitialiser-telephone', 'resetDevice')->name('enrollments.reset-device');
+        Route::patch('/inscriptions/{enrollment}/desactiver', 'disableEnrollment')->name('enrollments.disable');
+        Route::delete('/inscriptions/{enrollment}', 'destroyEnrollment')->name('enrollments.destroy');
+    });
+    Route::resource('/dashboard/fourrieres', PoundController::class)
+        ->parameters(['fourrieres'=>'pound'])
+        ->names([
+            'index'=>'pounds.index','create'=>'pounds.create','store'=>'pounds.store','show'=>'pounds.show',
+            'edit'=>'pounds.edit','update'=>'pounds.update','destroy'=>'pounds.destroy',
+        ]);
+
+
+    Route::get('/dashboard/comptes/{user}', [UserController::class, 'show'])->name('modifier');
+    Route::patch('/dashboard/comptes/{user}', [UserController::class, 'modifier'])->name('modifier.compte');
+    // Le champ "Mot De Passe" du formulaire Modifier n'a jamais été relié à
+    // rien côté backend (ni validé, ni lu) — un Admin qui le remplissait
+    // voyait "succès" sans que rien ne change. Route dédiée à la place,
+    // qui génère un mot de passe aléatoire et le transmet par e-mail
+    // (jamais saisi en clair par l'Admin).
+    Route::post('/dashboard/comptes/{user}/reset-password', [UserController::class, 'resetPassword'])->name('reset-password');
+
+    // Archivage d'un compte qui n'est plus affilié à SENDRA : il disparaît
+    // des listes, ne peut plus se connecter et sort des destinataires des
+    // e-mails d'approbation. Volontairement pas un DELETE en base :
+    // `car_positions.user_id` et `car_positions.agent_id` sont en
+    // ON DELETE CASCADE, la suppression de la ligne emporterait tous les
+    // signalements du compte.
+    Route::delete('/dashboard/comptes/{user}', [UserController::class, 'destroy'])->name('supprimer.compte');
+    Route::patch('/dashboard/comptes/{user}/restaurer', [UserController::class, 'restaurer'])->name('restaurer.compte');
+
+    // Correction WEB-H-2 : save_agents/save_admin/save_autorites pointaient
+    // vers des méthodes UserController inexistantes (500 au moindre appel),
+    // et aucun formulaire ne les utilisait — store()/modifier() gèrent déjà
+    // la création/modification pour les 4 rôles staff via le champ 'role'.
+    // Correction WEB-M-5 : route /test retirée (fuite du hash de mot de
+    // passe de l'utilisateur connecté par e-mail vers une adresse en dur).
+});
+
+Route::middleware([
+    'auth:sanctum', 'notArchived',
+    config('jetstream.auth_session'),
+    // 7 = Operateur : c'est la page de changement de mot de passe imposé à la
+    // première connexion. Sans lui, tout compte Operateur tombe en 403 juste
+    // après s'être connecté, sans aucun moyen d'aller plus loin.
+    'role:1,2,3,4,7',
+])->group(function () {
+    Route::get('/modifier/motDePasse', [UserController::class, 'modifierMotDePasse']);
+    Route::patch('/motDePasse', [UserController::class, 'modifierMotDePasse2'])->name('motDePasse');
+});
+
+// mame.bousso@sendra.sn
+
+// Son propre profil et son mot de passe : accessibles à tout compte du staff,
+// y compris l'Operateur, qui n'a pas accès au reste de ce groupe.
+Route::middleware([
+    'auth:sanctum', 'notArchived',
+    config('jetstream.auth_session'),
+    'role:1,2,3,4,7',
+])->group(function () {
+    Route::patch('/update/profil', [UserController::class, 'update'])->name('update.profil');
+    Route::patch('/update/pass', [UserController::class, 'updatepass'])->name('update.pass');
+});
+
+// Missions : Admin et Operateur. Le compte rendu de direction confie la
+// création des missions à l'Operateur ; le reste de son périmètre est à
+// préciser, d'où un groupe dédié plutôt qu'un ajout au groupe Admin.
+Route::middleware([
+    'auth:sanctum', 'notArchived', 'isActived',
+    config('jetstream.auth_session'),
+    'role:1,7',
+])->group(function () {
+    Route::get('/dashboard/missions', [MissionController::class, 'index'])->name('missions.index');
+    Route::get('/dashboard/missions/creer', [MissionController::class, 'create'])->name('missions.create');
+    Route::post('/dashboard/missions', [MissionController::class, 'store'])->name('missions.store');
+    Route::get('/dashboard/missions/{mission}', [MissionController::class, 'show'])->name('missions.show');
+    Route::get('/dashboard/missions/{mission}/modifier', [MissionController::class, 'edit'])->name('missions.edit');
+    Route::put('/dashboard/missions/{mission}', [MissionController::class, 'update'])->name('missions.update');
+    Route::delete('/dashboard/missions/{mission}', [MissionController::class, 'destroy'])->name('missions.destroy');
+});

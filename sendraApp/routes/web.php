@@ -5,6 +5,7 @@ use App\Http\Controllers\UserController;
 use App\Http\Controllers\MissionController;
 use App\Http\Controllers\CommuneController;
 use App\Http\Controllers\PoundController;
+use App\Http\Controllers\ContactMessageController;
 use App\Models\CarPosition;
 use App\Models\User;
 use Illuminate\Support\Facades\Route;
@@ -130,6 +131,11 @@ Route::middleware([
             'edit'=>'pounds.edit','update'=>'pounds.update','destroy'=>'pounds.destroy',
         ]);
 
+
+    // Messages du formulaire de contact du site web : Admin uniquement.
+    Route::get('/dashboard/messages-site', [ContactMessageController::class, 'index'])->name('contact-messages.index');
+    Route::get('/dashboard/messages-site/{contactMessage}', [ContactMessageController::class, 'show'])->name('contact-messages.show');
+    Route::patch('/dashboard/messages-site/{contactMessage}', [ContactMessageController::class, 'update'])->name('contact-messages.update');
 
     Route::get('/dashboard/comptes/{user}', [UserController::class, 'show'])->name('modifier');
     Route::patch('/dashboard/comptes/{user}', [UserController::class, 'modifier'])->name('modifier.compte');

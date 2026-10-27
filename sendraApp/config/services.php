@@ -39,4 +39,10 @@ return [
         'storage_url' => env('BACKEND_STORAGE_URL', 'https://backend.sendra.sn/storage'),
     ],
 
+    // Clé partagée avec le site web (variable SENDRA_SITE_CONTACT_KEY côté
+    // Vercel) : seul le serveur du site peut déposer des messages de contact.
+    'site_contact' => [
+        'key' => env('SENDRA_SITE_CONTACT_KEY'),
+    ],
+
 ];
