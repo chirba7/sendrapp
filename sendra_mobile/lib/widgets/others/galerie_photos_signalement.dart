@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:walletium/services/offline_signalement_service.dart';
+import 'package:walletium/widgets/others/photo_reseau.dart';
 
 /// Une photo affichable d'un signalement.
 class PhotoAffichee {
@@ -64,13 +65,21 @@ class _GaleriePhotosSignalementState extends State<GaleriePhotosSignalement> {
       );
     }
 
+    // Décodage à la taille réellement affichée (au lieu d'une valeur fixe) :
+    // moins de mémoire et un défilement fluide sur les petits téléphones.
+    final largeur = MediaQuery.sizeOf(context).width;
+
     return Column(
       children: [
         Text(
           photos.length > 1
               ? 'Faites défiler les ${photos.length} photos · appuyez pour agrandir'
               : 'Appuyez pour agrandir l\'image',
-          style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+          textAlign: TextAlign.center,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style:
+              const TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 10),
         Container(
@@ -79,7 +88,7 @@ class _GaleriePhotosSignalementState extends State<GaleriePhotosSignalement> {
             borderRadius: BorderRadius.circular(12),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.1),
+                color: Colors.black.withValues(alpha: 0.1),
                 spreadRadius: 1,
                 blurRadius: 10,
                 offset: const Offset(0, 3),
@@ -96,7 +105,8 @@ class _GaleriePhotosSignalementState extends State<GaleriePhotosSignalement> {
                   onPageChanged: (i) => setState(() => _index = i),
                   itemBuilder: (context, i) => GestureDetector(
                     onTap: () => _pleinEcran(context, photos, i),
-                    child: _image(photos[i].url, BoxFit.cover, cacheWidth: 1000),
+                    child:
+                        _image(photos[i].url, BoxFit.cover, largeur: largeur),
                   ),
                 ),
                 if (photos[_index].libelle != null)
@@ -142,7 +152,7 @@ class _GaleriePhotosSignalementState extends State<GaleriePhotosSignalement> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: Colors.black.withOpacity(0.55),
+        color: Colors.black.withValues(alpha: 0.55),
         borderRadius: BorderRadius.circular(10),
       ),
       child: Text(
@@ -152,7 +162,8 @@ class _GaleriePhotosSignalementState extends State<GaleriePhotosSignalement> {
     );
   }
 
-  void _pleinEcran(BuildContext context, List<PhotoAffichee> photos, int depart) {
+  void _pleinEcran(
+      BuildContext context, List<PhotoAffichee> photos, int depart) {
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => _PhotosPleinEcran(photos: photos, depart: depart),
@@ -175,6 +186,9 @@ class _PhotosPleinEcranState extends State<_PhotosPleinEcran> {
   late final PageController _controller =
       PageController(initialPage: widget.depart);
   late int _index = widget.depart;
+  // Quarts de tour appliqués à l'affichage, photo par photo : permet de
+  // redresser une ancienne photo enregistrée couchée.
+  final Map<int, int> _quarts = {};
 
   @override
   void dispose() {
@@ -193,9 +207,18 @@ class _PhotosPleinEcranState extends State<_PhotosPleinEcran> {
         title: Text(
           [
             if (photo.libelle != null) photo.libelle!,
-            if (widget.photos.length > 1) '${_index + 1}/${widget.photos.length}',
+            if (widget.photos.length > 1)
+              '${_index + 1}/${widget.photos.length}',
           ].join(' · '),
         ),
+        actions: [
+          IconButton(
+            tooltip: 'Pivoter la photo',
+            icon: const Icon(Icons.rotate_right_rounded),
+            onPressed: () => setState(
+                () => _quarts[_index] = ((_quarts[_index] ?? 0) + 1) % 4),
+          ),
+        ],
       ),
       body: PageView.builder(
         controller: _controller,
@@ -203,25 +226,25 @@ class _PhotosPleinEcranState extends State<_PhotosPleinEcran> {
         onPageChanged: (i) => setState(() => _index = i),
         itemBuilder: (context, i) => InteractiveViewer(
           maxScale: 4,
-          child: Center(child: _image(widget.photos[i].url, BoxFit.contain)),
+          child: Center(
+            child: RotatedBox(
+              quarterTurns: _quarts[i] ?? 0,
+              child: _image(widget.photos[i].url, BoxFit.contain),
+            ),
+          ),
         ),
       ),
     );
   }
 }
 
-Widget _image(String url, BoxFit fit, {int? cacheWidth}) {
-  return Image.network(
+/// Photo mise en cache sur le téléphone : elle n'est téléchargée qu'une
+/// fois, puis s'affiche instantanément (liste, fiche, plein écran).
+Widget _image(String url, BoxFit fit, {double? largeur}) {
+  return PhotoReseau(
     url,
     fit: fit,
-    // Décode à la taille d'affichage plutôt qu'en pleine résolution.
-    cacheWidth: cacheWidth,
-    loadingBuilder: (context, child, progression) => progression == null
-        ? child
-        : const Center(child: CircularProgressIndicator()),
-    errorBuilder: (context, error, stack) => const ColoredBox(
-      color: Color(0xFFEAF1ED),
-      child: Center(child: Icon(Icons.broken_image_outlined)),
-    ),
+    largeur: largeur,
+    attente: const Center(child: CircularProgressIndicator()),
   );
 }

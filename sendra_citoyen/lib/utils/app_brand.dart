@@ -14,7 +14,7 @@ class AppBrand {
 
   /// Pas de logo transparent pour l'application citoyen : le menu affiche
   /// l'icône de l'application et le nom en blanc sur le vert.
-  static const String? drawerLogo = 'assets/images/logo_epavie.png';
+  static const String drawerLogo = 'assets/images/logo_epavie.png';
 
   /// Nom de l'application en logotype (texte « epAvie », lettres noires et
   /// A recyclage vert), pour le splash et l'écran de bienvenue sur fond vert.
@@ -30,32 +30,33 @@ class AppBrand {
   static const List<GuideStep> guide = [
     GuideStep(
       icon: Icons.waving_hand_rounded,
-      title: "Bienvenue sur epaVie",
+      title: 'Bienvenue sur epaVie',
       text:
           "Aidez à libérer l'espace public en signalant les véhicules abandonnés près de chez vous.",
     ),
     GuideStep(
       icon: Icons.add_a_photo_rounded,
-      title: "Signaler en 1 minute",
+      title: 'Signaler en 1 minute',
       text:
-          "Touchez « Signaler », prenez une photo du véhicule : la position est ajoutée automatiquement.",
+          'Touchez « Signaler », prenez une photo du véhicule : la position est ajoutée automatiquement.',
     ),
     GuideStep(
       icon: Icons.track_changes_rounded,
-      title: "Suivre vos signalements",
+      title: 'Suivre vos signalements',
       text:
           "L'onglet Participations affiche chacun de vos signalements et l'avancement de son traitement.",
     ),
     GuideStep(
       icon: Icons.map_rounded,
-      title: "La cartographie",
-      text: "Visualisez les signalements autour de vous sur la carte.",
+      title: 'La cartographie',
+      text: 'Visualisez les signalements autour de vous sur la carte.',
     ),
   ];
 }
 
 class GuideStep {
-  const GuideStep({required this.icon, required this.title, required this.text});
+  const GuideStep(
+      {required this.icon, required this.title, required this.text});
   final IconData icon;
   final String title;
   final String text;

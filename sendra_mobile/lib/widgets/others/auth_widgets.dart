@@ -39,7 +39,8 @@ class AuthBrand extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: EdgeInsets.fromLTRB(18, compact ? 16 : 22, 18, compact ? 14 : 20),
+      padding:
+          EdgeInsets.fromLTRB(18, compact ? 16 : 22, 18, compact ? 14 : 20),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(24),

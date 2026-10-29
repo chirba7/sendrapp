@@ -472,7 +472,8 @@ class _SignInScreenState extends State<SignInScreen> {
               });
             } catch (_) {
               setDialogState(() {
-                error = 'Connexion indisponible. Vérifiez votre accès à Internet.';
+                error =
+                    'Connexion indisponible. Vérifiez votre accès à Internet.';
                 isSending = false;
               });
             }

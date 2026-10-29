@@ -49,8 +49,9 @@ class _SignUpFinalScreenState extends State<SignUpFinalScreen> {
             _error = body['message']?.toString() ?? 'Inscription impossible.');
       }
     } catch (_) {
-      if (mounted)
+      if (mounted) {
         setState(() => _error = 'Connexion indisponible. Réessayez.');
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }

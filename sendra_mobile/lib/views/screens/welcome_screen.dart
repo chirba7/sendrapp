@@ -25,8 +25,14 @@ class WelcomeScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     const points = AppBrand.isPro
         ? <(IconData, String)>[
-            (Icons.assignment_turned_in_rounded, 'Prenez en charge les signalements proches'),
-            (Icons.fact_check_rounded, 'Constatez, annotez les dommages et signez le PV'),
+            (
+              Icons.assignment_turned_in_rounded,
+              'Prenez en charge les signalements proches'
+            ),
+            (
+              Icons.fact_check_rounded,
+              'Constatez, annotez les dommages et signez le PV'
+            ),
             (Icons.local_shipping_rounded, 'Suivez vos missions d’enlèvement'),
           ]
         : <(IconData, String)>[
@@ -46,7 +52,8 @@ class WelcomeScreen extends StatelessWidget {
           fit: StackFit.expand,
           children: [
             const Positioned(top: -90, right: -70, child: _Circle(260, .07)),
-            const Positioned(bottom: -130, left: -105, child: _Circle(330, .06)),
+            const Positioned(
+                bottom: -130, left: -105, child: _Circle(330, .06)),
             SafeArea(
               child: LayoutBuilder(
                 builder: (context, c) => SingleChildScrollView(
@@ -105,7 +112,8 @@ class WelcomeScreen extends StatelessWidget {
                           ),
                           const Spacer(flex: 2),
                           const SizedBox(height: 28),
-                          for (final p in points) _Point(icon: p.$1, text: p.$2),
+                          for (final p in points)
+                            _Point(icon: p.$1, text: p.$2),
                           const Spacer(),
                           const SizedBox(height: 28),
                           SizedBox(

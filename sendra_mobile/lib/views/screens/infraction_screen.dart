@@ -12,10 +12,10 @@ class InfractionForm extends StatefulWidget {
   final int
       signalementId; // Identifiant de l'infraction à mettre à jour, ne sera jamais nul
 
-  InfractionForm({required this.signalementId});
+  const InfractionForm({super.key, required this.signalementId});
 
   @override
-  _InfractionFormState createState() => _InfractionFormState();
+  State<InfractionForm> createState() => _InfractionFormState();
 }
 
 class _InfractionFormState extends State<InfractionForm> {
@@ -62,9 +62,6 @@ class _InfractionFormState extends State<InfractionForm> {
       'Authorization': 'Bearer $token',
     });
 
-    print('DONNEES DU GET: ${response.body}');
-    print(response.statusCode);
-
     if (response.statusCode == 200) {
       final data = json.decode(response.body);
       setState(() {
@@ -77,8 +74,9 @@ class _InfractionFormState extends State<InfractionForm> {
             : (data['nuit'] == 1 ? 'Nuit' : 'Jour');
       });
     } else {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
+        const SnackBar(
             content: Text('Échec du chargement des détails de l\'infraction')),
       );
     }
@@ -111,24 +109,17 @@ class _InfractionFormState extends State<InfractionForm> {
         }),
       );
 
-      print('Données envoyées :');
-      print('-Adresse: ${_adresseController.text}');
-      print('-Motif: ${_motifController.text}');
-      print('-Lieu: $_lieu');
-      print('-Météo: $_meteo');
-      print('-Nuit: $nuit');
-      print('-Pluie: $pluie');
-      print('Response body: ${response.body}');
-
       if (response.statusCode == 200) {
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
+          const SnackBar(
             content: Text('Infraction mise à jour avec succès'),
             duration: Duration(seconds: 1),
           ),
         );
 
-        Future.delayed(Duration(seconds: 1), () {
+        Future.delayed(const Duration(seconds: 1), () {
+          if (!mounted) return;
           Navigator.of(context).push(
             MaterialPageRoute(
               builder: (context) =>
@@ -140,6 +131,7 @@ class _InfractionFormState extends State<InfractionForm> {
         final responseData = json.decode(response.body);
         if (responseData is! Map || responseData['errorList'] is! Map) {
           // 409 (pris en charge par un autre agent), 423 (déjà transmis)…
+          if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(
             content: Text(responseData is Map && responseData['message'] != null
                 ? responseData['message'].toString()
@@ -154,13 +146,14 @@ class _InfractionFormState extends State<InfractionForm> {
           return '$field: $messages';
         }).join('\n');
 
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Erreur de validation: \n$errorMessages')),
         );
       }
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
+        const SnackBar(
             content: Text('Veuillez remplir tous les champs obligatoires')),
       );
     }
@@ -173,18 +166,22 @@ class _InfractionFormState extends State<InfractionForm> {
         title: const Text('Infraction'),
         actions: [
           IconButton(
-            icon: Icon(Icons.list),
+            icon: const Icon(Icons.list),
             onPressed: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => InfractionListPage()),
+                MaterialPageRoute(
+                    builder: (context) => const InfractionListPage()),
               );
             },
           ),
         ],
       ),
-      body: SafeArea(child: Padding(
-        padding: const EdgeInsets.all(25.0),
+      body: SafeArea(
+          child: Padding(
+        // Marges réduites sur petit écran pour laisser la place au contenu.
+        padding:
+            EdgeInsets.all(MediaQuery.sizeOf(context).width < 360 ? 16 : 25),
         child: Form(
           key: _formKey,
           child: ListView(
@@ -211,52 +208,61 @@ class _InfractionFormState extends State<InfractionForm> {
                 ),
               ),
               DropdownButtonFormField<String>(
-                value: _motifs.contains(_motifController.text)
-                    ? _motifController.text : null,
+                initialValue: _motifs.contains(_motifController.text)
+                    ? _motifController.text
+                    : null,
                 isExpanded: true,
-                decoration: const InputDecoration(labelText: 'Motif de l’infraction'),
-                items: _motifs.map((motif) => DropdownMenuItem(
-                  value: motif, child: Text(motif, overflow: TextOverflow.ellipsis),
-                )).toList(),
-                onChanged: (value) => setState(() => _motifController.text = value ?? ''),
-                validator: (value) => value == null ? 'Choisissez un motif.' : null,
+                decoration:
+                    const InputDecoration(labelText: 'Motif de l’infraction'),
+                items: _motifs
+                    .map((motif) => DropdownMenuItem(
+                          value: motif,
+                          child: Text(motif, overflow: TextOverflow.ellipsis),
+                        ))
+                    .toList(),
+                onChanged: (value) =>
+                    setState(() => _motifController.text = value ?? ''),
+                validator: (value) =>
+                    value == null ? 'Choisissez un motif.' : null,
               ),
               TextFormField(
                 controller: _explicationController,
                 maxLines: 3,
-                decoration: const InputDecoration(labelText: 'Explication',
+                decoration: const InputDecoration(
+                    labelText: 'Explication',
                     hintText: 'Justifiez le motif retenu'),
                 validator: (value) => value == null || value.trim().isEmpty
-                    ? 'Expliquez le motif.' : null,
+                    ? 'Expliquez le motif.'
+                    : null,
               ),
-              SizedBox(height: 20),
+              const SizedBox(height: 20),
               const Text('Lieu',
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
               const SizedBox(height: 10),
               _choiceRow(const {'PUBLIC': '🏛️  Public', 'PRIVE': '🔒  Privé'},
                   _lieu, (value) => setState(() => _lieu = value)),
               if (_isSubmitting && _lieu == null)
-                Padding(
-                  padding: const EdgeInsets.only(top: 8.0),
+                const Padding(
+                  padding: EdgeInsets.only(top: 8.0),
                   child: Text(
                     'Ce champ est obligatoire',
                     style: TextStyle(color: Colors.red),
                   ),
                 ),
-              SizedBox(height: 20),
+              const SizedBox(height: 20),
               const Text('Moment du constat',
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
               const SizedBox(height: 10),
               _timeChoiceRow(),
               if (_isSubmitting && _meteo == null)
-                Padding(
-                  padding: const EdgeInsets.only(top: 8.0),
+                const Padding(
+                  padding: EdgeInsets.only(top: 8.0),
                   child: Text(
                     'Ce champ est obligatoire',
                     style: TextStyle(color: Colors.red),
                   ),
                 ),
-              SizedBox(height: 30),
+              const SizedBox(height: 30),
               ElevatedButton(
                 onPressed: () async {
                   if (_formKey.currentState!.validate() &&
@@ -273,13 +279,13 @@ class _InfractionFormState extends State<InfractionForm> {
                     });
                   }
                 },
-                child: Text(
-                  'Mettre à jour',
-                  style: TextStyle(fontSize: 16),
-                ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.green[700],
                   foregroundColor: Colors.white,
+                ),
+                child: const Text(
+                  'Mettre à jour',
+                  style: TextStyle(fontSize: 16),
                 ),
               ),
             ],
@@ -288,8 +294,6 @@ class _InfractionFormState extends State<InfractionForm> {
       )),
     );
   }
-
-
 
   Widget _choiceRow(
     Map<String, String> choices,
@@ -403,23 +407,35 @@ class _InfractionFormState extends State<InfractionForm> {
         ),
         child: Stack(
           children: [
-            Center(
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  icon,
-                  const SizedBox(width: 10),
-                  Text(
-                    value,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 16,
-                    ),
-                  ),
-                ],
-              ),
-            ),
+            // Tuile étroite (petit écran, 3 tuiles côte à côte) : l'icône
+            // passe au-dessus du libellé au lieu de déborder sur le côté.
+            LayoutBuilder(builder: (context, c) {
+              final libelle = Text(
+                value,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 16,
+                ),
+              );
+              return Center(
+                child: c.maxWidth < 110
+                    ? Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [icon, const SizedBox(height: 4), libelle],
+                      )
+                    : Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          icon,
+                          const SizedBox(width: 10),
+                          Flexible(child: libelle),
+                        ],
+                      ),
+              );
+            }),
             if (selected)
               const Positioned(
                 right: 8,

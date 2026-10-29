@@ -59,6 +59,7 @@ class ResultatEnvoi {
 class PendingSignalement {
   final String uuid;
   final String titre;
+
   /// Voiture, Moto ou Camion (bulles du formulaire) — remplace le titre.
   final String vehicleKind;
   final String description;
@@ -121,7 +122,8 @@ class PendingSignalement {
 /// crée pas de doublon (voir CarPositionController::store()).
 class OfflineSignalementService {
   OfflineSignalementService._();
-  static final OfflineSignalementService instance = OfflineSignalementService._();
+  static final OfflineSignalementService instance =
+      OfflineSignalementService._();
 
   static const _uuidGen = Uuid();
   StreamSubscription<List<ConnectivityResult>>? _subscription;
@@ -235,7 +237,8 @@ class OfflineSignalementService {
 
       // 422 réel (image invalide) : rejet définitif, inutile de réessayer.
       if (reponse.statusCode == 422) {
-        return ResultatEnvoi.rejete(message.isNotEmpty ? message : 'Signalement refusé.');
+        return ResultatEnvoi.rejete(
+            message.isNotEmpty ? message : 'Signalement refusé.');
       }
 
       // 401/403 (jeton expiré), 413 (payload trop volumineux), 5xx... : on

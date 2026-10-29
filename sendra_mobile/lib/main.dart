@@ -1,7 +1,7 @@
+import 'package:flutter/foundation.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 import 'package:walletium/routes/routes.dart';
 import 'package:walletium/services/offline_signalement_service.dart';
@@ -11,6 +11,28 @@ import 'utils/sendra_theme.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // En production, les traces de débogage ne doivent ni ralentir l'app ni
+  // exposer de données (réponses d'API, jetons) dans les logs du téléphone.
+  if (kReleaseMode) {
+    debugPrint = (String? message, {int? wrapWidth}) {};
+  }
+
+  // En production, un bloc qui plante affichait une zone grise ou blanche
+  // muette. On montre un encart lisible : le reste de la page reste
+  // utilisable et le message peut être remonté tel quel.
+  ErrorWidget.builder = (FlutterErrorDetails details) => Material(
+        color: const Color(0xFFFFF4E5),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Text(
+            'Cette partie n’a pas pu s’afficher.\n${details.exceptionAsString()}',
+            maxLines: 6,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(color: Color(0xFF8A4B00), fontSize: 12.5),
+          ),
+        ),
+      );
 
   SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitDown,
@@ -39,36 +61,35 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ScreenUtilInit(
-      designSize: const Size(414, 896),
-      minTextAdapt: true,
-      builder: (_, child) => GetMaterialApp(
-        debugShowCheckedModeBanner: false,
-        title: 'epaVie',
-        theme: SendraTheme.light,
-        initialRoute: Routes.splashScreen,
-        getPages: Routes.list,
-        // Transition unique, courte et fluide pour toutes les pages.
-        defaultTransition: Transition.cupertino,
-        transitionDuration: const Duration(milliseconds: 280),
-        // Remarque : l'ancien GetObserver écrivait la route courante dans
-        // SharedPreferences à CHAQUE navigation (écriture disque sur le
-        // thread UI) alors que cette valeur n'était plus jamais relue.
-        builder: (context, widget) {
-          // Respecte la taille de texte du téléphone, dans une plage qui
-          // ne casse pas les mises en page.
-          final mq = MediaQuery.of(context);
-          return MediaQuery(
-            data: mq.copyWith(
-              textScaler: mq.textScaler.clamp(
-                minScaleFactor: 0.9,
-                maxScaleFactor: 1.15,
-              ),
+    // Tailles en dp natifs de Flutter (plus de mise à l'échelle sur une
+    // maquette 414 × 896) : les écrans s'adaptent par leurs contraintes,
+    // y compris sur un Fold fermé où le texte devenait minuscule.
+    return GetMaterialApp(
+      debugShowCheckedModeBanner: false,
+      title: 'epaVie',
+      theme: SendraTheme.light,
+      initialRoute: Routes.splashScreen,
+      getPages: Routes.list,
+      // Transition unique, courte et fluide pour toutes les pages.
+      defaultTransition: Transition.cupertino,
+      transitionDuration: const Duration(milliseconds: 280),
+      // Remarque : l'ancien GetObserver écrivait la route courante dans
+      // SharedPreferences à CHAQUE navigation (écriture disque sur le
+      // thread UI) alors que cette valeur n'était plus jamais relue.
+      builder: (context, widget) {
+        // Respecte la taille de texte du téléphone, dans une plage qui
+        // ne casse pas les mises en page.
+        final mq = MediaQuery.of(context);
+        return MediaQuery(
+          data: mq.copyWith(
+            textScaler: mq.textScaler.clamp(
+              minScaleFactor: 0.9,
+              maxScaleFactor: 1.15,
             ),
-            child: widget!,
-          );
-        },
-      ),
+          ),
+          child: widget!,
+        );
+      },
     );
   }
 }

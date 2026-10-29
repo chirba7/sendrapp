@@ -12,10 +12,10 @@ class InfractionForm extends StatefulWidget {
   final int
       signalementId; // Identifiant de l'infraction à mettre à jour, ne sera jamais nul
 
-  InfractionForm({required this.signalementId});
+  const InfractionForm({super.key, required this.signalementId});
 
   @override
-  _InfractionFormState createState() => _InfractionFormState();
+  State<InfractionForm> createState() => _InfractionFormState();
 }
 
 class _InfractionFormState extends State<InfractionForm> {
@@ -45,9 +45,6 @@ class _InfractionFormState extends State<InfractionForm> {
       'Authorization': 'Bearer $token',
     });
 
-    print('DONNEES DU GET: ${response.body}');
-    print(response.statusCode);
-
     if (response.statusCode == 200) {
       final data = json.decode(response.body);
       setState(() {
@@ -59,8 +56,9 @@ class _InfractionFormState extends State<InfractionForm> {
             : (data['nuit'] == 1 ? 'Nuit' : 'Jour');
       });
     } else {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
+        const SnackBar(
             content: Text('Échec du chargement des détails de l\'infraction')),
       );
     }
@@ -92,24 +90,17 @@ class _InfractionFormState extends State<InfractionForm> {
         }),
       );
 
-      print('Données envoyées :');
-      print('-Adresse: ${_adresseController.text}');
-      print('-Motif: ${_motifController.text}');
-      print('-Lieu: $_lieu');
-      print('-Météo: $_meteo');
-      print('-Nuit: $nuit');
-      print('-Pluie: $pluie');
-      print('Response body: ${response.body}');
-
       if (response.statusCode == 200) {
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
+          const SnackBar(
             content: Text('Infraction mise à jour avec succès'),
             duration: Duration(seconds: 1),
           ),
         );
 
-        Future.delayed(Duration(seconds: 1), () {
+        Future.delayed(const Duration(seconds: 1), () {
+          if (!mounted) return;
           Navigator.of(context).push(
             MaterialPageRoute(
               builder: (context) =>
@@ -126,13 +117,14 @@ class _InfractionFormState extends State<InfractionForm> {
           return '$field: $messages';
         }).join('\n');
 
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Erreur de validation: \n$errorMessages')),
         );
       }
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
+        const SnackBar(
             content: Text('Veuillez remplir tous les champs obligatoires')),
       );
     }
@@ -145,78 +137,87 @@ class _InfractionFormState extends State<InfractionForm> {
         title: const Text('Infraction'),
         actions: [
           IconButton(
-            icon: Icon(Icons.list),
+            icon: const Icon(Icons.list),
             onPressed: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => InfractionListPage()),
+                MaterialPageRoute(
+                    builder: (context) => const InfractionListPage()),
               );
             },
           ),
         ],
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(25.0),
-        child: Form(
-          key: _formKey,
-          child: ListView(
-            children: [
-              _buildField('Adresse précise', _adresseController),
-              _buildField('Motif de l\'infraction', _motifController),
-              SizedBox(height: 20),
-              const Text('Lieu',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-              const SizedBox(height: 10),
-              _choiceRow(const {'PUBLIC': '🏛️  Public', 'PRIVE': '🔒  Privé'},
-                  _lieu, (value) => setState(() => _lieu = value)),
-              if (_isSubmitting && _lieu == null)
-                Padding(
-                  padding: const EdgeInsets.only(top: 8.0),
-                  child: Text(
-                    'Ce champ est obligatoire',
-                    style: TextStyle(color: Colors.red),
+      body: SafeArea(
+        top: false,
+        child: Padding(
+          padding:
+              EdgeInsets.all(MediaQuery.sizeOf(context).width < 360 ? 16 : 25),
+          child: Form(
+            key: _formKey,
+            child: ListView(
+              children: [
+                _buildField('Adresse précise', _adresseController),
+                _buildField('Motif de l\'infraction', _motifController),
+                const SizedBox(height: 20),
+                const Text('Lieu',
+                    style:
+                        TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                const SizedBox(height: 10),
+                _choiceRow(
+                    const {'PUBLIC': '🏛️  Public', 'PRIVE': '🔒  Privé'},
+                    _lieu,
+                    (value) => setState(() => _lieu = value)),
+                if (_isSubmitting && _lieu == null)
+                  const Padding(
+                    padding: EdgeInsets.only(top: 8.0),
+                    child: Text(
+                      'Ce champ est obligatoire',
+                      style: TextStyle(color: Colors.red),
+                    ),
+                  ),
+                const SizedBox(height: 20),
+                const Text('Moment du constat',
+                    style:
+                        TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                const SizedBox(height: 10),
+                _timeChoiceRow(),
+                if (_isSubmitting && _meteo == null)
+                  const Padding(
+                    padding: EdgeInsets.only(top: 8.0),
+                    child: Text(
+                      'Ce champ est obligatoire',
+                      style: TextStyle(color: Colors.red),
+                    ),
+                  ),
+                const SizedBox(height: 30),
+                ElevatedButton(
+                  onPressed: () async {
+                    if (_formKey.currentState!.validate() &&
+                        _lieu != null &&
+                        _meteo != null) {
+                      setState(() {
+                        _isSubmitting = true;
+                      });
+                      await _updateInfraction();
+                    } else {
+                      setState(() {
+                        _isSubmitting =
+                            true; // Afficher les erreurs si des champs sont manquants
+                      });
+                    }
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.green[700],
+                    foregroundColor: Colors.white,
+                  ),
+                  child: const Text(
+                    'Mettre à jour',
+                    style: TextStyle(fontSize: 16),
                   ),
                 ),
-              SizedBox(height: 20),
-              const Text('Moment du constat',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-              const SizedBox(height: 10),
-              _timeChoiceRow(),
-              if (_isSubmitting && _meteo == null)
-                Padding(
-                  padding: const EdgeInsets.only(top: 8.0),
-                  child: Text(
-                    'Ce champ est obligatoire',
-                    style: TextStyle(color: Colors.red),
-                  ),
-                ),
-              SizedBox(height: 30),
-              ElevatedButton(
-                onPressed: () async {
-                  if (_formKey.currentState!.validate() &&
-                      _lieu != null &&
-                      _meteo != null) {
-                    setState(() {
-                      _isSubmitting = true;
-                    });
-                    await _updateInfraction();
-                  } else {
-                    setState(() {
-                      _isSubmitting =
-                          true; // Afficher les erreurs si des champs sont manquants
-                    });
-                  }
-                },
-                child: Text(
-                  'Mettre à jour',
-                  style: TextStyle(fontSize: 16),
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.green[700],
-                  foregroundColor: Colors.white,
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -356,23 +357,35 @@ class _InfractionFormState extends State<InfractionForm> {
         ),
         child: Stack(
           children: [
-            Center(
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  icon,
-                  const SizedBox(width: 10),
-                  Text(
-                    value,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 16,
-                    ),
-                  ),
-                ],
-              ),
-            ),
+            // Tuile étroite (petit écran, 3 tuiles côte à côte) : l'icône
+            // passe au-dessus du libellé au lieu de déborder sur le côté.
+            LayoutBuilder(builder: (context, c) {
+              final libelle = Text(
+                value,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 16,
+                ),
+              );
+              return Center(
+                child: c.maxWidth < 110
+                    ? Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [icon, const SizedBox(height: 4), libelle],
+                      )
+                    : Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          icon,
+                          const SizedBox(width: 10),
+                          Flexible(child: libelle),
+                        ],
+                      ),
+              );
+            }),
             if (selected)
               const Positioned(
                 right: 8,

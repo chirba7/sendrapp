@@ -21,13 +21,17 @@ class EtapeAvancement {
   final String? detail;
   final String? date;
 
-  bool get atteinte => statut == 'fait' || statut == 'actuel' || statut == 'echec';
+  bool get atteinte =>
+      statut == 'fait' || statut == 'actuel' || statut == 'echec';
 
   /// Étapes envoyées par le serveur (`avancement`), ou à défaut déduites de
   /// l'état seul (signalement hors ligne ou ancienne réponse).
   static List<EtapeAvancement> depuis(Map<String, dynamic> data) {
     final brut = data['avancement'];
-    if (brut is List && brut.isNotEmpty && brut.first is Map && (brut.first as Map).containsKey('etape')) {
+    if (brut is List &&
+        brut.isNotEmpty &&
+        brut.first is Map &&
+        (brut.first as Map).containsKey('etape')) {
       return [
         for (final e in brut)
           if (e is Map)
@@ -46,8 +50,10 @@ class EtapeAvancement {
     final nonResolu = etat == 'NON RESOLU';
     final enleve = etat == 'ENLEVE';
     final approuve = data['is_approve'] == true || enleve || nonResolu;
-    final constate =
-        data['dommages_saisis'] == true || etat == 'EN COURS' || approuve || rejete;
+    final constate = data['dommages_saisis'] == true ||
+        etat == 'EN COURS' ||
+        approuve ||
+        rejete;
     return [
       EtapeAvancement(
         etape: 'signale',
@@ -70,8 +76,16 @@ class EtapeAvancement {
                 : constate
                     ? 'En attente d’approbation de l’autorité'
                     : 'Approbation de l’autorité',
-        statut: rejete ? 'echec' : approuve ? 'fait' : constate ? 'actuel' : 'a_venir',
-        detail: rejete ? 'Motif : ${data['motif_approbation'] ?? 'non précisé'}' : null,
+        statut: rejete
+            ? 'echec'
+            : approuve
+                ? 'fait'
+                : constate
+                    ? 'actuel'
+                    : 'a_venir',
+        detail: rejete
+            ? 'Motif : ${data['motif_approbation'] ?? 'non précisé'}'
+            : null,
       ),
       EtapeAvancement(
         etape: 'enlevement',
@@ -91,12 +105,20 @@ class EtapeAvancement {
                     : approuve
                         ? 'actuel'
                         : 'a_venir',
-        detail: nonResolu ? 'Motif : ${data['non_removal_reason'] ?? 'non précisé'}' : null,
+        detail: nonResolu
+            ? 'Motif : ${data['non_removal_reason'] ?? 'non précisé'}'
+            : null,
       ),
       EtapeAvancement(
         etape: 'issue',
         libelle: nonResolu ? 'Non résolu' : 'Résolu',
-        statut: enleve ? 'fait' : nonResolu ? 'echec' : rejete ? 'saute' : 'a_venir',
+        statut: enleve
+            ? 'fait'
+            : nonResolu
+                ? 'echec'
+                : rejete
+                    ? 'saute'
+                    : 'a_venir',
       ),
     ];
   }
@@ -156,7 +178,9 @@ class AvancementTimeline extends StatelessWidget {
         children: [
           Text(titre,
               style: const TextStyle(
-                  fontSize: 17, fontWeight: FontWeight.w800, color: SendraTheme.ink)),
+                  fontSize: 17,
+                  fontWeight: FontWeight.w800,
+                  color: SendraTheme.ink)),
           const SizedBox(height: 14),
           for (var i = 0; i < etapes.length; i++)
             _LigneEtape(
@@ -199,15 +223,26 @@ class _LigneEtape extends StatelessWidget {
     final actuelle = etape.statut == 'actuel';
     final echec = etape.statut == 'echec';
 
-    return IntrinsicHeight(
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          SizedBox(
-            width: 34,
-            child: Column(
-              children: [
-                AnimatedContainer(
+    // Pas d'IntrinsicHeight (passe de mesure supplémentaire, fragile selon
+    // la police et la largeur du téléphone) : la ligne prend la hauteur de
+    // son texte, et le rail est posé par-dessus en position absolue.
+    return Stack(
+      children: [
+        if (!derniere)
+          Positioned(
+            left: 15,
+            top: 34,
+            bottom: 4,
+            width: 4,
+            child: _Rail(rempli: railRempli, couleur: couleurRail, delai: index),
+          ),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SizedBox(
+              width: 34,
+              child: Center(
+                child: AnimatedContainer(
                   duration: const Duration(milliseconds: 300),
                   width: 30,
                   height: 30,
@@ -216,95 +251,102 @@ class _LigneEtape extends StatelessWidget {
                     shape: BoxShape.circle,
                     border: Border.all(color: couleur, width: 2),
                     boxShadow: actuelle
-                        ? [BoxShadow(color: couleur.withValues(alpha: .28), spreadRadius: 5)]
+                        ? [
+                            BoxShadow(
+                                color: couleur.withValues(alpha: .28),
+                                spreadRadius: 5)
+                          ]
                         : null,
                   ),
                   child: Icon(_icone(etape),
-                      size: 17, color: atteinte ? Colors.white : SendraTheme.muted),
+                      size: 17,
+                      color: atteinte ? Colors.white : SendraTheme.muted),
                 ),
-                if (!derniere)
-                  Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 4),
-                      child: _Rail(rempli: railRempli, couleur: couleurRail, delai: index),
-                    ),
-                  ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Padding(
-              padding: EdgeInsets.only(top: 4, bottom: derniere ? 8 : 20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Wrap(
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    spacing: 8,
-                    runSpacing: 4,
-                    children: [
-                      Text(
-                        etape.libelle,
-                        style: TextStyle(
-                          fontSize: 15.5,
-                          fontWeight: actuelle || echec ? FontWeight.w800 : FontWeight.w700,
-                          color: echec
-                              ? _rouge
-                              : atteinte
-                                  ? SendraTheme.ink
-                                  : SendraTheme.muted,
-                          decoration: saute ? TextDecoration.lineThrough : null,
-                        ),
-                      ),
-                      if (actuelle)
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: couleur.withValues(alpha: .12),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Text('Étape actuelle',
-                              style: TextStyle(
-                                  fontSize: 11, fontWeight: FontWeight.w700, color: couleur)),
-                        ),
-                    ],
-                  ),
-                  if ((etape.detail ?? '').isNotEmpty) ...[
-                    const SizedBox(height: 3),
-                    Text(etape.detail!,
-                        style: TextStyle(
-                            color: echec ? _rouge : SendraTheme.muted,
-                            fontWeight: echec ? FontWeight.w600 : FontWeight.w400,
-                            fontSize: 13.5,
-                            height: 1.35)),
-                  ],
-                  if (atteinte && (etape.date ?? '').isNotEmpty) ...[
-                    const SizedBox(height: 3),
-                    Row(
-                      children: [
-                        const Icon(Icons.schedule_rounded, size: 14, color: SendraTheme.muted),
-                        const SizedBox(width: 4),
-                        Flexible(
-                          child: Text(etape.date!,
-                              style: const TextStyle(color: SendraTheme.muted, fontSize: 12.5)),
-                        ),
-                      ],
-                    ),
-                  ],
-                ],
               ),
             ),
-          ),
-        ],
-      ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Padding(
+                padding: EdgeInsets.only(top: 4, bottom: derniere ? 8 : 20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Wrap(
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      spacing: 8,
+                      runSpacing: 4,
+                      children: [
+                        Text(
+                          etape.libelle,
+                          style: TextStyle(
+                            fontSize: 15.5,
+                            fontWeight: actuelle || echec
+                                ? FontWeight.w800
+                                : FontWeight.w700,
+                            color: echec
+                                ? _rouge
+                                : atteinte
+                                    ? SendraTheme.ink
+                                    : SendraTheme.muted,
+                            decoration: saute ? TextDecoration.lineThrough : null,
+                          ),
+                        ),
+                        if (actuelle)
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 7, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: couleur.withValues(alpha: .12),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text('Étape actuelle',
+                                style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w700,
+                                    color: couleur)),
+                          ),
+                      ],
+                    ),
+                    if ((etape.detail ?? '').isNotEmpty) ...[
+                      const SizedBox(height: 3),
+                      Text(etape.detail!,
+                          style: TextStyle(
+                              color: echec ? _rouge : SendraTheme.muted,
+                              fontWeight:
+                                  echec ? FontWeight.w600 : FontWeight.w400,
+                              fontSize: 13.5,
+                              height: 1.35)),
+                    ],
+                    if (atteinte && (etape.date ?? '').isNotEmpty) ...[
+                      const SizedBox(height: 3),
+                      Row(
+                        children: [
+                          const Icon(Icons.schedule_rounded,
+                              size: 14, color: SendraTheme.muted),
+                          const SizedBox(width: 4),
+                          Flexible(
+                            child: Text(etape.date!,
+                                style: const TextStyle(
+                                    color: SendraTheme.muted, fontSize: 12.5)),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 }
 
 /// Rail vertical entre deux étapes : se remplit de haut en bas à l'affichage.
 class _Rail extends StatelessWidget {
-  const _Rail({required this.rempli, required this.couleur, required this.delai});
+  const _Rail(
+      {required this.rempli, required this.couleur, required this.delai});
   final bool rempli;
   final Color couleur;
   final int delai;

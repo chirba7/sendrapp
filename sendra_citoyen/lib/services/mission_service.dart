@@ -63,8 +63,9 @@ class MissionService {
         .get(Uri.parse('${Strings.apiURI}missions/$missionId'),
             headers: await _headers())
         .timeout(const Duration(seconds: 20));
-    if (response.statusCode != 200)
+    if (response.statusCode != 200) {
       throw Exception(_message(response, 'Impossible de charger la mission.'));
+    }
     final decoded = jsonDecode(response.body) as Map;
     return Mission.fromJson(Map<String, dynamic>.from(decoded['data'] as Map));
   }
@@ -79,11 +80,13 @@ class MissionService {
     final request = http.MultipartRequest(
         'POST', Uri.parse('${Strings.apiURI}missions/$missionId/enlevements'));
     request.headers.addAll(await _authHeaders());
-    if (carPositionId != null)
+    if (carPositionId != null) {
       request.fields['car_position_id'] = '$carPositionId';
+    }
     if (truckId != null) request.fields['mission_truck_id'] = '$truckId';
-    if ((vehicleLabel ?? '').isNotEmpty)
+    if ((vehicleLabel ?? '').isNotEmpty) {
       request.fields['vehicle_label'] = vehicleLabel!;
+    }
     if ((plate ?? '').isNotEmpty) request.fields['plate'] = plate!;
     for (final entry in photos.entries) {
       request.files
@@ -94,9 +97,10 @@ class MissionService {
     }
     final response = await http.Response.fromStream(await request.send())
         .timeout(const Duration(seconds: 60));
-    if (response.statusCode < 200 || response.statusCode >= 300)
+    if (response.statusCode < 200 || response.statusCode >= 300) {
       throw Exception(
           _message(response, 'Impossible d’enregistrer l’enlèvement.'));
+    }
     final decoded = jsonDecode(response.body) as Map;
     return Mission.fromJson(Map<String, dynamic>.from(decoded['data'] as Map));
   }
@@ -113,8 +117,9 @@ class MissionService {
             '${Strings.apiURI}missions/$missionId/enlevements/$removalId/modifier'));
     request.headers.addAll(await _authHeaders());
     request.fields['mission_truck_id'] = '$truckId';
-    if ((vehicleLabel ?? '').isNotEmpty)
+    if ((vehicleLabel ?? '').isNotEmpty) {
       request.fields['vehicle_label'] = vehicleLabel!;
+    }
     if ((plate ?? '').isNotEmpty) request.fields['plate'] = plate!;
     for (final entry in photos.entries) {
       request.files
@@ -125,9 +130,10 @@ class MissionService {
     }
     final response = await http.Response.fromStream(await request.send())
         .timeout(const Duration(seconds: 60));
-    if (response.statusCode < 200 || response.statusCode >= 300)
+    if (response.statusCode < 200 || response.statusCode >= 300) {
       throw Exception(
           _message(response, 'Impossible de modifier l’enlèvement.'));
+    }
     final decoded = jsonDecode(response.body) as Map;
     return Mission.fromJson(Map<String, dynamic>.from(decoded['data'] as Map));
   }

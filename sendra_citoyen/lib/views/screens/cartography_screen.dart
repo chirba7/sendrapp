@@ -84,7 +84,8 @@ class _CartographyScreenState extends State<CartographyScreen>
 
   /// Position : d'abord la dernière connue (instantané), puis la position
   /// précise en arrière-plan. La carte n'attend jamais le GPS.
-  Future<void> _locateUser({bool recenter = true, bool userAction = false}) async {
+  Future<void> _locateUser(
+      {bool recenter = true, bool userAction = false}) async {
     try {
       if (!await _ensurePermission()) throw Exception();
       final last = await Geolocator.getLastKnownPosition();
@@ -179,7 +180,8 @@ class _CartographyScreenState extends State<CartographyScreen>
                 ' · ${SendraTheme.status(etat).label}',
             snippet: [
               item['commune']?.toString() ?? '',
-              if (!_isStaff) mien ? 'Mon signalement' : 'Signalé par un autre citoyen',
+              if (!_isStaff)
+                mien ? 'Mon signalement' : 'Signalé par un autre citoyen',
             ].where((t) => t.isNotEmpty).join(' · '),
           ),
         ),

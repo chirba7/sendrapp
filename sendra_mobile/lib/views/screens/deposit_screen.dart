@@ -34,7 +34,12 @@ const _typesVehicule = <(String, String, IconData)>[
 
 /// Angles supplémentaires (facultatifs), réservés aux agents : le backend
 /// n'accepte qu'une photo pour un citoyen.
-const _anglesSupplementaires = ['devant', 'derriere', 'cote_gauche', 'cote_droit'];
+const _anglesSupplementaires = [
+  'devant',
+  'derriere',
+  'cote_gauche',
+  'cote_droit'
+];
 
 class _DepositScreenState extends State<DepositScreen> {
   final _offline = OfflineSignalementService.instance;
@@ -90,8 +95,8 @@ class _DepositScreenState extends State<DepositScreen> {
       _latitude = position.latitude;
       _longitude = position.longitude;
       try {
-        final lieux =
-            await placemarkFromCoordinates(position.latitude, position.longitude);
+        final lieux = await placemarkFromCoordinates(
+            position.latitude, position.longitude);
         if (lieux.isNotEmpty) {
           final lieu = lieux.first;
           final sousLocalite = lieu.subLocality ?? '';
@@ -152,9 +157,11 @@ class _DepositScreenState extends State<DepositScreen> {
         return;
       }
 
-      await _localisation?.timeout(const Duration(seconds: 25), onTimeout: () {});
+      await _localisation?.timeout(const Duration(seconds: 25),
+          onTimeout: () {});
       if (_latitude == null || _longitude == null) {
-        _message('Position introuvable : activez la localisation puis réessayez.');
+        _message(
+            'Position introuvable : activez la localisation puis réessayez.');
         return;
       }
 
@@ -300,14 +307,18 @@ class _DepositScreenState extends State<DepositScreen> {
   }
 
   Widget _titreSection(String texte, {bool obligatoire = false}) {
-    return Row(
+    return Wrap(
+      crossAxisAlignment: WrapCrossAlignment.end,
+      spacing: 6,
       children: [
         Text(texte,
             style: const TextStyle(
-                fontSize: 16, fontWeight: FontWeight.w800, color: SendraTheme.ink)),
-        const SizedBox(width: 6),
-        Text(obligatoire ? '' : '(facultatif)',
-            style: const TextStyle(color: SendraTheme.muted, fontSize: 13)),
+                fontSize: 16,
+                fontWeight: FontWeight.w800,
+                color: SendraTheme.ink)),
+        if (!obligatoire)
+          const Text('(facultatif)',
+              style: TextStyle(color: SendraTheme.muted, fontSize: 13)),
       ],
     );
   }
@@ -435,7 +446,9 @@ class _Bulle extends StatelessWidget {
         onTap: onTap,
         behavior: HitTestBehavior.opaque,
         child: LayoutBuilder(builder: (context, c) {
-          final taille = (c.maxWidth - 12).clamp(56.0, 92.0);
+          // Bulle proportionnelle à la place disponible (jamais plus large
+          // que sa colonne, même sur un Fold fermé).
+          final taille = (c.maxWidth - 12).clamp(40.0, 92.0).toDouble();
           return Column(
             children: [
               AnimatedContainer(
@@ -466,6 +479,8 @@ class _Bulle extends StatelessWidget {
               const SizedBox(height: 8),
               Text(
                 libelle,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                   fontSize: 14.5,
                   fontWeight: choisie ? FontWeight.w800 : FontWeight.w600,
@@ -519,6 +534,8 @@ class _TuileAngle extends StatelessWidget {
                       color: SendraTheme.green, size: 22),
                   const SizedBox(height: 4),
                   Text(libelle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                           fontSize: 12, fontWeight: FontWeight.w600)),
                 ],

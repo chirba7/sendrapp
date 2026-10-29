@@ -3,7 +3,7 @@ import 'package:walletium/utils/dimsensions.dart';
 
 // ignore: must_be_immutable
 class TextLabelsWidget extends StatelessWidget {
-  TextLabelsWidget(
+  const TextLabelsWidget(
       {Key? key,
       required this.textLabels,
       required this.textColor,

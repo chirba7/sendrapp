@@ -16,7 +16,8 @@ class SplashController extends GetxController {
   Future<void> _goToScreen() async {
     final prefs = await AppPrefs.init();
     final token = prefs.getString('token');
-    final authorized = token != null && token.isNotEmpty && AppPrefs.roleId == 5;
+    final authorized =
+        token != null && token.isNotEmpty && AppPrefs.roleId == 5;
     final hasSeenWelcome = prefs.getBool('has_seen_welcome') ?? false;
     await Future<void>.delayed(minimumDisplay);
     Get.offAllNamed(

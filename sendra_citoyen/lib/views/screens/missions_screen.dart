@@ -57,18 +57,21 @@ class _MissionsScreenState extends State<MissionsScreen> {
         body: FutureBuilder<List<Mission>>(
           future: _missions,
           builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting)
+            if (snapshot.connectionState == ConnectionState.waiting) {
               return const Center(child: CircularProgressIndicator());
-            if (snapshot.hasError)
+            }
+            if (snapshot.hasError) {
               return _StateMessage(
                   message:
                       snapshot.error.toString().replaceFirst('Exception: ', ''),
                   onRetry: () => setState(_reload));
+            }
             final missions = snapshot.data ?? const [];
-            if (missions.isEmpty)
+            if (missions.isEmpty) {
               return _StateMessage(
                   message: 'Vos prochaines missions apparaîtront ici.',
                   onRetry: () => setState(_reload));
+            }
             final now = DateTime.now();
             final visible = missions
                 .where((mission) =>
@@ -92,12 +95,15 @@ class _MissionsScreenState extends State<MissionsScreen> {
               Padding(
                 padding: const EdgeInsets.fromLTRB(8, 10, 8, 4),
                 child: Row(children: [
-                  Expanded(child: _filterChip('all', 'Toutes', Icons.view_agenda_outlined,
-                      const Color(0xFF52606D))),
-                  Expanded(child: _filterChip('programmee', 'Programmées',
-                      Icons.event_available_outlined, SendraTheme.green)),
-                  Expanded(child: _filterChip('ponctuelle', 'Ponctuelles',
-                      Icons.flash_on_outlined, SendraTheme.amber)),
+                  Expanded(
+                      child: _filterChip(
+                          'all', 'Toutes', const Color(0xFF52606D))),
+                  Expanded(
+                      child: _filterChip(
+                          'programmee', 'Programmées', SendraTheme.green)),
+                  Expanded(
+                      child: _filterChip(
+                          'ponctuelle', 'Ponctuelles', SendraTheme.amber)),
                 ]),
               ),
               SingleChildScrollView(
@@ -208,7 +214,7 @@ class _MissionsScreenState extends State<MissionsScreen> {
         ),
       );
 
-  Widget _filterChip(String value, String label, IconData icon, Color color) {
+  Widget _filterChip(String value, String label, Color color) {
     final selected = _typeFilter == value;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 2),

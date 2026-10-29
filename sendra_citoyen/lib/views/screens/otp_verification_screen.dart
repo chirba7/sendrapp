@@ -1,7 +1,6 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 import 'package:http/http.dart' as http;
 import 'package:walletium/controller/otp_controller.dart';
@@ -61,13 +60,14 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
       }
 
       setState(() {
-        _errorMessage =
-            jsonResponse['message']?.toString() ?? 'Code de vérification invalide.';
+        _errorMessage = jsonResponse['message']?.toString() ??
+            'Code de vérification invalide.';
         _isVerifying = false;
       });
     } catch (_) {
       setState(() {
-        _errorMessage = 'Connexion indisponible. Vérifiez votre accès à Internet.';
+        _errorMessage =
+            'Connexion indisponible. Vérifiez votre accès à Internet.';
         _isVerifying = false;
       });
     }
@@ -94,11 +94,12 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
 
   ListView _bodyWidget(BuildContext context) {
     return ListView(
-      padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom + 24),
+      padding:
+          EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom + 24),
       children: [
         _upperWidget(context),
         _imageWidget(context),
-        addVerticalSpace(30.h),
+        addVerticalSpace(30),
         _submitButtonWidget(context),
       ],
     );
@@ -109,7 +110,7 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
       color: CustomColor.whiteColor,
       child: Column(
         children: [
-          addVerticalSpace(20.h),
+          addVerticalSpace(20),
           _otpMiddleSection(context),
           _titleWidget(context),
           if (_errorMessage != null) _errorWidget(context),
@@ -120,18 +121,18 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
 
   Container _otpMiddleSection(BuildContext context) {
     return Container(
-      margin: EdgeInsets.symmetric(horizontal: Dimensions.marginSize),
+      margin: const EdgeInsets.symmetric(horizontal: Dimensions.marginSize),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text('Code de vérification'),
           const SizedBox(height: 8),
           TextFieldOtp(
-        controller: controller.otpController,
-        keyboardType: TextInputType.number,
-        decoration: const InputDecoration(
-          labelText: 'Code de vérification',
-        ),
+            controller: controller.otpController,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(
+              labelText: 'Code de vérification',
+            ),
           ),
         ],
       ),
@@ -140,19 +141,20 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
 
   Container _titleWidget(BuildContext context) {
     return Container(
-      margin: EdgeInsets.all(Dimensions.marginSize),
+      margin: const EdgeInsets.all(Dimensions.marginSize),
       // Correction : les deux Text (libellé + numéro) sans Expanded
       // débordaient de la Row de 59px sur les numéros/écrans un peu longs
       // (ex: écran d'OTP pendant le flux mot de passe oublié).
       child: Row(
         mainAxisAlignment: MainAxisAlignment.start,
         children: [
-          Flexible(child: Text(
+          Flexible(
+              child: Text(
             Strings.enterTheCodeSentTo,
             textAlign: TextAlign.center,
             style: CustomStyler.otpVerificationDescriptionStyle,
           )),
-          addHorizontalSpace(6.w),
+          addHorizontalSpace(6),
           Expanded(
             child: Text(
               widget.phone,
@@ -168,7 +170,7 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
 
   Container _errorWidget(BuildContext context) {
     return Container(
-      margin: EdgeInsets.symmetric(horizontal: Dimensions.marginSize),
+      margin: const EdgeInsets.symmetric(horizontal: Dimensions.marginSize),
       child: Text(
         _errorMessage!,
         textAlign: TextAlign.center,
@@ -185,7 +187,11 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
           Image.asset(
             Strings.otpImage,
             width: double.infinity,
-            height: 220.h,
+            // Illustration plus petite sur un écran bas (clavier ouvert,
+            // Fold fermé) pour garder le champ et le bouton visibles.
+            height: (MediaQuery.sizeOf(context).height * .25)
+                .clamp(110.0, 220.0)
+                .toDouble(),
             fit: BoxFit.contain,
           ),
         ],

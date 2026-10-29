@@ -11,7 +11,6 @@ class SendraTheme {
 
   // Couleurs de marque
   static const green = Color(0xFF07883F);
-  static const greenDark = Color(0xFF06703A);
   static const forest = Color(0xFF075C32);
   static const greenSoft = Color(0xFFE3F3EA);
 
@@ -247,8 +246,7 @@ class SendraTheme {
             fontFamily: fontFamily,
             fontSize: 15.5,
             fontWeight: FontWeight.w700),
-        shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
       ),
       navigationBarTheme: NavigationBarThemeData(
         height: 68,
@@ -327,19 +325,19 @@ class SendraTheme {
         linearTrackColor: greenSoft,
       ),
       checkboxTheme: CheckboxThemeData(
-        fillColor: WidgetStateProperty.resolveWith((states) =>
-            states.contains(WidgetState.selected) ? green : null),
+        fillColor: WidgetStateProperty.resolveWith(
+            (states) => states.contains(WidgetState.selected) ? green : null),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
       ),
       radioTheme: RadioThemeData(
-        fillColor: WidgetStateProperty.resolveWith((states) =>
-            states.contains(WidgetState.selected) ? green : muted),
+        fillColor: WidgetStateProperty.resolveWith(
+            (states) => states.contains(WidgetState.selected) ? green : muted),
       ),
       switchTheme: SwitchThemeData(
         thumbColor: WidgetStateProperty.resolveWith((states) =>
             states.contains(WidgetState.selected) ? Colors.white : null),
-        trackColor: WidgetStateProperty.resolveWith((states) =>
-            states.contains(WidgetState.selected) ? green : null),
+        trackColor: WidgetStateProperty.resolveWith(
+            (states) => states.contains(WidgetState.selected) ? green : null),
       ),
     );
   }

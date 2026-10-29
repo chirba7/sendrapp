@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 import 'package:walletium/routes/routes.dart';
 import 'package:walletium/utils/custom_color.dart';
@@ -20,18 +19,11 @@ class SignUpCongratulationsScreen extends StatelessWidget {
     );
   }
 
-
-
-
   ListView _bodyWidget(BuildContext context) {
     return ListView(
-      children: [
-        _upperWidget(context),
-        _okayButtonWidget(context)
-      ],
+      children: [_upperWidget(context), _okayButtonWidget(context)],
     );
   }
-
 
   Container _upperWidget(BuildContext context) {
     return Container(
@@ -40,35 +32,33 @@ class SignUpCongratulationsScreen extends StatelessWidget {
         mainAxisAlignment: mainStart,
         crossAxisAlignment: crossStart,
         children: [
-          addVerticalSpace(100.h),
+          addVerticalSpace(100),
           _titleWidget(context),
-          addVerticalSpace(100.h),
+          addVerticalSpace(100),
           _imageWidget(context),
-          addVerticalSpace(40.h),
-
+          addVerticalSpace(40),
         ],
       ),
     );
   }
 
-
-  Container _titleWidget(BuildContext context){
+  Container _titleWidget(BuildContext context) {
     return Container(
-      margin: EdgeInsets.symmetric(horizontal: Dimensions.marginSize),
+      margin: const EdgeInsets.symmetric(horizontal: Dimensions.marginSize),
       child: Column(
         mainAxisAlignment: mainStart,
         crossAxisAlignment: crossStart,
         children: [
           Image.asset(
             Strings.splashLogo,
-            width: 180.w,
+            width: 180,
           ),
-          addVerticalSpace(20.h),
+          addVerticalSpace(20),
           Text(
             Strings.signUpCongTitle,
             style: CustomStyler.onboardTitleStyle,
           ),
-          addVerticalSpace(5.h),
+          addVerticalSpace(5),
           Text(
             Strings.signUpCongDes,
             style: CustomStyler.onboardDesStyle,
@@ -77,8 +67,6 @@ class SignUpCongratulationsScreen extends StatelessWidget {
       ),
     );
   }
-
-
 
   Container _imageWidget(BuildContext context) {
     return Container(

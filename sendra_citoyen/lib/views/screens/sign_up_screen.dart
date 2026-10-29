@@ -44,8 +44,9 @@ class _SignUpScreenState extends State<SignUpScreen> {
             body['message']?.toString() ?? 'Envoi du code impossible.');
       }
     } catch (_) {
-      if (mounted)
+      if (mounted) {
         setState(() => _error = 'Connexion indisponible. Réessayez.');
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }

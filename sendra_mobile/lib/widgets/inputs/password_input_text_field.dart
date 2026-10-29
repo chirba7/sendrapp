@@ -19,7 +19,7 @@ class PasswordInputTextField extends StatefulWidget {
   }) : super(key: key);
 
   @override
-  _PasswordInputTextFieldState createState() => _PasswordInputTextFieldState();
+  State<PasswordInputTextField> createState() => _PasswordInputTextFieldState();
 }
 
 class _PasswordInputTextFieldState extends State<PasswordInputTextField> {
@@ -61,7 +61,7 @@ class _PasswordInputTextFieldState extends State<PasswordInputTextField> {
         ),
         filled: true,
         fillColor: Colors.transparent,
-        contentPadding: EdgeInsets.symmetric(
+        contentPadding: const EdgeInsets.symmetric(
             horizontal: Dimensions.defaultPaddingSize * 0.7,
             vertical: Dimensions.defaultPaddingSize * 0.5),
         hintText: widget.hintText,

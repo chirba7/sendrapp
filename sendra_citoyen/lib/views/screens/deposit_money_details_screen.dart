@@ -10,15 +10,15 @@ import '../../widgets/others/avancement_timeline.dart';
 import '../../widgets/others/galerie_photos_signalement.dart';
 import 'carto.dart';
 import 'dommages_screen.dart';
-import 'informationBase_screen.dart';
+import 'information_base_screen.dart';
 import 'infraction_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class DepositMoneyDetailsScreen extends StatefulWidget {
-  DepositMoneyDetailsScreen({Key? key}) : super(key: key);
+  const DepositMoneyDetailsScreen({Key? key}) : super(key: key);
 
   @override
-  _DepositMoneyDetailsScreenState createState() =>
+  State<DepositMoneyDetailsScreen> createState() =>
       _DepositMoneyDetailsScreenState();
 }
 
@@ -40,7 +40,7 @@ class _DepositMoneyDetailsScreenState extends State<DepositMoneyDetailsScreen> {
       int signalementId) async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('token');
-    final url = Strings.apiURI + 'listerSignalement/$signalementId';
+    final url = '${Strings.apiURI}listerSignalement/$signalementId';
     final headers = {'Authorization': 'Bearer $token'};
 
     final response = await http.get(Uri.parse(url), headers: headers);
@@ -59,6 +59,7 @@ class _DepositMoneyDetailsScreenState extends State<DepositMoneyDetailsScreen> {
   Future<void> fetchSignalementData() async {
     try {
       _isStaff = await Session.isStaff();
+      if (!mounted) return;
       final args = ModalRoute.of(context)!.settings.arguments;
 
       if (args is Map) {
@@ -76,7 +77,8 @@ class _DepositMoneyDetailsScreenState extends State<DepositMoneyDetailsScreen> {
             );
             if (response.statusCode == 200) {
               final decoded = jsonDecode(response.body);
-              final items = decoded is List ? decoded
+              final items = decoded is List
+                  ? decoded
                   : (decoded['data'] as List<dynamic>? ?? const []);
               for (final item in items) {
                 if (item['signalementId']?.toString() ==
@@ -103,7 +105,7 @@ class _DepositMoneyDetailsScreenState extends State<DepositMoneyDetailsScreen> {
         isLoading = false;
       });
     } catch (e) {
-      print('Erreur: $e');
+      debugPrint('Erreur: $e');
       setState(() {
         isLoading = false;
       });
@@ -142,6 +144,7 @@ class _DepositMoneyDetailsScreenState extends State<DepositMoneyDetailsScreen> {
           double.parse(signalementData['longitude'].toString());
 
       // Rediriger vers NavigationScreen avec les coordonnées du signalement
+      if (!mounted) return;
       Navigator.push(
         context,
         MaterialPageRoute(
@@ -151,19 +154,8 @@ class _DepositMoneyDetailsScreenState extends State<DepositMoneyDetailsScreen> {
           ),
         ),
       );
-      /*
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => MapScreen(
-            currentLocation: LatLng(currentPosition.latitude, currentPosition.longitude),
-            destinationLocation: LatLng(signalementLat, signalementLng),
-          ),
-        ),
-      );
-       */
     } catch (e) {
-      print('Erreur lors de la récupération de la position : $e');
+      debugPrint('Erreur lors de la récupération de la position : $e');
     }
   }
 
@@ -173,12 +165,12 @@ class _DepositMoneyDetailsScreenState extends State<DepositMoneyDetailsScreen> {
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: Text('Services de localisation désactivés'),
-          content: Text(
+          title: const Text('Services de localisation désactivés'),
+          content: const Text(
               'Veuillez activer les services de localisation pour continuer.'),
           actions: <Widget>[
             TextButton(
-              child: Text('OK'),
+              child: const Text('OK'),
               onPressed: () {
                 Navigator.of(context).pop();
               },
@@ -195,7 +187,7 @@ class _DepositMoneyDetailsScreenState extends State<DepositMoneyDetailsScreen> {
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: Row(
+          title: const Row(
             children: [
               Icon(Icons.error,
                   color: Colors.orange, size: 32), // Icône d'erreur plus grande
@@ -216,8 +208,8 @@ class _DepositMoneyDetailsScreenState extends State<DepositMoneyDetailsScreen> {
               ),
             ],
           ),
-          content: Padding(
-            padding: const EdgeInsets.symmetric(
+          content: const Padding(
+            padding: EdgeInsets.symmetric(
                 vertical: 8.0), // Ajout d'un peu de padding autour du texte
             child: Text(
               'Pour afficher l\'itinéraire, veuillez activer la localisation dans les paramètres de votre appareil.',
@@ -235,7 +227,7 @@ class _DepositMoneyDetailsScreenState extends State<DepositMoneyDetailsScreen> {
           elevation: 6, // Ajouter une ombre pour un effet flottant
           backgroundColor:
               Colors.white, // Fond blanc pour un contraste plus marqué
-          actionsPadding: EdgeInsets.symmetric(
+          actionsPadding: const EdgeInsets.symmetric(
               horizontal: 20, vertical: 10), // Espacement des boutons
           actions: <Widget>[
             TextButton(
@@ -248,8 +240,8 @@ class _DepositMoneyDetailsScreenState extends State<DepositMoneyDetailsScreen> {
                 backgroundColor: Colors.blue
                     .withValues(alpha: 0.1), // Fond léger pour le bouton
               ),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
+              child: const Padding(
+                padding: EdgeInsets.symmetric(
                     vertical: 10,
                     horizontal: 20), // Un peu de padding pour le bouton
                 child: Text(
@@ -290,7 +282,7 @@ class _DepositMoneyDetailsScreenState extends State<DepositMoneyDetailsScreen> {
                   if (snapshot.connectionState == ConnectionState.waiting) {
                     return _buildLoading();
                   } else if (snapshot.hasError) {
-                    print('Erreur: ${snapshot.error}');
+                    debugPrint('Erreur: ${snapshot.error}');
                     return _buildError();
                   } else if (snapshot.hasData) {
                     return _buildContent(snapshot.data!);
@@ -322,12 +314,15 @@ class _DepositMoneyDetailsScreenState extends State<DepositMoneyDetailsScreen> {
           children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 12, 20, 4),
-              child: GaleriePhotosSignalement(
-                signalementData: signalementData,
-                hauteur: 220,
-              ),
+              child: _isole(() => GaleriePhotosSignalement(
+                    signalementData: signalementData,
+                    // Hauteur proportionnelle à la largeur de l'écran.
+                    hauteur: (MediaQuery.sizeOf(context).width * .58)
+                        .clamp(170.0, 300.0)
+                        .toDouble(),
+                  )),
             ),
-            _workflowHeader(signalementData),
+            _isole(() => _workflowHeader(signalementData)),
             _localisationButton(),
             // « Informations de base » sert à la constatation des agents : un
             // citoyen n'y a pas accès (elle exposait des données internes).
@@ -353,7 +348,7 @@ class _DepositMoneyDetailsScreenState extends State<DepositMoneyDetailsScreen> {
               ],
             ],
             // Avancement : Signalé → En cours → Résolu / Non résolu / Rejeté.
-            AvancementTimeline(data: signalementData),
+            _isole(() => AvancementTimeline(data: signalementData)),
             if (!_isStaff)
               const Padding(
                 padding: EdgeInsets.fromLTRB(20, 4, 20, 0),
@@ -476,20 +471,27 @@ class _DepositMoneyDetailsScreenState extends State<DepositMoneyDetailsScreen> {
         children: [
           Row(
             children: [
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: .11),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(
-                  label,
-                  style: TextStyle(
-                      color: color, fontWeight: FontWeight.w700, fontSize: 12),
+              Flexible(
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: .11),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                        color: color,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 12),
+                  ),
                 ),
               ),
               const Spacer(),
+              const SizedBox(width: 8),
               Text(
                 'N° ${data['signalementId'] ?? ''}',
                 style: const TextStyle(
@@ -501,7 +503,8 @@ class _DepositMoneyDetailsScreenState extends State<DepositMoneyDetailsScreen> {
           // Après constatation : marque, modèle et plaque à côté du type.
           Text(
             [
-              (data['vehicle_kind'] ?? data['titre'])?.toString() ?? 'Signalement',
+              (data['vehicle_kind'] ?? data['titre'])?.toString() ??
+                  'Signalement',
               '${data['marque'] ?? ''} ${data['model'] ?? ''}'.trim(),
             ].where((t) => t.isNotEmpty).join(' · '),
             style: const TextStyle(fontSize: 21, fontWeight: FontWeight.w800),
@@ -533,12 +536,19 @@ class _DepositMoneyDetailsScreenState extends State<DepositMoneyDetailsScreen> {
               Expanded(
                 child: Text(
                   [data['commune'], data['adresse_precise']]
-                      .where((part) => part != null && part.toString().trim().isNotEmpty)
-                      .map((part) => part.toString()).toSet().join(' · ').isEmpty
+                          .where((part) =>
+                              part != null && part.toString().trim().isNotEmpty)
+                          .map((part) => part.toString())
+                          .toSet()
+                          .join(' · ')
+                          .isEmpty
                       ? 'Adresse non renseignée'
                       : [data['commune'], data['adresse_precise']]
-                          .where((part) => part != null && part.toString().trim().isNotEmpty)
-                          .map((part) => part.toString()).toSet().join(' · '),
+                          .where((part) =>
+                              part != null && part.toString().trim().isNotEmpty)
+                          .map((part) => part.toString())
+                          .toSet()
+                          .join(' · '),
                   style: const TextStyle(color: SendraTheme.muted),
                 ),
               ),
@@ -585,11 +595,11 @@ class _DepositMoneyDetailsScreenState extends State<DepositMoneyDetailsScreen> {
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 6),
       child: ElevatedButton.icon(
         onPressed: _showRouteToSignalement,
-        icon: Icon(
+        icon: const Icon(
           Icons.location_on,
           size: 22,
         ),
-        label: Text(
+        label: const Text(
           'Voir l\'itinéraire',
           style: TextStyle(
             fontSize: 15,
@@ -601,7 +611,7 @@ class _DepositMoneyDetailsScreenState extends State<DepositMoneyDetailsScreen> {
           foregroundColor:
               Colors.white, // Couleur du texte et de l'icône en blanc
           minimumSize: const Size(double.infinity, 52),
-          textStyle: TextStyle(
+          textStyle: const TextStyle(
               fontSize: 18.0,
               fontWeight: FontWeight.bold), // Texte plus lisible
           shape: RoundedRectangleBorder(
@@ -627,7 +637,7 @@ class _DepositMoneyDetailsScreenState extends State<DepositMoneyDetailsScreen> {
         color: Colors.white, // Couleur de fond claire
         child: ListTile(
           contentPadding:
-              EdgeInsets.symmetric(vertical: 12.0, horizontal: 16.0),
+              const EdgeInsets.symmetric(vertical: 12.0, horizontal: 16.0),
           leading: Container(
             width: 44,
             height: 44,
@@ -691,7 +701,10 @@ class _DepositMoneyDetailsScreenState extends State<DepositMoneyDetailsScreen> {
   /// emojis, dont le rendu variait selon les téléphones).
   (IconData, Color) _iconForTitle(String title) {
     return switch (title) {
-      'Informations de base' => (Icons.description_rounded, const Color(0xFF1A73E8)),
+      'Informations de base' => (
+          Icons.description_rounded,
+          const Color(0xFF1A73E8)
+        ),
       'Véhicule' => (Icons.directions_car_rounded, SendraTheme.green),
       'Infraction' => (Icons.gavel_rounded, const Color(0xFFE37400)),
       'Dommages' => (Icons.car_crash_rounded, const Color(0xFFD93025)),
@@ -699,34 +712,20 @@ class _DepositMoneyDetailsScreenState extends State<DepositMoneyDetailsScreen> {
     };
   }
 
-// Fonction pour obtenir l'icône correspondante en fonction du titre
-  IconData _getIconForTitle(String title) {
-    switch (title) {
-      case 'Informations de base':
-        return Icons
-            .library_books; // Icône de livre ou de données (plus spécifique pour les informations)
-      case 'Véhicule':
-        return Icons
-            .directions_car_filled; // Icône de voiture remplie (plus explicite)
-      case 'Infraction':
-        return Icons
-            .report_problem; // Icône de rapport de problème (plus adapté aux infractions)
-      case 'Dommages':
-        return Icons.draw; // Icône de rapport pour dommages (plus approprié)
-      //return Icons.report_problem;; // Icône de rapport pour dommages (plus approprié)
-      default:
-        return Icons.list; // Icône de liste générique pour un menu
-    }
-  }
+  /// Chaque bloc est construit à part : si l'un échoue sur un téléphone
+  /// (donnée inattendue), seul ce bloc est remplacé par un encart d'erreur
+  /// au lieu de vider toute la page.
+  Widget _isole(Widget Function() construire) =>
+      Builder(builder: (_) => construire());
 
   Widget _buildLoading() {
-    return Center(
+    return const Center(
       child: CircularProgressIndicator(),
     );
   }
 
   Widget _buildError() {
-    return Center(
+    return const Center(
       child: Text(
         'Échec du chargement des détails du signalement.',
         style: TextStyle(

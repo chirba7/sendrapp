@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 import 'package:walletium/routes/routes.dart';
 import 'package:walletium/utils/custom_color.dart';
@@ -20,20 +19,17 @@ class ResetPasswordCongratulationsScreen extends StatelessWidget {
     );
   }
 
-
-
-
   Widget _bodyWidget(BuildContext context) {
-    return SingleChildScrollView(child: Column(
+    return SingleChildScrollView(
+        child: Column(
       children: [
         _upperWidget(context),
-        addVerticalSpace(60.h),
+        addVerticalSpace(60),
         _okayButtonWidget(context),
-        addVerticalSpace(24.h),
+        addVerticalSpace(24),
       ],
     ));
   }
-
 
   Container _upperWidget(BuildContext context) {
     return Container(
@@ -42,36 +38,34 @@ class ResetPasswordCongratulationsScreen extends StatelessWidget {
         mainAxisAlignment: mainStart,
         crossAxisAlignment: crossStart,
         children: [
-          addVerticalSpace(40.h),
+          addVerticalSpace(40),
           _titleWidget(context),
-          addVerticalSpace(40.h),
+          addVerticalSpace(40),
           _imageWidget(context),
-          addVerticalSpace(40.h),
-
+          addVerticalSpace(40),
         ],
       ),
     );
   }
 
-
-  Container _titleWidget(BuildContext context){
+  Container _titleWidget(BuildContext context) {
     return Container(
-      margin: EdgeInsets.symmetric(horizontal: Dimensions.marginSize),
+      margin: const EdgeInsets.symmetric(horizontal: Dimensions.marginSize),
       child: Column(
         mainAxisAlignment: mainStart,
         crossAxisAlignment: crossStart,
         children: [
           Image.asset(
             'assets/images/logo_epavie.png',
-            width: 220.w,
+            width: 220,
             fit: BoxFit.contain,
           ),
-          addVerticalSpace(20.h),
+          addVerticalSpace(20),
           Text(
             Strings.resetPassCongTitle,
             style: CustomStyler.onboardTitleStyle,
           ),
-          addVerticalSpace(5.h),
+          addVerticalSpace(5),
           Text(
             Strings.resetPassCongDes,
             style: CustomStyler.onboardDesStyle,
@@ -80,8 +74,6 @@ class ResetPasswordCongratulationsScreen extends StatelessWidget {
       ),
     );
   }
-
-
 
   Container _imageWidget(BuildContext context) {
     return Container(

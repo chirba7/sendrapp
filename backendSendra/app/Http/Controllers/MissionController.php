@@ -352,7 +352,7 @@ class MissionController extends Controller
         // the field team validates, even when there is nothing to receive.
         $unlocked = $checkedIn || $receptionCheckedIn ||
             ($isReceiver && (bool) $mission->removal_validated_at);
-        if ($unlocked && ! $mission->relationLoaded('vehicles')) $mission->load('vehicles');
+        if ($unlocked && ! $mission->relationLoaded('vehicles')) $mission->load('vehicles.photo');
         $readyPounds = collect($mission->pounds ?? [])
             ->push($mission->receptionPound?->name)
             ->filter()
@@ -389,7 +389,7 @@ class MissionController extends Controller
                 'plate' => $vehicle->numero_vehicule,
                 'non_removal_reason' => $vehicle->pivot->non_removal_reason,
                 'non_removed_at' => $vehicle->pivot->non_removed_at,
-            ])->values() : [],
+            ] + $this->signalementPourAgent($vehicle))->values() : [],
             'removals' => $unlocked ? $mission->removals->map(fn ($removal) => [
                 'id' => $removal->id, 'car_position_id' => $removal->car_position_id,
                 'vehicle_label' => $removal->vehicle_label ?: trim(($removal->vehicle?->marque ?? '').' '.($removal->vehicle?->model ?? '')) ?: 'Véhicule',
@@ -403,7 +403,7 @@ class MissionController extends Controller
                 'photos' => $removal->photos->mapWithKeys(fn ($photo) => [$photo->angle => request()->getSchemeAndHttpHost().Storage::url($photo->path)]),
                 'received' => (bool)$removal->reception,
                 'reception_photos' => $removal->reception ? collect(['front','back','left','right','sheet'])->mapWithKeys(fn($angle)=>[$angle=>request()->getSchemeAndHttpHost().Storage::url($removal->reception->{$angle.'_photo_path'})]) : (object)[],
-            ])->values() : [],
+            ] + $this->signalementPourAgent($removal->vehicle))->values() : [],
             'dispatches' => $checkedIn ? $mission->dispatches->map(fn ($dispatch) => [
                 'id' => $dispatch->id, 'mission_truck_id' => $dispatch->mission_truck_id,
                 'pound_name' => $dispatch->pound_name, 'departed_at' => $dispatch->departed_at?->toIso8601String(),
@@ -412,9 +412,41 @@ class MissionController extends Controller
         ];
     }
 
+    /**
+     * Ce que l'équipe terrain et le réceptionniste doivent voir du
+     * signalement d'origine : sa position et ses photos (celles du citoyen,
+     * puis celles de l'agent qui l'a constaté).
+     */
+    private function signalementPourAgent(?CarPosition $signalement): array
+    {
+        if (! $signalement) {
+            return ['photos_signalement' => [], 'thumbnail_url' => null];
+        }
+        $hote = request()->getSchemeAndHttpHost();
+        $photos = ($signalement->photo ?? collect())
+            ->sortBy(fn ($p) => [$p->position === 'agent_constat' ? 1 : 0, $p->id])
+            ->values()
+            ->map(fn ($p) => [
+                'url' => $hote.'/storage/'.$p->filepath,
+                'source' => $p->position === 'agent_constat' ? 'agent' : 'citoyen',
+                'position' => $p->position,
+            ]);
+        $citoyen = $photos->firstWhere('source', 'citoyen');
+
+        return [
+            'signalement_id' => $signalement->id,
+            'latitude' => $signalement->latitude,
+            'longitude' => $signalement->longitude,
+            'commune' => $signalement->commune,
+            'adresse' => $signalement->adresse_precise,
+            'thumbnail_url' => ($citoyen ?? $photos->first())['url'] ?? null,
+            'photos_signalement' => $photos->all(),
+        ];
+    }
+
     private function agentRelations(int $userId): array
     {
-        return ['agents' => fn ($query) => $query->where('users.id', $userId), 'vehicles', 'commune', 'trucks', 'removals.photos', 'removals.vehicle', 'removals.dispatch', 'removals.reception', 'dispatches', 'receptionPound', 'receptionAgent'];
+        return ['agents' => fn ($query) => $query->where('users.id', $userId), 'vehicles.photo', 'commune', 'trucks', 'removals.photos', 'removals.vehicle.photo', 'removals.dispatch', 'removals.reception', 'dispatches', 'receptionPound', 'receptionAgent'];
     }
 
     private function assertVisibleToAgent(Request $request, Mission $mission): void

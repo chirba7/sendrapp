@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:walletium/routes/routes.dart';
 import 'package:walletium/utils/sendra_theme.dart';
 import 'package:walletium/utils/strings.dart';
+import 'package:walletium/widgets/others/photo_reseau.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({Key? key}) : super(key: key);
@@ -108,8 +109,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     color: const Color(0xFF1A73E8).withValues(alpha: .12),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: const Icon(Icons.lock_rounded,
-                      color: Color(0xFF1A73E8)),
+                  child:
+                      const Icon(Icons.lock_rounded, color: Color(0xFF1A73E8)),
                 ),
                 title: const Text(Strings.changePassword),
                 trailing: const Icon(Icons.chevron_right_rounded,
@@ -123,8 +124,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Widget _profilePicture() {
-    const fallback =
-        Icon(Icons.person_rounded, color: Colors.white, size: 54);
+    const fallback = Icon(Icons.person_rounded, color: Colors.white, size: 54);
     return Container(
       width: 96,
       height: 96,
@@ -135,10 +135,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
       child: photoUrl != null && photoUrl!.isNotEmpty
           ? ClipOval(
-              child: Image.network(photoUrl!,
-                  fit: BoxFit.cover,
-                  cacheWidth: 300,
-                  errorBuilder: (_, __, ___) => fallback))
+              child: PhotoReseau(photoUrl!, largeur: 96, erreur: fallback))
           : fallback,
     );
   }

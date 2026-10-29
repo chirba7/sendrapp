@@ -47,6 +47,7 @@ class _BottomNavigationWidgetState extends State<BottomNavigationWidget> {
   late final List<_Tab> _tabs = [
     _Tab(
       'Participations',
+      'Accueil',
       Icons.directions_car_outlined,
       Icons.directions_car_rounded,
       () => const HomeScreen(),
@@ -54,12 +55,14 @@ class _BottomNavigationWidgetState extends State<BottomNavigationWidget> {
     if (_isAgent)
       _Tab(
         'Missions',
+        'Missions',
         Icons.assignment_outlined,
         Icons.assignment_rounded,
         () => const MissionsScreen(),
       ),
     _Tab(
       'Cartographie',
+      'Carte',
       Icons.map_outlined,
       Icons.map_rounded,
       () => const CartographyScreen(),
@@ -96,53 +99,61 @@ class _BottomNavigationWidgetState extends State<BottomNavigationWidget> {
 
   Widget _buildApp() {
     return Obx(() {
-        final index = _controller.getIndex();
-        return Scaffold(
-          backgroundColor: SendraTheme.surface,
-          body: IndexedStack(
-            index: index,
-            children: [
-              for (var i = 0; i < _tabs.length; i++)
-                _built[i] ? _tabs[i].builder() : const SizedBox.shrink(),
+      final index = _controller.getIndex();
+      final etroit = MediaQuery.sizeOf(context).width / _tabs.length < 120;
+      return Scaffold(
+        backgroundColor: SendraTheme.surface,
+        body: IndexedStack(
+          index: index,
+          children: [
+            // Les onglets masqués gardent leur état mais n'animent plus
+            // rien en arrière-plan (bouton Signaler, carte…).
+            for (var i = 0; i < _tabs.length; i++)
+              TickerMode(
+                enabled: i == index,
+                child: _built[i] ? _tabs[i].builder() : const SizedBox.shrink(),
+              ),
+          ],
+        ),
+        // Sur l'accueil, le grand bouton Signaler est dans la page (tiers
+        // haut) ; ailleurs il reste accessible en bouton flottant.
+        floatingActionButton: index == 0
+            ? null
+            : FloatingActionButton.extended(
+                heroTag: 'signaler',
+                onPressed: () => SignalerFlow.demarrer(context),
+                icon: const Icon(Icons.add_a_photo_rounded),
+                label: const Text('Signaler'),
+              ),
+        floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
+        bottomNavigationBar: DecoratedBox(
+          decoration: const BoxDecoration(
+            border: Border(top: BorderSide(color: SendraTheme.border)),
+          ),
+          child: NavigationBar(
+            selectedIndex: index,
+            onDestinationSelected: _select,
+            destinations: [
+              for (final tab in _tabs)
+                NavigationDestination(
+                  icon: Icon(tab.icon),
+                  selectedIcon: Icon(tab.selectedIcon),
+                  // Écran étroit (Fold fermé) : libellé court pour que
+                  // chaque onglet tienne dans sa largeur.
+                  label: etroit ? tab.shortLabel : tab.label,
+                ),
             ],
           ),
-          // Sur l'accueil, le grand bouton Signaler est dans la page (tiers
-          // haut) ; ailleurs il reste accessible en bouton flottant.
-          floatingActionButton: index == 0
-              ? null
-              : FloatingActionButton.extended(
-                  heroTag: 'signaler',
-                  onPressed: () => SignalerFlow.demarrer(context),
-                  icon: const Icon(Icons.add_a_photo_rounded),
-                  label: const Text('Signaler'),
-                ),
-          floatingActionButtonLocation:
-              FloatingActionButtonLocation.centerFloat,
-          bottomNavigationBar: DecoratedBox(
-            decoration: const BoxDecoration(
-              border: Border(top: BorderSide(color: SendraTheme.border)),
-            ),
-            child: NavigationBar(
-              selectedIndex: index,
-              onDestinationSelected: _select,
-              destinations: [
-                for (final tab in _tabs)
-                  NavigationDestination(
-                    icon: Icon(tab.icon),
-                    selectedIcon: Icon(tab.selectedIcon),
-                    label: tab.label,
-                  ),
-              ],
-            ),
-          ),
-        );
+        ),
+      );
     });
   }
 }
 
 class _Tab {
-  _Tab(this.label, this.icon, this.selectedIcon, this.builder);
+  _Tab(this.label, this.shortLabel, this.icon, this.selectedIcon, this.builder);
   final String label;
+  final String shortLabel;
   final IconData icon;
   final IconData selectedIcon;
   final Widget Function() builder;

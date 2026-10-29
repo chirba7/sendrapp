@@ -7,8 +7,10 @@ import '../../utils/strings.dart';
 import 'infraction_details_screen.dart';
 
 class InfractionListPage extends StatefulWidget {
+  const InfractionListPage({super.key});
+
   @override
-  _InfractionListPageState createState() => _InfractionListPageState();
+  State<InfractionListPage> createState() => _InfractionListPageState();
 }
 
 class _InfractionListPageState extends State<InfractionListPage> {
@@ -26,16 +28,13 @@ class _InfractionListPageState extends State<InfractionListPage> {
   Future<void> _fetchInfractions() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('token');
-    final url = Strings.apiURI + 'infraction'; // Remplacez par votre URL API
+    final url = '${Strings.apiURI}infraction'; // Remplacez par votre URL API
 
     try {
       final response = await http.get(Uri.parse(url), headers: {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer $token',
       });
-
-     // print('Response body: ${response.body}');
-     // print(response.statusCode);
 
       if (_isDisposed) return;
 
@@ -52,7 +51,7 @@ class _InfractionListPageState extends State<InfractionListPage> {
         });
       }
     } catch (e) {
-      print('Erreur: $e');
+      debugPrint('Erreur: $e');
       if (mounted) {
         setState(() {
           _hasError = true;
@@ -73,114 +72,126 @@ class _InfractionListPageState extends State<InfractionListPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(
+        title: const Text(
           'Liste des Infractions',
           style: TextStyle(fontWeight: FontWeight.bold),
         ),
       ),
-      body: _isLoading
-          ? Center(
-        child: CircularProgressIndicator(
-          color: Colors.green[700],
-        ),
-      )
-          : _hasError
-          ? Center(
-        child: Text(
-          'Erreur de chargement des infractions',
-          style: TextStyle(color: Colors.red, fontSize: 16),
-        ),
-      )
-          : Padding(
-        padding: const EdgeInsets.only(right: 8.0),
-          child: Scrollbar(
-        thumbVisibility: true, // Always show the scrollbar
-        thickness: 4.0,
-        radius: Radius.circular(10),
-        child: ListView.builder(
-          itemCount: _infractions.length,
-          itemBuilder: (context, index) {
-            final infraction = _infractions[index];
-            return Card(
-              elevation: 6,
-              margin: EdgeInsets.symmetric(vertical: 6, horizontal: 12),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(15),
-              ),
-              color: Colors.white,
-              shadowColor: Colors.black26,
-              child: ListTile(
-                contentPadding: EdgeInsets.symmetric(vertical: 10, horizontal: 12),
-                leading: CircleAvatar(
-                  radius: 25,
-                  backgroundColor: Colors.green[700],
-                  child: Icon(
-                    Icons.warning,
-                    color: Colors.white,
-                    size: 28,
-                  ),
-                ),
-                title: Text(
-                  infraction['adresse_precise'] ?? 'Adresse non disponible',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                    color: Colors.black,
-                  ),
-                ),
-                subtitle: Padding(
-                  padding: const EdgeInsets.only(top: 4.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        infraction['motif_infraction'] ?? 'Motif non disponible',
-                        style: TextStyle(
-                          color: Colors.grey[700],
-                          fontSize: 14,
-                        ),
-                      ),
-                      SizedBox(height: 6),
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.location_pin,
-                            size: 18,
-                            color: Colors.red,
-                          ),
-                          SizedBox(width: 8),
-                          Text(
-                            infraction['lieu'] ?? 'Lieu inconnu',
-                            style: TextStyle(
-                              color: Colors.grey[600],
-                              fontSize: 14,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                trailing: Icon(
-                  Icons.arrow_forward_ios,
+      body: SafeArea(
+        top: false,
+        child: _isLoading
+            ? Center(
+                child: CircularProgressIndicator(
                   color: Colors.green[700],
-                  size: 22,
                 ),
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => InfractionDetailPage(infraction: infraction),
+              )
+            : _hasError
+                ? const Center(
+                    child: Text(
+                      'Erreur de chargement des infractions',
+                      style: TextStyle(color: Colors.red, fontSize: 16),
                     ),
-                  );
-                },
-              ),
-            );
-          },
-        ),
+                  )
+                : Padding(
+                    padding: const EdgeInsets.only(right: 8.0),
+                    child: Scrollbar(
+                      thumbVisibility: true, // Always show the scrollbar
+                      thickness: 4.0,
+                      radius: const Radius.circular(10),
+                      child: ListView.builder(
+                        itemCount: _infractions.length,
+                        itemBuilder: (context, index) {
+                          final infraction = _infractions[index];
+                          return Card(
+                            elevation: 6,
+                            margin: const EdgeInsets.symmetric(
+                                vertical: 6, horizontal: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(15),
+                            ),
+                            color: Colors.white,
+                            shadowColor: Colors.black26,
+                            child: ListTile(
+                              contentPadding: const EdgeInsets.symmetric(
+                                  vertical: 10, horizontal: 12),
+                              leading: CircleAvatar(
+                                radius: 25,
+                                backgroundColor: Colors.green[700],
+                                child: const Icon(
+                                  Icons.warning,
+                                  color: Colors.white,
+                                  size: 28,
+                                ),
+                              ),
+                              title: Text(
+                                infraction['adresse_precise'] ??
+                                    'Adresse non disponible',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                  color: Colors.black,
+                                ),
+                              ),
+                              subtitle: Padding(
+                                padding: const EdgeInsets.only(top: 4.0),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      infraction['motif_infraction'] ??
+                                          'Motif non disponible',
+                                      style: TextStyle(
+                                        color: Colors.grey[700],
+                                        fontSize: 14,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 6),
+                                    Row(
+                                      children: [
+                                        const Icon(
+                                          Icons.location_pin,
+                                          size: 18,
+                                          color: Colors.red,
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: Text(
+                                            infraction['lieu'] ??
+                                                'Lieu inconnu',
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: TextStyle(
+                                              color: Colors.grey[600],
+                                              fontSize: 14,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              trailing: Icon(
+                                Icons.arrow_forward_ios,
+                                color: Colors.green[700],
+                                size: 22,
+                              ),
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => InfractionDetailPage(
+                                        infraction: infraction),
+                                  ),
+                                );
+                              },
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
       ),
-    ),
     );
   }
-
 }

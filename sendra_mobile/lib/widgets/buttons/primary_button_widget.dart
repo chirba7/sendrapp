@@ -24,7 +24,7 @@ class PrimaryButtonWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       height: Dimensions.buttonHeight,
-      margin: EdgeInsets.only(
+      margin: const EdgeInsets.only(
         left: Dimensions.marginSize * 0.5,
         right: Dimensions.marginSize * 0.5,
         top: Dimensions.marginSize,
@@ -32,8 +32,21 @@ class PrimaryButtonWidget extends StatelessWidget {
       width: double.infinity,
       child: ElevatedButton(
         onPressed: isLoading ? null : onPressed,
+        style: TextButton.styleFrom(
+          elevation: 0,
+          backgroundColor: backgroundColor,
+          shape: RoundedRectangleBorder(
+            borderRadius: const BorderRadius.all(
+              Radius.circular(8.0),
+            ),
+            side: BorderSide(
+              width: 1,
+              color: borderColor,
+            ),
+          ),
+        ),
         child: isLoading
-            ? SizedBox(
+            ? const SizedBox(
                 width: 20.0,
                 height: 20.0,
                 child: CircularProgressIndicator(
@@ -48,19 +61,6 @@ class PrimaryButtonWidget extends StatelessWidget {
                   fontWeight: FontWeight.w600,
                 ),
               ),
-        style: TextButton.styleFrom(
-          elevation: 0,
-          backgroundColor: backgroundColor,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.all(
-              Radius.circular(8.0),
-            ),
-            side: BorderSide(
-              width: 1,
-              color: borderColor,
-            ),
-          ),
-        ),
       ),
     );
   }

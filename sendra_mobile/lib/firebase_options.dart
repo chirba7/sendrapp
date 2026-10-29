@@ -67,7 +67,8 @@ class DefaultFirebaseOptions {
     messagingSenderId: '705542613105',
     projectId: 'sendra-3dbbc',
     storageBucket: 'sendra-3dbbc.appspot.com',
-    iosClientId: '705542613105-atukr48h3hv5otsqu4qc0an1plultjer.apps.googleusercontent.com',
+    iosClientId:
+        '705542613105-atukr48h3hv5otsqu4qc0an1plultjer.apps.googleusercontent.com',
     iosBundleId: 'net.appdevs.walletium',
   );
 
@@ -77,7 +78,8 @@ class DefaultFirebaseOptions {
     messagingSenderId: '705542613105',
     projectId: 'sendra-3dbbc',
     storageBucket: 'sendra-3dbbc.appspot.com',
-    iosClientId: '705542613105-8cg3gj3245uu3ud5pt2ql58vm6c86enc.apps.googleusercontent.com',
+    iosClientId:
+        '705542613105-8cg3gj3245uu3ud5pt2ql58vm6c86enc.apps.googleusercontent.com',
     iosBundleId: 'net.appdevs.sendraPRO',
   );
 }

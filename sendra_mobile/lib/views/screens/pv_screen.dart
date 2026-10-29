@@ -33,8 +33,18 @@ class _PvScreenState extends State<PvScreen> {
 
   final List<List<Offset>> _traits = [];
   Size _taillePad = Size.zero;
+  // Redessine seulement le cadre de signature pendant le tracé, sans
+  // reconstruire toute la page à chaque mouvement du doigt.
+  final ValueNotifier<int> _trace = ValueNotifier<int>(0);
 
-  bool get _signe => _pv?['pv_signe'] == true || _signalement?['pv_signe'] == true;
+  @override
+  void dispose() {
+    _trace.dispose();
+    super.dispose();
+  }
+
+  bool get _signe =>
+      _pv?['pv_signe'] == true || _signalement?['pv_signe'] == true;
 
   @override
   void initState() {
@@ -60,7 +70,8 @@ class _PvScreenState extends State<PvScreen> {
       final entetes = await _entetes();
       final reponse = await http
           .get(
-            Uri.parse('${Strings.apiURI}listerSignalement/${widget.signalementId}'),
+            Uri.parse(
+                '${Strings.apiURI}listerSignalement/${widget.signalementId}'),
             headers: entetes,
           )
           .timeout(const Duration(seconds: 20));
@@ -77,7 +88,8 @@ class _PvScreenState extends State<PvScreen> {
         }
       }
     } catch (_) {
-      _erreur = 'Impossible de charger le procès-verbal. Vérifiez la connexion.';
+      _erreur =
+          'Impossible de charger le procès-verbal. Vérifiez la connexion.';
     } finally {
       if (mounted) setState(() => _chargement = false);
     }
@@ -91,7 +103,7 @@ class _PvScreenState extends State<PvScreen> {
     final recorder = ui.PictureRecorder();
     final canvas = Canvas(recorder);
     canvas.scale(echelle);
-    _SignaturePainter(_traits).paint(canvas, _taillePad);
+    _SignaturePainter(_traits, _trace).paint(canvas, _taillePad);
     final image = await recorder.endRecording().toImage(
           (_taillePad.width * echelle).round(),
           (_taillePad.height * echelle).round(),
@@ -166,7 +178,8 @@ class _PvScreenState extends State<PvScreen> {
         _pv = Map<String, dynamic>.from(jsonDecode(reponse.body) as Map);
       }
     } catch (_) {}
-    final url = _pv?[telecharger ? 'pv_url_telechargement' : 'pv_url']?.toString();
+    final url =
+        _pv?[telecharger ? 'pv_url_telechargement' : 'pv_url']?.toString();
     if (url == null || url.isEmpty) {
       _message('Lien du PV indisponible.');
       return;
@@ -200,7 +213,8 @@ class _PvScreenState extends State<PvScreen> {
                         Text(_erreur!, textAlign: TextAlign.center),
                         const SizedBox(height: 12),
                         OutlinedButton(
-                            onPressed: _charger, child: const Text('Réessayer')),
+                            onPressed: _charger,
+                            child: const Text('Réessayer')),
                       ],
                     ),
                   ),
@@ -221,7 +235,8 @@ class _PvScreenState extends State<PvScreen> {
         d['model'],
       ].where((v) => v != null && v.toString().isNotEmpty).join(' · '),
       'Immatriculation': d['numero_vehicule']?.toString() ?? '',
-      'Adresse': d['adresse_precise']?.toString() ?? d['commune']?.toString() ?? '',
+      'Adresse':
+          d['adresse_precise']?.toString() ?? d['commune']?.toString() ?? '',
       'Infraction': d['motif_infraction']?.toString() ?? '',
       'Pièces manquantes': d['pieces_manquantes']?.toString() ?? '',
     };
@@ -249,7 +264,7 @@ class _PvScreenState extends State<PvScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     SizedBox(
-                      width: 120,
+                      width: MediaQuery.sizeOf(context).width < 360 ? 96 : 120,
                       child: Text(e.key,
                           style: const TextStyle(
                               color: SendraTheme.muted, fontSize: 13.5)),
@@ -313,25 +328,32 @@ class _PvScreenState extends State<PvScreen> {
                 ),
                 const SizedBox(height: 6),
                 SizedBox(
-                  height: 170,
+                  // Cadre plus bas sur un petit écran pour que le
+                  // récapitulatif reste visible au-dessus.
+                  height: (MediaQuery.sizeOf(context).height * .24)
+                      .clamp(120.0, 200.0)
+                      .toDouble(),
                   child: LayoutBuilder(builder: (context, c) {
                     _taillePad = Size(c.maxWidth, c.maxHeight);
                     return DecoratedBox(
                       decoration: BoxDecoration(
                         color: const Color(0xFFFAFCFB),
                         borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: SendraTheme.border, width: 1.4),
+                        border:
+                            Border.all(color: SendraTheme.border, width: 1.4),
                       ),
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(14),
                         child: GestureDetector(
                           behavior: HitTestBehavior.opaque,
-                          onPanStart: (d) => setState(
-                              () => _traits.add([d.localPosition])),
-                          onPanUpdate: (d) => setState(
-                              () => _traits.last.add(d.localPosition)),
+                          onPanStart: (d) =>
+                              setState(() => _traits.add([d.localPosition])),
+                          onPanUpdate: (d) {
+                            _traits.last.add(d.localPosition);
+                            _trace.value++;
+                          },
                           child: CustomPaint(
-                            painter: _SignaturePainter(_traits),
+                            painter: _SignaturePainter(_traits, _trace),
                             child: _traits.isEmpty
                                 ? const Center(
                                     child: Text('Signez ici',
@@ -356,7 +378,9 @@ class _PvScreenState extends State<PvScreen> {
                             child: CircularProgressIndicator(
                                 strokeWidth: 2.4, color: Colors.white))
                         : const Icon(Icons.draw_rounded),
-                    label: Text(_envoi ? 'Génération du PV…' : 'Signer le procès-verbal'),
+                    label: Text(_envoi
+                        ? 'Génération du PV…'
+                        : 'Signer le procès-verbal'),
                   ),
                 ),
               ],
@@ -384,7 +408,8 @@ class _PvScreenState extends State<PvScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text('Signature de l’agent',
-              style: TextStyle(fontWeight: FontWeight.w800, color: SendraTheme.forest)),
+              style: TextStyle(
+                  fontWeight: FontWeight.w800, color: SendraTheme.forest)),
           if (agent != null && agent.isNotEmpty) ...[
             const SizedBox(height: 4),
             Text(agent, style: const TextStyle(fontWeight: FontWeight.w600)),
@@ -414,7 +439,10 @@ class _PvScreenState extends State<PvScreen> {
     final numero = _pv?['pv_numero'] ?? _signalement?['pv_numero'];
     final date = _pv?['pv_signe_at'];
     return ListView(
-      padding: const EdgeInsets.all(16),
+      // Marge basse = barre de navigation du téléphone : les boutons ne
+      // passent jamais dessous.
+      padding: EdgeInsets.fromLTRB(
+          16, 16, 16, 16 + MediaQuery.viewPaddingOf(context).bottom),
       children: [
         Container(
           padding: const EdgeInsets.all(20),
@@ -434,7 +462,8 @@ class _PvScreenState extends State<PvScreen> {
                 const SizedBox(height: 4),
                 Text('$numero',
                     style: const TextStyle(
-                        fontWeight: FontWeight.w700, color: SendraTheme.forest)),
+                        fontWeight: FontWeight.w700,
+                        color: SendraTheme.forest)),
               ],
               if (date != null) ...[
                 const SizedBox(height: 2),
@@ -481,7 +510,7 @@ Uint8List? _decoderDataUri(String? dataUri) {
 }
 
 class _SignaturePainter extends CustomPainter {
-  _SignaturePainter(this.traits);
+  _SignaturePainter(this.traits, Listenable trace) : super(repaint: trace);
   final List<List<Offset>> traits;
 
   @override
@@ -494,7 +523,8 @@ class _SignaturePainter extends CustomPainter {
       ..style = PaintingStyle.stroke;
     for (final trait in traits) {
       if (trait.length == 1) {
-        canvas.drawCircle(trait.first, 1.4, pinceau..style = PaintingStyle.fill);
+        canvas.drawCircle(
+            trait.first, 1.4, pinceau..style = PaintingStyle.fill);
         pinceau.style = PaintingStyle.stroke;
         continue;
       }

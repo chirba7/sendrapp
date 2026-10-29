@@ -9,11 +9,4 @@ class SignUpController extends GetxController {
   final phoneNumberController = TextEditingController();
   final passwordController = TextEditingController();
   final confirmPasswordController = TextEditingController();
-
-
-// @override
-// void dispose() {
-//   Get.delete<SignInController>();
-//   super.dispose();
-// }
 }

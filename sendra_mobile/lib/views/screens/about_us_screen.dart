@@ -1,6 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_screenutil/flutter_screenutil.dart';
-import 'package:walletium/utils/custom_color.dart';
 import 'package:walletium/utils/custom_style.dart';
 import 'package:walletium/utils/dimsensions.dart';
 import 'package:walletium/utils/size.dart';
@@ -23,7 +21,10 @@ class AboutUsScreen extends StatelessWidget {
         ),
         elevation: 0,
       ),
-      body: _bodyWidget(context),
+      body: SafeArea(
+        top: false,
+        child: _bodyWidget(context),
+      ),
     );
   }
 
@@ -31,9 +32,9 @@ class AboutUsScreen extends StatelessWidget {
     return Scrollbar(
       child: ListView(
         children: [
-          addVerticalSpace(20.h),
+          addVerticalSpace(20),
           _imageWidget(context),
-          addVerticalSpace(20.h),
+          addVerticalSpace(20),
           _aboutUsDescription(context),
           _copyRightWidget(context)
         ],
@@ -53,49 +54,49 @@ class AboutUsScreen extends StatelessWidget {
 
   Container _aboutUsDescription(BuildContext context) {
     return Container(
-      margin: EdgeInsets.all(Dimensions.marginSize * 0.5),
+      margin: const EdgeInsets.all(Dimensions.marginSize * 0.5),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             'I.	Conditions Générales d\'Utilisation (CGU)',
             style: TextStyle(
-              fontSize: 16.sp,
+              fontSize: 16,
               fontWeight: FontWeight.bold,
               color: Colors.black,
               shadows: [
                 Shadow(
-                  color: Colors.grey.withOpacity(0.5),
+                  color: Colors.grey.withValues(alpha: 0.5),
                   blurRadius: 2,
-                  offset: Offset(2, 2),
+                  offset: const Offset(2, 2),
                 ),
               ],
             ),
           ),
-          addVerticalSpace(20.h),
+          addVerticalSpace(20),
           Text(
             Strings.aboutUsPartOne,
             textAlign: TextAlign.justify,
             style: CustomStyler.aboutUsDesStyle,
           ),
-          addVerticalSpace(20.h),
+          addVerticalSpace(20),
           Text(
             Strings.aboutUsPartTwo,
             textAlign: TextAlign.justify,
             style: CustomStyler.aboutUsDesStyle,
           ),
-          addVerticalSpace(20.h),
+          addVerticalSpace(20),
           Text(
             'II.	Protection de la Vie Privée',
             style: TextStyle(
-              fontSize: 16.sp,
+              fontSize: 16,
               fontWeight: FontWeight.bold,
               color: Colors.black,
               shadows: [
                 Shadow(
-                  color: Colors.grey.withOpacity(0.5),
+                  color: Colors.grey.withValues(alpha: 0.5),
                   blurRadius: 2,
-                  offset: Offset(2, 2),
+                  offset: const Offset(2, 2),
                 ),
               ],
             ),
@@ -105,34 +106,33 @@ class AboutUsScreen extends StatelessWidget {
             textAlign: TextAlign.justify,
             style: CustomStyler.aboutUsDesStyle,
           ),
-          addVerticalSpace(20.h),
+          addVerticalSpace(20),
           Text(
             Strings.aboutUsPartFour,
             textAlign: TextAlign.justify,
             style: CustomStyler.aboutUsDesStyle,
           ),
-          addVerticalSpace(20.h),
-
+          addVerticalSpace(20),
           Text(
             'III.  Rappel de l\'Usage et de la Destination de l\'Application',
             style: TextStyle(
-              fontSize: 16.sp,
+              fontSize: 16,
               fontWeight: FontWeight.bold,
               color: Colors.black,
               shadows: [
                 Shadow(
-                  color: Colors.grey.withOpacity(0.5),
+                  color: Colors.grey.withValues(alpha: 0.5),
                   blurRadius: 2,
-                  offset: Offset(2, 2),
+                  offset: const Offset(2, 2),
                 ),
               ],
             ),
           ),
-          addVerticalSpace(20.h),
-          Text(
+          addVerticalSpace(20),
+          const Text(
             'Notre application de gestion des signalements simplifie le processus de signalement et de suivi des incidents. Avec une interface conviviale, des performances optimales et un stockage sécurisé des données, les utilisateurs peuvent signaler et suivre les incidents avec facilité. Notre application offre une expérience fluide et efficace pour gérer les signalements, améliorant ainsi la gestion des problèmes dans la communauté.',
             style: TextStyle(
-              fontSize: 14.sp,
+              fontSize: 14,
               color: Colors.black87,
               wordSpacing: -1,
             ),

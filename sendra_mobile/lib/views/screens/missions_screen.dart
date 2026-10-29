@@ -50,34 +50,37 @@ class _MissionsScreenState extends State<MissionsScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(
-      title: Text(_showHistory ? 'Historique des missions' : 'Missions'),
-      actions: [
-        IconButton(
-          onPressed: () => setState(_reload),
-          icon: const Icon(Icons.refresh),
+        appBar: AppBar(
+          title: Text(_showHistory ? 'Historique des missions' : 'Missions'),
+          actions: [
+            IconButton(
+              onPressed: () => setState(_reload),
+              icon: const Icon(Icons.refresh),
+            ),
+          ],
         ),
-      ],
-    ),
-    body: FutureBuilder<List<Mission>>(
-      future: _missions,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting)
-          return const Center(child: CircularProgressIndicator());
-        if (snapshot.hasError)
-          return _StateMessage(
-            message: snapshot.error.toString().replaceFirst('Exception: ', ''),
-            onRetry: () => setState(_reload),
-          );
-        final missions = snapshot.data ?? const [];
-        if (missions.isEmpty)
-          return _StateMessage(
-            message: 'Vos prochaines missions apparaîtront ici.',
-            onRetry: () => setState(_reload),
-          );
-        final now = DateTime.now();
-        final visible =
-            missions
+        body: FutureBuilder<List<Mission>>(
+          future: _missions,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            if (snapshot.hasError) {
+              return _StateMessage(
+                message:
+                    snapshot.error.toString().replaceFirst('Exception: ', ''),
+                onRetry: () => setState(_reload),
+              );
+            }
+            final missions = snapshot.data ?? const [];
+            if (missions.isEmpty) {
+              return _StateMessage(
+                message: 'Vos prochaines missions apparaîtront ici.',
+                onRetry: () => setState(_reload),
+              );
+            }
+            final now = DateTime.now();
+            final visible = missions
                 .where(
                   (mission) =>
                       // L'historique montre toutes les missions, ouvertes
@@ -96,254 +99,254 @@ class _MissionsScreenState extends State<MissionsScreen> {
                 .toList()
               ..sort((a, b) {
                 if (_showHistory) {
-                  if (a.scheduledAt == null)
+                  if (a.scheduledAt == null) {
                     return b.scheduledAt == null ? 0 : 1;
+                  }
                   if (b.scheduledAt == null) return -1;
                   return b.scheduledAt!.compareTo(a.scheduledAt!);
                 }
                 if (a.scheduledAt == null) return b.scheduledAt == null ? 0 : 1;
                 if (b.scheduledAt == null) return -1;
-                final aDistance = a.scheduledAt!
-                    .difference(now)
-                    .inSeconds
-                    .abs();
-                final bDistance = b.scheduledAt!
-                    .difference(now)
-                    .inSeconds
-                    .abs();
+                final aDistance =
+                    a.scheduledAt!.difference(now).inSeconds.abs();
+                final bDistance =
+                    b.scheduledAt!.difference(now).inSeconds.abs();
                 return aDistance.compareTo(bDistance);
               });
-        return Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(8, 10, 8, 4),
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                children: [
-                  _filterChip(
-                      'all',
-                      'Toutes',
-                      Icons.view_agenda_outlined,
-                      const Color(0xFF52606D),
-                    ),
-                  _filterChip(
-                      'programmee',
-                      'Programmées',
-                      Icons.event_available_outlined,
-                      SendraTheme.green,
-                    ),
-                  _filterChip(
-                      'ponctuelle',
-                      'Ponctuelles',
-                      Icons.flash_on_outlined,
-                      SendraTheme.amber,
-                    ),
-                ],
-                ),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(12, 2, 12, 8),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  if (!_showHistory)
-                    SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: Row(
-                        children: [
-                          _statusChip('all', 'Toutes les actives'),
-                          _statusChip('a_venir', 'À venir'),
-                          _statusChip('en_cours', 'En cours'),
-                        ],
-                      ),
-                    )
-                  else
-                    const Padding(
-                      padding: EdgeInsets.only(left: 4),
-                      child: Text(
-                        'Toutes les missions, ouvertes et terminées',
-                        style: TextStyle(
-                            fontSize: 15, fontWeight: FontWeight.w700),
-                      ),
-                    ),
-                  // Bascule compacte (l'ancien grand bouton prenait une
-                  // ligne entière au-dessus de la liste).
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: TextButton.icon(
-                      onPressed: () => setState(() {
-                        _showHistory = !_showHistory;
-                        _statusFilter = 'all';
-                      }),
-                      icon: Icon(_showHistory
-                          ? Icons.arrow_back_rounded
-                          : Icons.history_rounded),
-                      label: Text(_showHistory
-                          ? 'Missions actives'
-                          : 'Voir l’historique'),
+            return Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(8, 10, 8, 4),
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        _filterChip(
+                          'all',
+                          'Toutes',
+                          const Color(0xFF52606D),
+                        ),
+                        _filterChip(
+                          'programmee',
+                          'Programmées',
+                          SendraTheme.green,
+                        ),
+                        _filterChip(
+                          'ponctuelle',
+                          'Ponctuelles',
+                          SendraTheme.amber,
+                        ),
+                      ],
                     ),
                   ),
-                ],
-              ),
-            ),
-            Expanded(
-              child: visible.isEmpty
-                  ? Center(
-                      child: Text(
-                        _showHistory
-                            ? 'Aucune mission dans cet historique.'
-                            : 'Aucune mission en cours ou à venir dans ce filtre.',
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 2, 12, 8),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (!_showHistory)
+                        SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: Row(
+                            children: [
+                              _statusChip('all', 'Toutes les actives'),
+                              _statusChip('a_venir', 'À venir'),
+                              _statusChip('en_cours', 'En cours'),
+                            ],
+                          ),
+                        )
+                      else
+                        const Padding(
+                          padding: EdgeInsets.only(left: 4),
+                          child: Text(
+                            'Toutes les missions, ouvertes et terminées',
+                            style: TextStyle(
+                                fontSize: 15, fontWeight: FontWeight.w700),
+                          ),
+                        ),
+                      // Bascule compacte (l'ancien grand bouton prenait une
+                      // ligne entière au-dessus de la liste).
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: TextButton.icon(
+                          onPressed: () => setState(() {
+                            _showHistory = !_showHistory;
+                            _statusFilter = 'all';
+                          }),
+                          icon: Icon(_showHistory
+                              ? Icons.arrow_back_rounded
+                              : Icons.history_rounded),
+                          label: Text(_showHistory
+                              ? 'Missions actives'
+                              : 'Voir l’historique'),
+                        ),
                       ),
-                    )
-                  : RefreshIndicator(
-                      onRefresh: _refresh,
-                      child: ListView.separated(
-                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 110),
-                        itemCount: visible.length,
-                        separatorBuilder: (_, __) => const SizedBox(height: 12),
-                        itemBuilder: (_, index) {
-                          final mission = visible[index];
-                          final hasPointed = mission.isReceiver
-                              ? mission.receptionCheckedIn
-                              : mission.checkedIn;
-                          final etat = _etat(mission, now);
-                          return Card(
-                            shape: RoundedRectangleBorder(
-                              borderRadius:
-                                  BorderRadius.circular(SendraTheme.radius),
-                              side: const BorderSide(color: SendraTheme.border),
-                            ),
-                            child: InkWell(
-                              borderRadius:
-                                  BorderRadius.circular(SendraTheme.radius),
-                              onTap: () async {
-                                await Navigator.of(context).push(
-                                  MaterialPageRoute(
-                                    builder: (_) => MissionDetailsScreen(
-                                      missionId: mission.id,
-                                      initialMission: mission,
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: visible.isEmpty
+                      ? Center(
+                          child: Text(
+                            _showHistory
+                                ? 'Aucune mission dans cet historique.'
+                                : 'Aucune mission en cours ou à venir dans ce filtre.',
+                          ),
+                        )
+                      : RefreshIndicator(
+                          onRefresh: _refresh,
+                          child: ListView.separated(
+                            padding: const EdgeInsets.fromLTRB(16, 12, 16, 110),
+                            itemCount: visible.length,
+                            separatorBuilder: (_, __) =>
+                                const SizedBox(height: 12),
+                            itemBuilder: (_, index) {
+                              final mission = visible[index];
+                              final hasPointed = mission.isReceiver
+                                  ? mission.receptionCheckedIn
+                                  : mission.checkedIn;
+                              final etat = _etat(mission, now);
+                              return Card(
+                                shape: RoundedRectangleBorder(
+                                  borderRadius:
+                                      BorderRadius.circular(SendraTheme.radius),
+                                  side: const BorderSide(
+                                      color: SendraTheme.border),
+                                ),
+                                child: InkWell(
+                                  borderRadius:
+                                      BorderRadius.circular(SendraTheme.radius),
+                                  onTap: () async {
+                                    await Navigator.of(context).push(
+                                      MaterialPageRoute(
+                                        builder: (_) => MissionDetailsScreen(
+                                          missionId: mission.id,
+                                          initialMission: mission,
+                                        ),
+                                      ),
+                                    );
+                                    if (mounted) setState(_reload);
+                                  },
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(16),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          children: [
+                                            Expanded(
+                                              child: Text(
+                                                mission.code.isNotEmpty
+                                                    ? mission.code
+                                                    : mission.title,
+                                                maxLines: 2,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: const TextStyle(
+                                                  fontSize: 16,
+                                                  fontWeight: FontWeight.w700,
+                                                  color: SendraTheme.ink,
+                                                ),
+                                              ),
+                                            ),
+                                            _Badge(
+                                              label: etat.$1,
+                                              color: etat.$2,
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 8),
+                                        Wrap(
+                                          spacing: 6,
+                                          runSpacing: 6,
+                                          children: [
+                                            _Badge(
+                                              label: mission.isReceiver
+                                                  ? 'Réception en fourrière'
+                                                  : 'Équipe terrain',
+                                              color: mission.isReceiver
+                                                  ? const Color(0xFF6847B8)
+                                                  : const Color(0xFF1769AA),
+                                            ),
+                                            _Badge(
+                                              label: mission.isProgrammed
+                                                  ? 'Programmée'
+                                                  : 'Ponctuelle',
+                                              color: mission.isProgrammed
+                                                  ? SendraTheme.green
+                                                  : SendraTheme.amber,
+                                            ),
+                                            if (mission.readOnly)
+                                              const _Badge(
+                                                label: 'Lecture seule',
+                                                color: SendraTheme.muted,
+                                              ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 12),
+                                        _Info(
+                                          Icons.event_outlined,
+                                          _dateLabel(mission.scheduledAt),
+                                        ),
+                                        if (mission.address.isNotEmpty)
+                                          _Info(
+                                            Icons.place_outlined,
+                                            mission.address,
+                                          ),
+                                        if (mission.isReceiver &&
+                                            mission.removalValidated &&
+                                            mission.vehicles.any((v) =>
+                                                (v.nonRemovalReason ?? '')
+                                                    .trim()
+                                                    .isNotEmpty))
+                                          _Info(
+                                            Icons.report_problem_outlined,
+                                            '${mission.vehicles.where((v) => (v.nonRemovalReason ?? '').trim().isNotEmpty).length} véhicule(s) non enlevé(s) — voir les motifs',
+                                          ),
+                                        _Info(
+                                          hasPointed
+                                              ? Icons.check_circle_outline
+                                              : Icons.my_location,
+                                          mission.completed
+                                              ? 'Mission terminée'
+                                              : hasPointed
+                                                  ? mission.isReceiver
+                                                      ? '${mission.removals.where((r) => r.received).length}/${mission.removals.length} réceptionné(s)'
+                                                      : '${mission.removals.length} enlèvement(s)'
+                                                  : mission.isReceiver &&
+                                                          !mission
+                                                              .removalValidated
+                                                      ? 'En attente de l’enlèvement'
+                                                      : 'Ouvrir pour pointer',
+                                        ),
+                                        const Align(
+                                          alignment: Alignment.centerRight,
+                                          child: Icon(Icons.chevron_right),
+                                        ),
+                                      ],
                                     ),
                                   ),
-                                );
-                                if (mounted) setState(_reload);
-                              },
-                              child: Padding(
-                                padding: const EdgeInsets.all(16),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Row(
-                                      children: [
-                                        Expanded(
-                                          child: Text(
-                                            mission.code.isNotEmpty
-                                                ? mission.code
-                                                : mission.title,
-                                            maxLines: 2,
-                                            overflow: TextOverflow.ellipsis,
-                                            style: const TextStyle(
-                                              fontSize: 16,
-                                              fontWeight: FontWeight.w700,
-                                              color: SendraTheme.ink,
-                                            ),
-                                          ),
-                                        ),
-                                        _Badge(
-                                          label: etat.$1,
-                                          color: etat.$2,
-                                        ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 8),
-                                    Wrap(
-                                      spacing: 6,
-                                      runSpacing: 6,
-                                      children: [
-                                        _Badge(
-                                          label: mission.isReceiver
-                                              ? 'Réception en fourrière'
-                                              : 'Équipe terrain',
-                                          color: mission.isReceiver
-                                              ? const Color(0xFF6847B8)
-                                              : const Color(0xFF1769AA),
-                                        ),
-                                        _Badge(
-                                          label: mission.isProgrammed
-                                              ? 'Programmée'
-                                              : 'Ponctuelle',
-                                          color: mission.isProgrammed
-                                              ? SendraTheme.green
-                                              : SendraTheme.amber,
-                                        ),
-                                        if (mission.readOnly)
-                                          const _Badge(
-                                            label: 'Lecture seule',
-                                            color: SendraTheme.muted,
-                                          ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 12),
-                                    _Info(
-                                      Icons.event_outlined,
-                                      _dateLabel(mission.scheduledAt),
-                                    ),
-                                    if (mission.address.isNotEmpty)
-                                      _Info(
-                                        Icons.place_outlined,
-                                        mission.address,
-                                      ),
-                                    if (mission.isReceiver &&
-                                        mission.removalValidated &&
-                                        mission.vehicles.any((v) =>
-                                            (v.nonRemovalReason ?? '')
-                                                .trim()
-                                                .isNotEmpty))
-                                      _Info(
-                                        Icons.report_problem_outlined,
-                                        '${mission.vehicles.where((v) => (v.nonRemovalReason ?? '').trim().isNotEmpty).length} véhicule(s) non enlevé(s) — voir les motifs',
-                                      ),
-                                    _Info(
-                                      hasPointed
-                                          ? Icons.check_circle_outline
-                                          : Icons.my_location,
-                                      mission.completed
-                                          ? 'Mission terminée'
-                                          : hasPointed
-                                          ? mission.isReceiver
-                                                ? '${mission.removals.where((r) => r.received).length}/${mission.removals.length} réceptionné(s)'
-                                                : '${mission.removals.length} enlèvement(s)'
-                                          : mission.isReceiver &&
-                                                !mission.removalValidated
-                                          ? 'En attente de l’enlèvement'
-                                          : 'Ouvrir pour pointer',
-                                    ),
-                                    const Align(
-                                      alignment: Alignment.centerRight,
-                                      child: Icon(Icons.chevron_right),
-                                    ),
-                                  ],
                                 ),
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-            ),
-          ],
-        );
-      },
-    ),
-  );
+                              );
+                            },
+                          ),
+                        ),
+                ),
+              ],
+            );
+          },
+        ),
+      );
 
   /// État affiché d'une mission (historique compris).
   (String, Color) _etat(Mission mission, DateTime now) {
     if (mission.completed || mission.status == 'terminee') {
       return ('Terminée', SendraTheme.green);
     }
-    if (mission.status == 'annulee') return ('Annulée', SendraTheme.statusSignale);
+    if (mission.status == 'annulee') {
+      return ('Annulée', SendraTheme.statusSignale);
+    }
     if (mission.removalValidated || mission.status == 'en_reception') {
       return ('En réception', const Color(0xFF6847B8));
     }
@@ -353,7 +356,7 @@ class _MissionsScreenState extends State<MissionsScreen> {
     return ('À venir', const Color(0xFF1769AA));
   }
 
-  Widget _filterChip(String value, String label, IconData icon, Color color) {
+  Widget _filterChip(String value, String label, Color color) {
     final selected = _typeFilter == value;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 2),
@@ -392,15 +395,15 @@ class _Info extends StatelessWidget {
   final String text;
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(bottom: 7),
-    child: Row(
-      children: [
-        Icon(icon, size: 18, color: SendraTheme.muted),
-        const SizedBox(width: 8),
-        Expanded(child: Text(text)),
-      ],
-    ),
-  );
+        padding: const EdgeInsets.only(bottom: 7),
+        child: Row(
+          children: [
+            Icon(icon, size: 18, color: SendraTheme.muted),
+            const SizedBox(width: 8),
+            Expanded(child: Text(text)),
+          ],
+        ),
+      );
 }
 
 class _Badge extends StatelessWidget {
@@ -409,16 +412,17 @@ class _Badge extends StatelessWidget {
   final Color color;
   @override
   Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-    decoration: BoxDecoration(
-      color: color.withValues(alpha: .12),
-      borderRadius: BorderRadius.circular(20),
-    ),
-    child: Text(
-      label,
-      style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.w700),
-    ),
-  );
+        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: .12),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+              color: color, fontSize: 11, fontWeight: FontWeight.w700),
+        ),
+      );
 }
 
 class _StateMessage extends StatelessWidget {
@@ -427,26 +431,26 @@ class _StateMessage extends StatelessWidget {
   final VoidCallback onRetry;
   @override
   Widget build(BuildContext context) => Center(
-    child: Padding(
-      padding: const EdgeInsets.all(28),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(
-            Icons.assignment_outlined,
-            size: 54,
-            color: SendraTheme.muted,
+        child: Padding(
+          padding: const EdgeInsets.all(28),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(
+                Icons.assignment_outlined,
+                size: 54,
+                color: SendraTheme.muted,
+              ),
+              const SizedBox(height: 12),
+              Text(message, textAlign: TextAlign.center),
+              const SizedBox(height: 14),
+              OutlinedButton.icon(
+                onPressed: onRetry,
+                icon: const Icon(Icons.refresh),
+                label: const Text('Réessayer'),
+              ),
+            ],
           ),
-          const SizedBox(height: 12),
-          Text(message, textAlign: TextAlign.center),
-          const SizedBox(height: 14),
-          OutlinedButton.icon(
-            onPressed: onRetry,
-            icon: const Icon(Icons.refresh),
-            label: const Text('Réessayer'),
-          ),
-        ],
-      ),
-    ),
-  );
+        ),
+      );
 }

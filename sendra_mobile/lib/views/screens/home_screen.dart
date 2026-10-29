@@ -11,6 +11,7 @@ import '../../utils/strings.dart';
 import '../../utils/sendra_theme.dart';
 import '../../widgets/others/guide_view.dart';
 import '../screens/drawer_screen.dart';
+import 'package:walletium/widgets/others/photo_reseau.dart';
 
 /// Accueil : liste des signalements.
 ///
@@ -51,7 +52,9 @@ class _HomeScreenState extends State<HomeScreen> {
   List<dynamic> _autresItems = [];
   bool _autresCharges = false;
   bool _autresChargement = false;
-
+  // « Les autres » : commune choisie (clé normalisée), null = toutes.
+  String? _commune;
+  static const _toutes = '__toutes__';
 
   static const _filters = <({String value, String label})>[
     (value: 'TOUS', label: 'Tous'),
@@ -64,9 +67,48 @@ class _HomeScreenState extends State<HomeScreen> {
 
   List<dynamic> get _source => _autres ? _autresItems : _items;
 
-  List<dynamic> get _filtered => _filter == 'TOUS'
+  /// Liste affichée avant le filtre de statut : « Les autres » est
+  /// restreint à la commune choisie.
+  List<dynamic> get _base => _autres && _commune != null
       ? _source
-      : _source.where((s) => s['etat'] == _filter).toList(growable: false);
+          .where((s) => _cleCommune(s) == _commune)
+          .toList(growable: false)
+      : _source;
+
+  List<dynamic> get _filtered => _filter == 'TOUS'
+      ? _base
+      : _base.where((s) => s['etat'] == _filter).toList(growable: false);
+
+  /// Clé de regroupement : « Dakar Plateau » et « dakar plateau  » ne font
+  /// qu'une seule commune.
+  static String _cleCommune(dynamic s) =>
+      (s is Map ? s['commune'] ?? '' : '').toString().trim().toLowerCase();
+
+  /// Communes présentes dans « Les autres », triées par nom, avec le nombre
+  /// de signalements ; « non renseignée » en dernier.
+  List<({String cle, String libelle, int n})> get _communes {
+    final parCle = <String, ({String libelle, int n})>{};
+    for (final s in _autresItems) {
+      final cle = _cleCommune(s);
+      final deja = parCle[cle];
+      parCle[cle] = (
+        libelle: deja?.libelle ??
+            (cle.isEmpty
+                ? 'Commune non renseignée'
+                : s['commune'].toString().trim()),
+        n: (deja?.n ?? 0) + 1,
+      );
+    }
+    final liste = [
+      for (final e in parCle.entries)
+        (cle: e.key, libelle: e.value.libelle, n: e.value.n)
+    ];
+    liste.sort((a, b) {
+      if (a.cle.isEmpty != b.cle.isEmpty) return a.cle.isEmpty ? 1 : -1;
+      return a.libelle.toLowerCase().compareTo(b.libelle.toLowerCase());
+    });
+    return liste;
+  }
 
   @override
   void initState() {
@@ -91,8 +133,8 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _recount() {
-    final counts = <String, int>{'TOUS': _source.length};
-    for (final s in _source) {
+    final counts = <String, int>{'TOUS': _base.length};
+    for (final s in _base) {
       final etat = s['etat']?.toString() ?? '';
       counts[etat] = (counts[etat] ?? 0) + 1;
     }
@@ -125,6 +167,11 @@ class _HomeScreenState extends State<HomeScreen> {
             .where((s) => s is Map && s['est_mien'] != true)
             .toList(growable: false);
         _autresCharges = true;
+        // La commune choisie n'a plus de signalement : on revient à toutes.
+        if (_commune != null &&
+            !_autresItems.any((s) => _cleCommune(s) == _commune)) {
+          _commune = null;
+        }
         _recount();
       });
     } catch (_) {
@@ -144,6 +191,32 @@ class _HomeScreenState extends State<HomeScreen> {
       _recount();
     });
     if (autres && !_autresCharges) _fetchAutres();
+  }
+
+  void _choisirCommune(String? cle) {
+    if (cle == _commune) return;
+    setState(() {
+      _commune = cle;
+      _recount();
+    });
+    if (_scroll.hasClients) _scroll.jumpTo(0);
+  }
+
+  /// Tiroir de choix de la commune (avec recherche s'il y en a beaucoup).
+  Future<void> _ouvrirCommunes() async {
+    final choix = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      backgroundColor: Colors.white,
+      builder: (_) => _TiroirCommunes(
+        communes: _communes,
+        actuelle: _commune,
+        total: _autresItems.length,
+      ),
+    );
+    if (choix == null || !mounted) return;
+    _choisirCommune(choix == _toutes ? null : choix);
   }
 
   Future<void> _fetchData() async {
@@ -282,6 +355,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     slivers: [
                       SliverToBoxAdapter(child: _header()),
                       if (!_isStaff) SliverToBoxAdapter(child: _porteeBar()),
+                      if (!_isStaff && _autres && _autresItems.isNotEmpty)
+                        SliverToBoxAdapter(child: _communeBar()),
                       SliverToBoxAdapter(child: _filterBar()),
                       ..._content(),
                       SliverToBoxAdapter(
@@ -311,6 +386,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
   /// Citoyen : bascule entre ses signalements et ceux des autres.
   Widget _porteeBar() {
+    // Écran étroit (Fold fermé, petits Android) : libellés courts, sans
+    // icône, pour que les deux segments tiennent sur une ligne.
+    final etroit = MediaQuery.sizeOf(context).width < 360;
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
       child: SegmentedButton<bool>(
@@ -319,19 +397,20 @@ class _HomeScreenState extends State<HomeScreen> {
           selectedBackgroundColor: SendraTheme.greenSoft,
           selectedForegroundColor: SendraTheme.forest,
           side: const BorderSide(color: SendraTheme.border),
-          textStyle:
-              const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+          textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
         ),
-        segments: const [
+        segments: [
           ButtonSegment(
             value: false,
-            icon: Icon(Icons.person_rounded, size: 18),
-            label: Text('Mes signalements'),
+            icon: etroit ? null : const Icon(Icons.person_rounded, size: 18),
+            label: Text(etroit ? 'Les miens' : 'Mes signalements',
+                maxLines: 1, overflow: TextOverflow.ellipsis),
           ),
           ButtonSegment(
             value: true,
-            icon: Icon(Icons.groups_rounded, size: 18),
-            label: Text('Les autres'),
+            icon: etroit ? null : const Icon(Icons.groups_rounded, size: 18),
+            label: const Text('Les autres',
+                maxLines: 1, overflow: TextOverflow.ellipsis),
           ),
         ],
         selected: {_autres},
@@ -340,9 +419,91 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  /// « Les autres » : la commune courante ; un appui ouvre le tiroir.
+  Widget _communeBar() {
+    final actif = _commune != null;
+    final libelle = actif
+        ? _communes
+            .firstWhere((c) => c.cle == _commune,
+                orElse: () => (cle: '', libelle: 'Toutes les communes', n: 0))
+            .libelle
+        : 'Toutes les communes';
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      child: Row(
+        children: [
+          const SizedBox(
+            width: 72,
+            child: Text('Commune',
+                style: TextStyle(
+                    color: SendraTheme.muted,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600)),
+          ),
+          Expanded(
+            child: Material(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(14),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(14),
+                onTap: _ouvrirCommunes,
+                child: Container(
+                  height: 48,
+                  padding: const EdgeInsets.only(left: 14, right: 6),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: actif ? SendraTheme.green : SendraTheme.border,
+                      width: actif ? 1.6 : 1,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.place_outlined,
+                          size: 18,
+                          color: actif ? SendraTheme.green : SendraTheme.muted),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          libelle,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                            color: SendraTheme.ink,
+                          ),
+                        ),
+                      ),
+                      if (actif)
+                        IconButton(
+                          tooltip: 'Toutes les communes',
+                          visualDensity: VisualDensity.compact,
+                          onPressed: () => _choisirCommune(null),
+                          icon: const Icon(Icons.close_rounded,
+                              size: 20, color: SendraTheme.muted),
+                        )
+                      else
+                        const Padding(
+                          padding: EdgeInsets.only(right: 8),
+                          child: Icon(Icons.keyboard_arrow_down_rounded,
+                              color: SendraTheme.muted),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _header() {
-    final n = _source.length;
-    final chargement = _autres ? _autresChargement && !_autresCharges : _initialLoading;
+    final n = _base.length;
+    final chargement =
+        _autres ? _autresChargement && !_autresCharges : _initialLoading;
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
       child: Column(
@@ -379,12 +540,16 @@ class _HomeScreenState extends State<HomeScreen> {
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
       child: Row(
         children: [
-          const Text('Statut',
-              style: TextStyle(
-                  color: SendraTheme.muted,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600)),
-          const SizedBox(width: 12),
+          SizedBox(
+            width: !_isStaff && _autres && _autresItems.isNotEmpty ? 72 : null,
+            child: const Text('Statut',
+                style: TextStyle(
+                    color: SendraTheme.muted,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600)),
+          ),
+          if (_isStaff || !_autres || _autresItems.isEmpty)
+            const SizedBox(width: 12),
           Expanded(
             child: PopupMenuButton<String>(
               tooltip: 'Filtrer par statut',
@@ -422,6 +587,8 @@ class _HomeScreenState extends State<HomeScreen> {
                         Expanded(
                           child: Text(
                             f.label,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                             style: TextStyle(
                               fontSize: 15,
                               fontWeight: f.value == _filter
@@ -480,6 +647,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     Expanded(
                       child: Text(
                         current.label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.w700,
@@ -537,9 +706,7 @@ class _HomeScreenState extends State<HomeScreen> {
       return [
         SliverToBoxAdapter(
           child: _EmptyState(
-            icon: error != null
-                ? Icons.wifi_off_rounded
-                : Icons.inbox_outlined,
+            icon: error != null ? Icons.wifi_off_rounded : Icons.inbox_outlined,
             message: error ??
                 (_source.isEmpty
                     ? (_autres
@@ -577,6 +744,121 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
+// ───────────────────────────── Tiroir des communes ───────────────────────
+
+class _TiroirCommunes extends StatefulWidget {
+  const _TiroirCommunes({
+    required this.communes,
+    required this.actuelle,
+    required this.total,
+  });
+
+  final List<({String cle, String libelle, int n})> communes;
+  final String? actuelle;
+  final int total;
+
+  @override
+  State<_TiroirCommunes> createState() => _TiroirCommunesState();
+}
+
+class _TiroirCommunesState extends State<_TiroirCommunes> {
+  String _recherche = '';
+
+  @override
+  Widget build(BuildContext context) {
+    final q = _recherche.trim().toLowerCase();
+    final liste = q.isEmpty
+        ? widget.communes
+        : widget.communes
+            .where((c) => c.libelle.toLowerCase().contains(q))
+            .toList(growable: false);
+    return Padding(
+      padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+      child: SizedBox(
+        height: MediaQuery.sizeOf(context).height * .7,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Padding(
+              padding: EdgeInsets.fromLTRB(20, 0, 20, 10),
+              child: Text('Filtrer par commune',
+                  style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                      color: SendraTheme.ink)),
+            ),
+            if (widget.communes.length > 6)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                child: TextField(
+                  onChanged: (v) => setState(() => _recherche = v),
+                  textInputAction: TextInputAction.search,
+                  decoration: InputDecoration(
+                    hintText: 'Rechercher une commune',
+                    prefixIcon: const Icon(Icons.search_rounded),
+                    isDense: true,
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14)),
+                  ),
+                ),
+              ),
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.only(bottom: 16),
+                children: [
+                  if (q.isEmpty)
+                    _ligne(_HomeScreenState._toutes, 'Toutes les communes',
+                        widget.total, widget.actuelle == null),
+                  for (final c in liste)
+                    _ligne(c.cle, c.libelle, c.n, widget.actuelle == c.cle),
+                  if (liste.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.all(24),
+                      child: Text('Aucune commune ne correspond.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: SendraTheme.muted)),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _ligne(String cle, String libelle, int n, bool choisie) {
+    return ListTile(
+      onTap: () => Navigator.of(context).pop(cle),
+      leading: Icon(
+        choisie
+            ? Icons.radio_button_checked_rounded
+            : Icons.radio_button_off_rounded,
+        color: choisie ? SendraTheme.green : SendraTheme.muted,
+      ),
+      title: Text(
+        libelle,
+        style: TextStyle(
+          fontWeight: choisie ? FontWeight.w700 : FontWeight.w500,
+          color: SendraTheme.ink,
+        ),
+      ),
+      trailing: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+        decoration: BoxDecoration(
+          color: SendraTheme.greenSoft,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Text('$n',
+            style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: SendraTheme.forest)),
+      ),
+    );
+  }
+}
+
 // ───────────────────────────── Carte d'un signalement ─────────────────────
 
 class _SignalementCard extends StatelessWidget {
@@ -606,7 +888,6 @@ class _SignalementCard extends StatelessWidget {
     final date = (data['formatted_date'] ?? '').toString();
     final width = MediaQuery.sizeOf(context).width;
     final thumb = width < 360 ? 84.0 : 100.0;
-    final dpr = MediaQuery.devicePixelRatioOf(context);
 
     return RepaintBoundary(
       child: Padding(
@@ -630,17 +911,11 @@ class _SignalementCard extends StatelessWidget {
                       dimension: thumb,
                       child: imageUrl == null || imageUrl.isEmpty
                           ? const _ThumbPlaceholder()
-                          : Image.network(
+                          : PhotoReseau(
                               imageUrl,
-                              fit: BoxFit.cover,
-                              cacheWidth: (thumb * dpr).round(),
-                              gaplessPlayback: true,
-                              frameBuilder: (_, child, frame, sync) =>
-                                  sync || frame != null
-                                      ? child
-                                      : const _ThumbPlaceholder(),
-                              errorBuilder: (_, __, ___) =>
-                                  const _ThumbPlaceholder(),
+                              largeur: thumb,
+                              attente: const _ThumbPlaceholder(),
+                              erreur: const _ThumbPlaceholder(),
                             ),
                     ),
                   ),
@@ -673,13 +948,11 @@ class _SignalementCard extends StatelessWidget {
                         ],
                         if (commune.isNotEmpty) ...[
                           const SizedBox(height: 4),
-                          _InfoLine(
-                              icon: Icons.place_outlined, text: commune),
+                          _InfoLine(icon: Icons.place_outlined, text: commune),
                         ],
                         if (date.isNotEmpty) ...[
                           const SizedBox(height: 3),
-                          _InfoLine(
-                              icon: Icons.schedule_rounded, text: date),
+                          _InfoLine(icon: Icons.schedule_rounded, text: date),
                         ],
                         if (showAgent && agent != null && agent.isNotEmpty) ...[
                           const SizedBox(height: 3),
@@ -721,6 +994,8 @@ class _Plaque extends StatelessWidget {
         ),
         child: Text(
           texte.toUpperCase(),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
           style: const TextStyle(
             color: Colors.white,
             fontSize: 12,
@@ -772,125 +1047,137 @@ class _SignalerHeroState extends State<_SignalerHero>
             scale: _appuye ? .97 : 1,
             duration: const Duration(milliseconds: 120),
             child: Ink(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [SendraTheme.green, SendraTheme.forest],
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [SendraTheme.green, SendraTheme.forest],
+                ),
+              ),
+              child: LayoutBuilder(
+                builder: (context, c) {
+                  final icone = (c.maxHeight * .42).clamp(52.0, 92.0);
+                  return Stack(
+                    children: [
+                      Positioned(
+                        right: -30,
+                        top: -40,
+                        child: Container(
+                          width: 160,
+                          height: 160,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: Colors.white.withValues(alpha: .07),
+                          ),
+                        ),
+                      ),
+                      Center(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              // Couche à part : l'animation continue ne
+                              // redessine plus toute la page (liste et photos).
+                              RepaintBoundary(
+                                child: SizedBox.square(
+                                  dimension: icone * 1.35,
+                                  child: AnimatedBuilder(
+                                    animation: _anim,
+                                    builder: (context, child) {
+                                      final t = reduit ? 0.0 : _anim.value;
+                                      // Respiration douce de l'icône.
+                                      final souffle = reduit
+                                          ? 1.0
+                                          : 1 + .06 * (1 - (2 * t - 1).abs());
+                                      return Stack(
+                                        alignment: Alignment.center,
+                                        children: [
+                                          // Deux ondes décalées qui s'élargissent.
+                                          if (!reduit)
+                                            for (final decalage in const [
+                                              0.0,
+                                              .5
+                                            ])
+                                              Builder(builder: (_) {
+                                                final p = (t + decalage) % 1;
+                                                return Container(
+                                                  width: icone * (1 + .35 * p),
+                                                  height: icone * (1 + .35 * p),
+                                                  decoration: BoxDecoration(
+                                                    shape: BoxShape.circle,
+                                                    border: Border.all(
+                                                      color: Colors.white
+                                                          .withValues(
+                                                              alpha: .55 *
+                                                                  (1 - p)),
+                                                      width: 2.5,
+                                                    ),
+                                                  ),
+                                                );
+                                              }),
+                                          Transform.scale(
+                                              scale: souffle, child: child),
+                                        ],
+                                      );
+                                    },
+                                    child: Container(
+                                      width: icone,
+                                      height: icone,
+                                      decoration: BoxDecoration(
+                                        color: Colors.white,
+                                        shape: BoxShape.circle,
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: Colors.black
+                                                .withValues(alpha: .15),
+                                            blurRadius: 12,
+                                            offset: const Offset(0, 4),
+                                          ),
+                                        ],
+                                      ),
+                                      child: Icon(Icons.add_a_photo_rounded,
+                                          color: SendraTheme.green,
+                                          size: icone * .48),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              SizedBox(height: c.maxHeight > 190 ? 14 : 8),
+                              const FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Text(
+                                  'Signaler',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 26,
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: -.3,
+                                  ),
+                                ),
+                              ),
+                              if (c.maxHeight > 170) ...[
+                                const SizedBox(height: 2),
+                                Text(
+                                  'Touchez pour photographier le véhicule',
+                                  textAlign: TextAlign.center,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    color: Colors.white.withValues(alpha: .85),
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  );
+                },
               ),
             ),
-            child: LayoutBuilder(
-              builder: (context, c) {
-                final icone = (c.maxHeight * .42).clamp(52.0, 92.0);
-                return Stack(
-                  children: [
-                    Positioned(
-                      right: -30,
-                      top: -40,
-                      child: Container(
-                        width: 160,
-                        height: 160,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: Colors.white.withValues(alpha: .07),
-                        ),
-                      ),
-                    ),
-                    Center(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            SizedBox.square(
-                              dimension: icone * 1.35,
-                              child: AnimatedBuilder(
-                                animation: _anim,
-                                builder: (context, child) {
-                                  final t = reduit ? 0.0 : _anim.value;
-                                  // Respiration douce de l'icône.
-                                  final souffle = reduit
-                                      ? 1.0
-                                      : 1 + .06 * (1 - (2 * t - 1).abs());
-                                  return Stack(
-                                    alignment: Alignment.center,
-                                    children: [
-                                      // Deux ondes décalées qui s'élargissent.
-                                      if (!reduit)
-                                        for (final decalage in const [0.0, .5])
-                                          Builder(builder: (_) {
-                                            final p = (t + decalage) % 1;
-                                            return Container(
-                                              width: icone * (1 + .35 * p),
-                                              height: icone * (1 + .35 * p),
-                                              decoration: BoxDecoration(
-                                                shape: BoxShape.circle,
-                                                border: Border.all(
-                                                  color: Colors.white
-                                                      .withValues(alpha: .55 * (1 - p)),
-                                                  width: 2.5,
-                                                ),
-                                              ),
-                                            );
-                                          }),
-                                      Transform.scale(scale: souffle, child: child),
-                                    ],
-                                  );
-                                },
-                                child: Container(
-                                  width: icone,
-                                  height: icone,
-                                  decoration: BoxDecoration(
-                                    color: Colors.white,
-                                    shape: BoxShape.circle,
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: Colors.black.withValues(alpha: .15),
-                                        blurRadius: 12,
-                                        offset: const Offset(0, 4),
-                                      ),
-                                    ],
-                                  ),
-                                  child: Icon(Icons.add_a_photo_rounded,
-                                      color: SendraTheme.green, size: icone * .48),
-                                ),
-                              ),
-                            ),
-                            SizedBox(height: c.maxHeight > 190 ? 14 : 8),
-                            const FittedBox(
-                              fit: BoxFit.scaleDown,
-                              child: Text(
-                                'Signaler',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 26,
-                                  fontWeight: FontWeight.w800,
-                                  letterSpacing: -.3,
-                                ),
-                              ),
-                            ),
-                            if (c.maxHeight > 170) ...[
-                              const SizedBox(height: 2),
-                              Text(
-                                'Touchez pour photographier le véhicule',
-                                textAlign: TextAlign.center,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  color: Colors.white.withValues(alpha: .85),
-                                  fontSize: 14,
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                );
-              },
-            ),
-          ),
           ),
         ),
       ),
@@ -918,12 +1205,16 @@ class _StatusPill extends StatelessWidget {
         children: [
           Icon(icon, size: 14, color: color),
           const SizedBox(width: 5),
-          Text(
-            label,
-            style: TextStyle(
-              color: color,
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: color,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ),
         ],
@@ -1055,4 +1346,3 @@ class _EmptyState extends StatelessWidget {
     );
   }
 }
-

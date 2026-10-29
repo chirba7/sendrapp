@@ -6,7 +6,10 @@ import 'package:get/get.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:walletium/utils/ecran.dart';
+import 'package:walletium/utils/signaler_flow.dart';
 import 'package:walletium/utils/strings.dart';
+import 'package:walletium/widgets/others/photo_reseau.dart';
 
 class EditProfileScreen extends StatefulWidget {
   const EditProfileScreen({super.key});
@@ -48,16 +51,19 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     final source = await showModalBottomSheet<ImageSource>(
       context: context,
       showDragHandle: true,
-      builder: (sheetContext) => SafeArea(child: Column(
+      builder: (sheetContext) => SafeArea(
+          child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           const ListTile(title: Text('Photo de profil')),
-          ListTile(leading: const Icon(Icons.camera_alt_outlined),
-            title: const Text('Prendre une photo'),
-            onTap: () => Navigator.pop(sheetContext, ImageSource.camera)),
-          ListTile(leading: const Icon(Icons.photo_library_outlined),
-            title: const Text('Importer une photo'),
-            onTap: () => Navigator.pop(sheetContext, ImageSource.gallery)),
+          ListTile(
+              leading: const Icon(Icons.camera_alt_outlined),
+              title: const Text('Prendre une photo'),
+              onTap: () => Navigator.pop(sheetContext, ImageSource.camera)),
+          ListTile(
+              leading: const Icon(Icons.photo_library_outlined),
+              title: const Text('Importer une photo'),
+              onTap: () => Navigator.pop(sheetContext, ImageSource.gallery)),
         ],
       )),
     );
@@ -67,7 +73,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       imageQuality: 75,
       maxWidth: 1200,
     );
-    if (file != null && mounted) setState(() => _photo = File(file.path));
+    if (file == null) return;
+    // Redressée et allégée avant l'envoi (même traitement que les photos de
+    // signalement) : la photo de profil n'apparaît plus couchée.
+    final photo = await SignalerFlow.optimiser(File(file.path));
+    if (mounted) setState(() => _photo = photo);
   }
 
   Future<void> _save() async {
@@ -131,7 +141,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     final image = _photo != null
         ? FileImage(_photo!) as ImageProvider
         : (_photoUrl != null && _photoUrl!.isNotEmpty
-            ? NetworkImage(_photoUrl!) as ImageProvider
+            ? photoReseauProvider(_photoUrl!)
             : null);
     return Scaffold(
       appBar: AppBar(title: const Text('Modifier le profil')),
@@ -147,7 +157,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   borderRadius: BorderRadius.circular(60),
                   child: CircleAvatar(
                     radius: 52,
-                    backgroundImage: image,
+                    backgroundImage:
+                        image == null ? null : vignette(context, image, 104),
                     child: image == null
                         ? const Icon(Icons.add_a_photo, size: 36)
                         : null,
@@ -157,11 +168,15 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               const SizedBox(height: 8),
               const Center(child: Text('Touchez la photo pour la modifier')),
               const SizedBox(height: 28),
-              Text('Informations personnelles', style: Theme.of(context).textTheme.titleMedium),
+              Text('Informations personnelles',
+                  style: Theme.of(context).textTheme.titleMedium),
               const SizedBox(height: 12),
               TextFormField(
                 controller: _firstName,
-                decoration: const InputDecoration(labelText: 'Prénom', prefixIcon: Icon(Icons.person_outline), border: OutlineInputBorder()),
+                decoration: const InputDecoration(
+                    labelText: 'Prénom',
+                    prefixIcon: Icon(Icons.person_outline),
+                    border: OutlineInputBorder()),
                 textCapitalization: TextCapitalization.words,
                 validator: (value) => value == null || value.trim().isEmpty
                     ? 'Saisissez votre prénom.'
@@ -170,7 +185,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               const SizedBox(height: 16),
               TextFormField(
                 controller: _lastName,
-                decoration: const InputDecoration(labelText: 'Nom', prefixIcon: Icon(Icons.badge_outlined), border: OutlineInputBorder()),
+                decoration: const InputDecoration(
+                    labelText: 'Nom',
+                    prefixIcon: Icon(Icons.badge_outlined),
+                    border: OutlineInputBorder()),
                 textCapitalization: TextCapitalization.words,
                 validator: (value) => value == null || value.trim().isEmpty
                     ? 'Saisissez votre nom.'
@@ -179,8 +197,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               const SizedBox(height: 28),
               FilledButton.icon(
                 icon: const Icon(Icons.check),
-                style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52),
-                  backgroundColor: const Color(0xFF0B7D4A)),
+                style: FilledButton.styleFrom(
+                    minimumSize: const Size.fromHeight(52),
+                    backgroundColor: const Color(0xFF0B7D4A)),
                 onPressed: _saving ? null : _save,
                 label: Text(_saving ? 'Enregistrement…' : 'Enregistrer'),
               ),

@@ -13,7 +13,7 @@ class AppBrand {
   static const String appBarLogo = 'assets/images/logo_epavie_pro.png';
 
   /// Logo sur fond transparent, posé directement sur le vert du menu.
-  static const String? drawerLogo = 'assets/images/logo_epavie_pro.png';
+  static const String drawerLogo = 'assets/images/logo_epavie_pro.png';
 
   /// Nom de l'application en logotype (texte « epAvie », lettres noires et
   /// A recyclage vert), pour le splash et l'écran de bienvenue sur fond vert.
@@ -29,31 +29,31 @@ class AppBrand {
   static const List<GuideStep> guide = [
     GuideStep(
       icon: Icons.waving_hand_rounded,
-      title: "Bienvenue sur epaVie Pro",
+      title: 'Bienvenue sur epaVie Pro',
       text:
-          "Votre outil de terrain pour constater, traiter et enlever les véhicules signalés.",
+          'Votre outil de terrain pour constater, traiter et enlever les véhicules signalés.',
     ),
     GuideStep(
       icon: Icons.list_alt_rounded,
-      title: "Les signalements",
+      title: 'Les signalements',
       text:
           "L'onglet Participations liste les dossiers. Filtrez par statut et touchez un dossier pour l'ouvrir.",
     ),
     GuideStep(
       icon: Icons.fact_check_rounded,
-      title: "La constatation",
+      title: 'La constatation',
       text:
           "Dans un dossier, complétez dans l'ordre : véhicule, infraction, dommages, puis soumettez à l'approbation.",
     ),
     GuideStep(
       icon: Icons.local_shipping_rounded,
-      title: "Les missions",
+      title: 'Les missions',
       text:
           "L'onglet Mission regroupe les enlèvements qui vous sont affectés, avec leur suivi.",
     ),
     GuideStep(
       icon: Icons.map_rounded,
-      title: "La cartographie",
+      title: 'La cartographie',
       text:
           "Visualisez les signalements autour de vous et lancez l'itinéraire en un geste.",
     ),
@@ -61,7 +61,8 @@ class AppBrand {
 }
 
 class GuideStep {
-  const GuideStep({required this.icon, required this.title, required this.text});
+  const GuideStep(
+      {required this.icon, required this.title, required this.text});
   final IconData icon;
   final String title;
   final String text;

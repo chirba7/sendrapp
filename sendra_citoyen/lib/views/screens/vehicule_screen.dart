@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:walletium/views/screens/vehicle_details_screen.dart';
 import 'package:walletium/views/screens/vehicle_list_screen.dart';
 import '../../utils/strings.dart';
 import '../../utils/sendra_theme.dart';
@@ -65,11 +64,9 @@ class _PlateInputFormatter extends TextInputFormatter {
 class VehicleForm extends StatefulWidget {
   final int signalementId; // Identifiant du véhicule à mettre à jour
 
-  VehicleForm({required this.signalementId}) {
-    print('Signalement ID: $signalementId');
-  }
+  const VehicleForm({super.key, required this.signalementId});
   @override
-  _VehicleFormState createState() => _VehicleFormState();
+  State<VehicleForm> createState() => _VehicleFormState();
 }
 
 class _VehicleFormState extends State<VehicleForm> {
@@ -148,18 +145,6 @@ class _VehicleFormState extends State<VehicleForm> {
     final response = await http.get(Uri.parse(url), headers: headers);
     if (response.statusCode == 200) {
       final data = json.decode(response.body);
-      print('Données du véhicule: $data');
-      print('Détails:');
-      print(
-          '  - Défaut de contrôle technique: ${data['defaut_controle_technique']}');
-      print('  - Pneumatiques manquantes: ${data['pneumatiques_manquantes']}');
-      print('  - Véhicule immergé: ${data['vehicule_immerge']}');
-      print(
-          '  - Défauts techniques irréversibles: ${data['defauts_techniques_irreversibles']}');
-      print(
-          '  - Véhicule non identifiable: ${data['vehicule_non_identifiable']}');
-      print('  - Véhicule brûlé: ${data['vehicule_brule']}');
-      print('  - Châssis non réparable: ${data['chassis_non_reparable']}');
       setState(() {
         _numeroController.text = _cleanValue(data['numero']).toUpperCase();
         // Marque : saisie libre (suggestions seulement) depuis cette
@@ -192,8 +177,10 @@ class _VehicleFormState extends State<VehicleForm> {
         };
       });
     } else {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Échec du chargement des détails du véhicule')),
+        const SnackBar(
+            content: Text('Échec du chargement des détails du véhicule')),
       );
     }
   }
@@ -219,7 +206,7 @@ class _VehicleFormState extends State<VehicleForm> {
         _entretien == null ||
         _paysEtranger == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
+        const SnackBar(
             content: Text('Veuillez remplir tous les champs obligatoires')),
       );
       return;
@@ -227,8 +214,7 @@ class _VehicleFormState extends State<VehicleForm> {
 
     // Le nombre de chiffres varie selon la plaque (0, 00, 000, 0000...) —
     // seul le nombre de lettres de part et d'autre est fixe.
-    if (!RegExp(r'^[A-Z]{2}-\d+-[A-Z]{2}$')
-        .hasMatch(_numeroController.text)) {
+    if (!RegExp(r'^[A-Z]{2}-\d+-[A-Z]{2}$').hasMatch(_numeroController.text)) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
@@ -277,15 +263,17 @@ class _VehicleFormState extends State<VehicleForm> {
     );
 
     if (response.statusCode == 200) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
+        const SnackBar(
           content: Text('Véhicule mis à jour avec succès'),
           duration: Duration(seconds: 1),
         ),
       );
 
       // Redirection vers la page InfractionForm
-      Future.delayed(Duration(seconds: 1), () {
+      Future.delayed(const Duration(seconds: 1), () {
+        if (!mounted) return;
         Navigator.of(context).push(
           MaterialPageRoute(
             builder: (context) =>
@@ -294,8 +282,9 @@ class _VehicleFormState extends State<VehicleForm> {
         );
       });
     } else {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Échec de la mise à jour du véhicule')),
+        const SnackBar(content: Text('Échec de la mise à jour du véhicule')),
       );
     }
   }
@@ -307,96 +296,101 @@ class _VehicleFormState extends State<VehicleForm> {
         title: const Text('Véhicule'),
         actions: [
           IconButton(
-            icon: Icon(Icons.list),
+            icon: const Icon(Icons.list),
             onPressed: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => VehicleListScreen()),
+                MaterialPageRoute(
+                    builder: (context) => const VehicleListScreen()),
               );
             },
           ),
         ],
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(20.0),
-        child: Scrollbar(
-          // Ajouter l'indicateur de défilement
-          thumbVisibility: true, // Rendre l'indicateur toujours visible
-          thickness: 4.0, // Réduit l'épaisseur de l'indicateur
-          radius: Radius.circular(5), // Arrondir les coins
-          child: ListView(
-            children: [
-              _buildSectionTitle('Type de véhicule'),
-              const SizedBox(height: 10),
-              _buildVehicleKindSelector(),
-              SizedBox(height: 20),
-              Divider(),
-              SizedBox(height: 10),
-              Text(
-                'Caractéristiques du Véhicule',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-              ),
-              SizedBox(height: 20),
-              _buildPlateField(),
-              _buildBrandField(),
-              _buildDropdown(
-                  'Type', _typeController, Icons.category, _vehicleTypes),
-              _buildField('Modèle', _modeleController, Icons.model_training),
-              _buildDropdown('Catégorie du véhicule', _categorieController,
-                  Icons.label, _vehicleCategories),
-              _buildColorPalette(),
-              SizedBox(height: 20),
-              Divider(),
-              SizedBox(height: 10),
-              _buildSectionTitle('État général'),
-              _buildChoiceGroup(const {
-                'BON': '✅  Bon',
-                'MOYEN': '🟠  Moyen',
-                'DEGRADE': '🛠️  Dégradé'
-              }, _entretien, (value) {
-                setState(() {
-                  _entretien = value;
-                });
-              }),
-              SizedBox(height: 20),
-              Divider(),
-              SizedBox(height: 10),
-              _buildSectionTitle('Pays étranger'),
-              _buildChoiceGroup(
-                  const {'NON': '🇸🇳  Non', 'OUI': '🌍  Oui'}, _paysEtranger,
-                  (value) {
-                setState(() {
-                  _paysEtranger = value;
-                });
-              }),
-              SizedBox(height: 20),
-              Divider(),
-              SizedBox(height: 10),
-              _buildSectionTitle('Détails du véhicule'),
-              ..._details.keys.map((key) {
-                return CheckboxListTile(
-                  title: Text(key),
-                  value: _details[key],
-                  onChanged: (value) {
-                    setState(() {
-                      _details[key] = value ?? false;
-                    });
-                  },
-                );
-              }).toList(),
-              SizedBox(height: 30),
-              ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(
-                  minimumSize: const Size.fromHeight(54),
+      body: SafeArea(
+        child: Padding(
+          padding:
+              EdgeInsets.all(MediaQuery.sizeOf(context).width < 360 ? 14 : 20),
+          child: Scrollbar(
+            // Ajouter l'indicateur de défilement
+            thumbVisibility: true, // Rendre l'indicateur toujours visible
+            thickness: 4.0, // Réduit l'épaisseur de l'indicateur
+            radius: const Radius.circular(5), // Arrondir les coins
+            child: ListView(
+              children: [
+                _buildSectionTitle('Type de véhicule'),
+                const SizedBox(height: 10),
+                _buildVehicleKindSelector(),
+                const SizedBox(height: 20),
+                const Divider(),
+                const SizedBox(height: 10),
+                const Text(
+                  'Caractéristiques du Véhicule',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                 ),
-                onPressed: _updateVehicle,
-                icon: Icon(Icons.directions_car), // Ajoutez une icône ici
-                label: Text(
-                  'Mettre à jour le véhicule',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                const SizedBox(height: 20),
+                _buildPlateField(),
+                _buildBrandField(),
+                _buildDropdown(
+                    'Type', _typeController, Icons.category, _vehicleTypes),
+                _buildField('Modèle', _modeleController, Icons.model_training),
+                _buildDropdown('Catégorie du véhicule', _categorieController,
+                    Icons.label, _vehicleCategories),
+                _buildColorPalette(),
+                const SizedBox(height: 20),
+                const Divider(),
+                const SizedBox(height: 10),
+                _buildSectionTitle('État général'),
+                _buildChoiceGroup(const {
+                  'BON': '✅  Bon',
+                  'MOYEN': '🟠  Moyen',
+                  'DEGRADE': '🛠️  Dégradé'
+                }, _entretien, (value) {
+                  setState(() {
+                    _entretien = value;
+                  });
+                }),
+                const SizedBox(height: 20),
+                const Divider(),
+                const SizedBox(height: 10),
+                _buildSectionTitle('Pays étranger'),
+                _buildChoiceGroup(
+                    const {'NON': '🇸🇳  Non', 'OUI': '🌍  Oui'}, _paysEtranger,
+                    (value) {
+                  setState(() {
+                    _paysEtranger = value;
+                  });
+                }),
+                const SizedBox(height: 20),
+                const Divider(),
+                const SizedBox(height: 10),
+                _buildSectionTitle('Détails du véhicule'),
+                ..._details.keys.map((key) {
+                  return CheckboxListTile(
+                    title: Text(key),
+                    value: _details[key],
+                    onChanged: (value) {
+                      setState(() {
+                        _details[key] = value ?? false;
+                      });
+                    },
+                  );
+                }).toList(),
+                const SizedBox(height: 30),
+                ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    minimumSize: const Size.fromHeight(54),
+                  ),
+                  onPressed: _updateVehicle,
+                  icon:
+                      const Icon(Icons.directions_car), // Ajoutez une icône ici
+                  label: const Text(
+                    'Mettre à jour le véhicule',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -436,22 +430,30 @@ class _VehicleFormState extends State<VehicleForm> {
         onTap: () => setState(() => _vehicleKind = label),
         child: SizedBox(
           height: 50,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon,
-                  size: 22,
-                  color: selected ? SendraTheme.forest : SendraTheme.muted),
-              const SizedBox(width: 8),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                  color: selected ? SendraTheme.forest : SendraTheme.ink,
-                ),
+          // Trois choix sur une ligne : le contenu se réduit au besoin
+          // (petits écrans) au lieu de déborder.
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 6),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(icon,
+                      size: 22,
+                      color: selected ? SendraTheme.forest : SendraTheme.muted),
+                  const SizedBox(width: 8),
+                  Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                      color: selected ? SendraTheme.forest : SendraTheme.ink,
+                    ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
         ),
       ),
@@ -488,18 +490,17 @@ class _VehicleFormState extends State<VehicleForm> {
         optionsBuilder: (TextEditingValue value) {
           if (value.text.isEmpty) return _brandOptions;
           return _brandOptions.where(
-            (brand) =>
-                brand.toLowerCase().contains(value.text.toLowerCase()),
+            (brand) => brand.toLowerCase().contains(value.text.toLowerCase()),
           );
         },
         onSelected: (selection) => _marqueController.text = selection,
         fieldViewBuilder: (context, controller, focusNode, onSubmitted) {
-          controller.addListener(() {
-            _marqueController.text = controller.text;
-          });
+          // onChanged plutôt qu'un écouteur ajouté à chaque reconstruction
+          // (les écouteurs s'accumulaient et ralentissaient la saisie).
           return TextField(
             controller: controller,
             focusNode: focusNode,
+            onChanged: (v) => _marqueController.text = v,
             decoration: InputDecoration(
               labelText: 'Marque',
               hintText: 'Choisissez dans la liste ou saisissez librement',
@@ -652,7 +653,10 @@ class _VehicleFormState extends State<VehicleForm> {
                               : null,
                         ),
                         const SizedBox(height: 5),
-                        Text(entry.key, style: const TextStyle(fontSize: 10)),
+                        Text(entry.key,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontSize: 10)),
                       ],
                     ),
                   ),
@@ -686,21 +690,6 @@ class _VehicleFormState extends State<VehicleForm> {
             color: selected ? SendraTheme.forest : SendraTheme.ink,
             fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
           ),
-        );
-      }).toList(),
-    );
-  }
-
-  Widget _buildRadioGroup(List<String> options, String? groupValue,
-      ValueChanged<String?> onChanged) {
-    return Column(
-      children: options.map((option) {
-        return RadioListTile<String>(
-          title: Text(option),
-          value: option,
-          groupValue: groupValue,
-          onChanged: onChanged,
-          activeColor: Colors.green,
         );
       }).toList(),
     );

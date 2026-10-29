@@ -101,8 +101,9 @@ class _PhoneVerificationScreenState extends State<PhoneVerificationScreen> {
             () => _error = body['message']?.toString() ?? 'Code invalide.');
       }
     } catch (_) {
-      if (mounted)
+      if (mounted) {
         setState(() => _error = 'Vérification impossible. Réessayez.');
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }

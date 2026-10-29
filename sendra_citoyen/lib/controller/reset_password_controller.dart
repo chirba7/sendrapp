@@ -5,5 +5,4 @@ class ResetPasswordController extends GetxController {
   final formKey = GlobalKey<FormState>();
   final newPasswordController = TextEditingController();
   final confirmPasswordController = TextEditingController();
-
 }

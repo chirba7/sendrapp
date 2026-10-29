@@ -6,7 +6,6 @@ class SignInController extends GetxController {
   final passwordController = TextEditingController();
   final emailController = TextEditingController();
 
-
   @override
   void dispose() {
     emailOrUserNameController.dispose();

@@ -17,15 +17,13 @@ class DommagesScreen extends StatefulWidget {
       : super(key: key);
 
   @override
-  _DommagesScreenState createState() => _DommagesScreenState();
+  State<DommagesScreen> createState() => _DommagesScreenState();
 }
 
 class _DommagesScreenState extends State<DommagesScreen> {
   final List<Offset?> _points = [];
   Map<String, dynamic>? signalementDetails;
   ui.Image? _image;
-  late double _imageWidth;
-  late double _imageHeight;
   String _vehicleKind = 'Voiture';
   bool _drawingEnabled = false;
   bool _isSaving = false;
@@ -41,7 +39,6 @@ class _DommagesScreenState extends State<DommagesScreen> {
   @override
   void initState() {
     super.initState();
-    print('DommagesScreen initialized');
 
     fetchSignalementDetails(widget.signalementId);
     // Correction perf : l'écran attendait deux appels réseau séquentiels
@@ -71,8 +68,6 @@ class _DommagesScreenState extends State<DommagesScreen> {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('token');
 
-    print('Récupération des détails pour le signalement ID: $signalementId');
-
     final url = '${Strings.apiURI}listerSignalement/$signalementId';
     final headers = {
       'Content-Type': 'application/json',
@@ -83,7 +78,6 @@ class _DommagesScreenState extends State<DommagesScreen> {
 
     if (response.statusCode == 200) {
       final jsonResponse = jsonDecode(response.body);
-      print('Réponse obtenue: ${jsonResponse.toString()}');
 
       if (jsonResponse.containsKey('data')) {
         final dataList = jsonResponse['data'];
@@ -110,8 +104,6 @@ class _DommagesScreenState extends State<DommagesScreen> {
 
     setState(() {
       _image = image;
-      _imageWidth = image.width.toDouble();
-      _imageHeight = image.height.toDouble();
       _isExistingImage = false;
     });
   }
@@ -120,8 +112,6 @@ class _DommagesScreenState extends State<DommagesScreen> {
   Future<void> _loadImageFromApi(int signalementId) async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('token');
-
-    print('Chargement de l\'image pour le signalement ID: $signalementId');
 
     final url = '${Strings.apiURI}voirDommages/$signalementId';
     final headers = {
@@ -136,7 +126,6 @@ class _DommagesScreenState extends State<DommagesScreen> {
 
       if (response.statusCode == 200) {
         final jsonResponse = jsonDecode(response.body);
-        print('Réponse d\'image obtenue: ${jsonResponse.toString()}');
 
         // Vérifiez si la clé "dommages" est présente
         if (jsonResponse.containsKey('dommages') &&
@@ -151,8 +140,6 @@ class _DommagesScreenState extends State<DommagesScreen> {
 
           setState(() {
             _image = image;
-            _imageWidth = image.width.toDouble();
-            _imageHeight = image.height.toDouble();
             _isExistingImage = true;
           });
         }
@@ -162,14 +149,15 @@ class _DommagesScreenState extends State<DommagesScreen> {
     } catch (e) {
       // Le gabarit local est déjà affiché depuis initState — un échec ici
       // (réseau lent, timeout) n'empêche pas l'utilisateur d'annoter.
-      print('Erreur lors du chargement de l\'image existante: $e');
+      debugPrint('Erreur lors du chargement de l\'image existante: $e');
     }
   }
 
 // Fonction utilitaire pour récupérer l'image depuis une URL
   Future<Uint8List> _fetchImageFromUrl(String imageUrl) async {
-    final response =
-        await http.get(Uri.parse(imageUrl)).timeout(const Duration(seconds: 15));
+    final response = await http
+        .get(Uri.parse(imageUrl))
+        .timeout(const Duration(seconds: 15));
     if (response.statusCode == 200) {
       return response.bodyBytes;
     } else {
@@ -191,7 +179,6 @@ class _DommagesScreenState extends State<DommagesScreen> {
   Future<void> _saveDrawing() async {
     if (_image == null || _canvasSize == Size.zero || _isSaving) return;
     setState(() => _isSaving = true);
-    print('Enregistrement du dessin...');
 
     final sourceRect = _sourceRectFor(_image!);
     final outputWidth = sourceRect.width.round();
@@ -249,7 +236,7 @@ class _DommagesScreenState extends State<DommagesScreen> {
     };
 
     final body = jsonEncode({
-      'signature': 'data:image/png;base64,' + base64Image,
+      'signature': 'data:image/png;base64,$base64Image',
     });
 
     http.Response response;
@@ -281,13 +268,13 @@ class _DommagesScreenState extends State<DommagesScreen> {
 
     if (response.statusCode == 200) {
       final jsonResponse = jsonDecode(response.body);
-      print('Réponse après enregistrement: ${jsonResponse.toString()}');
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text(jsonResponse['message']),
-        duration: Duration(seconds: 1),
+        duration: const Duration(seconds: 1),
       ));
 
-      Future.delayed(Duration(seconds: 1), () {
+      Future.delayed(const Duration(seconds: 1), () {
         if (mounted) {
           // Dommages peut être ouvert depuis la page Infraction. Un simple
           // pop ramenait donc l'agent vers le formulaire précédent. La
@@ -302,9 +289,10 @@ class _DommagesScreenState extends State<DommagesScreen> {
         }
       });
     } else {
-      print('Erreur lors de l\'enregistrement du dessin');
-      ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Échec de l\'enregistrement des dommages')));
+      debugPrint('Erreur lors de l\'enregistrement du dessin');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Échec de l\'enregistrement des dommages')));
     }
     if (mounted) setState(() => _isSaving = false);
   }

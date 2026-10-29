@@ -1,7 +1,6 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 import 'package:http/http.dart' as http;
 import 'package:walletium/controller/reset_password_controller.dart';
@@ -41,7 +40,8 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
     final confirmPassword = _controller.confirmPasswordController.text;
 
     if (newPassword.length < 6) {
-      setState(() => _errorMessage = 'Le mot de passe doit contenir au moins 6 caractères.');
+      setState(() => _errorMessage =
+          'Le mot de passe doit contenir au moins 6 caractères.');
       return;
     }
     if (newPassword != confirmPassword) {
@@ -79,7 +79,8 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
       });
     } catch (_) {
       setState(() {
-        _errorMessage = 'Connexion indisponible. Vérifiez votre accès à Internet.';
+        _errorMessage =
+            'Connexion indisponible. Vérifiez votre accès à Internet.';
         _isSubmitting = false;
       });
     }
@@ -89,17 +90,20 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: CustomColor.primaryColor,
-      body: _bodyWidget(context),
+      body: SafeArea(
+        top: false,
+        child: _bodyWidget(context),
+      ),
     );
   }
 
   ListView _bodyWidget(BuildContext context) {
     return ListView(
       children: [
-        addVerticalSpace(20.h),
+        addVerticalSpace(20),
         _upperWidget(context),
         _imageWidget(context),
-        addVerticalSpace(10.h),
+        addVerticalSpace(10),
         if (_errorMessage != null) _errorWidget(context),
         _resetButtonWidget(context),
       ],
@@ -112,9 +116,9 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
       child: Column(
         children: [
           _titleWidget(context),
-          addVerticalSpace(20.h),
+          addVerticalSpace(20),
           _inputWidgets(context),
-          addVerticalSpace(20.h),
+          addVerticalSpace(20),
         ],
       ),
     );
@@ -122,7 +126,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
 
   Container _titleWidget(BuildContext context) {
     return Container(
-        margin: EdgeInsets.all(Dimensions.marginSize),
+        margin: const EdgeInsets.all(Dimensions.marginSize),
         child: Column(
           mainAxisAlignment: mainCenter,
           crossAxisAlignment: crossCenter,
@@ -132,7 +136,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
               textAlign: TextAlign.center,
               style: CustomStyler.signInTitleStyle,
             ),
-            addHorizontalSpace(10.w),
+            addHorizontalSpace(10),
             Text(
               Strings.resetPasswordDescription,
               textAlign: TextAlign.center,
@@ -147,19 +151,29 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
       key: _controller.formKey,
       child: Column(
         children: [
-          TextLabelsWidget(textLabels: Strings.newPassword, textColor: CustomColor.textColor,),
+          const TextLabelsWidget(
+            textLabels: Strings.newPassword,
+            textColor: CustomColor.textColor,
+          ),
           Container(
-            margin: EdgeInsets.symmetric(horizontal: Dimensions.marginSize * 0.5),
+            margin: const EdgeInsets.symmetric(
+                horizontal: Dimensions.marginSize * 0.5),
             child: PasswordInputTextField(
               controller: _controller.newPasswordController,
-              hintText: Strings.enterNewPassword,),
+              hintText: Strings.enterNewPassword,
+            ),
           ),
-          TextLabelsWidget(textLabels: Strings.confirmPassword, textColor: CustomColor.textColor,),
+          const TextLabelsWidget(
+            textLabels: Strings.confirmPassword,
+            textColor: CustomColor.textColor,
+          ),
           Container(
-            margin: EdgeInsets.symmetric(horizontal: Dimensions.marginSize * 0.5),
+            margin: const EdgeInsets.symmetric(
+                horizontal: Dimensions.marginSize * 0.5),
             child: PasswordInputTextField(
               controller: _controller.confirmPasswordController,
-              hintText: Strings.enterConfirmPassword,),
+              hintText: Strings.enterConfirmPassword,
+            ),
           )
         ],
       ),
@@ -168,11 +182,12 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
 
   Container _errorWidget(BuildContext context) {
     return Container(
-      margin: EdgeInsets.symmetric(horizontal: Dimensions.marginSize),
+      margin: const EdgeInsets.symmetric(horizontal: Dimensions.marginSize),
       child: Text(
         _errorMessage!,
         textAlign: TextAlign.center,
-        style: const TextStyle(color: Colors.redAccent, fontWeight: FontWeight.w600),
+        style: const TextStyle(
+            color: Colors.redAccent, fontWeight: FontWeight.w600),
       ),
     );
   }

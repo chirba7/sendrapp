@@ -8,8 +8,10 @@ import '../../routes/routes.dart';
 import '../../utils/app_brand.dart';
 import '../../utils/app_prefs.dart';
 import '../../utils/custom_color.dart';
+import '../../utils/ecran.dart';
 import '../../utils/sendra_theme.dart';
 import '../../utils/strings.dart';
+import 'package:walletium/widgets/others/photo_reseau.dart';
 
 class DrawerScreen extends StatelessWidget {
   const DrawerScreen({Key? key}) : super(key: key);
@@ -27,11 +29,14 @@ class DrawerScreen extends StatelessWidget {
           const Divider(height: 1),
           Expanded(
             child: ListView(
-              padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+              // Marge basse : le bouton de déconnexion reste au-dessus de la
+              // barre de navigation du téléphone.
+              padding:
+                  EdgeInsets.fromLTRB(12, 12, 12, 12 + context.margeBasSysteme),
               children: [
                 _buildSection(
                   context,
-                  "Informations",
+                  'Informations',
                   [
                     MenuItemData(
                       title: Strings.aboutUs,
@@ -40,7 +45,7 @@ class DrawerScreen extends StatelessWidget {
                       onTap: () => _go(context, Routes.aboutUsScreen),
                     ),
                     MenuItemData(
-                      title: "Politique de confidentialité",
+                      title: 'Politique de confidentialité',
                       icon: Icons.shield_rounded,
                       color: const Color(0xFF7B3FC4),
                       onTap: () => _launchPrivacyPolicy(context),
@@ -49,7 +54,7 @@ class DrawerScreen extends StatelessWidget {
                 ),
                 _buildSection(
                   context,
-                  "Compte & profil",
+                  'Compte & profil',
                   [
                     MenuItemData(
                       title: Strings.profile,
@@ -58,7 +63,7 @@ class DrawerScreen extends StatelessWidget {
                       onTap: () => _go(context, Routes.profileScreen),
                     ),
                     MenuItemData(
-                      title: "Supprimer le compte",
+                      title: 'Supprimer le compte',
                       icon: Icons.delete_forever_rounded,
                       color: const Color(0xFFD93025),
                       onTap: () => _showDeleteAccountConfirmation(context),
@@ -103,7 +108,7 @@ class DrawerScreen extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Image.asset(
-                AppBrand.drawerLogo ?? AppBrand.appBarLogo,
+                AppBrand.drawerLogo,
                 height: 46,
                 fit: BoxFit.contain,
                 alignment: Alignment.centerLeft,
@@ -123,7 +128,8 @@ class DrawerScreen extends StatelessWidget {
                         radius: 22,
                         backgroundColor: SendraTheme.green,
                         foregroundImage: photoUrl.isNotEmpty
-                            ? NetworkImage(photoUrl)
+                            ? vignette(
+                                context, photoReseauProvider(photoUrl), 44)
                             : null,
                         child: Text(
                           initial,
@@ -172,15 +178,6 @@ class DrawerScreen extends StatelessWidget {
       ),
     );
   }
-
-  Widget _circle(double size, double opacity) => Container(
-        width: size,
-        height: size,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: Colors.white.withValues(alpha: opacity),
-        ),
-      );
 
   Widget _buildSection(
       BuildContext context, String title, List<MenuItemData> items) {
@@ -281,7 +278,7 @@ class DrawerScreen extends StatelessWidget {
           title: Row(
             children: [
               Container(
-                padding: EdgeInsets.all(8),
+                padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
                   color: Colors.orange.shade50,
                   borderRadius: BorderRadius.circular(10),
@@ -292,9 +289,9 @@ class DrawerScreen extends StatelessWidget {
                   size: 24,
                 ),
               ),
-              SizedBox(width: 12),
+              const SizedBox(width: 12),
               Text(
-                "Déconnexion",
+                'Déconnexion',
                 style: TextStyle(
                   color: Colors.grey.shade800,
                   fontWeight: FontWeight.w600,
@@ -304,7 +301,7 @@ class DrawerScreen extends StatelessWidget {
             ],
           ),
           content: Padding(
-            padding: EdgeInsets.symmetric(vertical: 8),
+            padding: const EdgeInsets.symmetric(vertical: 8),
             child: Text(
               "Êtes-vous sûr de vouloir vous déconnecter de l'application ?",
               style: TextStyle(
@@ -319,10 +316,11 @@ class DrawerScreen extends StatelessWidget {
               onPressed: () => Navigator.of(context).pop(),
               style: TextButton.styleFrom(
                 foregroundColor: Colors.grey.shade600,
-                padding: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
               ),
-              child: Text(
-                "Annuler",
+              child: const Text(
+                'Annuler',
                 style: TextStyle(
                   fontWeight: FontWeight.w500,
                   fontSize: 15,
@@ -338,13 +336,14 @@ class DrawerScreen extends StatelessWidget {
                 backgroundColor: Colors.red.shade600,
                 foregroundColor: Colors.white,
                 elevation: 2,
-                padding: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8),
                 ),
               ),
-              child: Text(
-                "Se déconnecter",
+              child: const Text(
+                'Se déconnecter',
                 style: TextStyle(
                   fontWeight: FontWeight.w600,
                   fontSize: 15,
@@ -360,7 +359,7 @@ class DrawerScreen extends StatelessWidget {
   Future<void> _performLogout(BuildContext context) async {
     // Afficher un snackbar discret pour la déconnexion
     Get.showSnackbar(
-      GetSnackBar(
+      const GetSnackBar(
         messageText: Row(
           children: [
             SizedBox(
@@ -373,7 +372,7 @@ class DrawerScreen extends StatelessWidget {
             ),
             SizedBox(width: 15),
             Text(
-              "Déconnexion en cours...",
+              'Déconnexion en cours...',
               style: TextStyle(
                 color: Colors.white,
                 fontWeight: FontWeight.w500,
@@ -399,63 +398,14 @@ class DrawerScreen extends StatelessWidget {
     await prefs.remove('lastRoute');
     await prefs.remove('role_id');
 
-
     // Rediriger vers l'écran de connexion
     Get.offAllNamed(Routes.signInScreen);
   }
 
   Future<void> _launchPrivacyPolicy(BuildContext context) async {
-    // Plus de boîte d'attente artificielle (700 ms) : le navigateur s'ouvre
-    // directement.
-    var loadingDialogVisible = false;
-    if (loadingDialogVisible) showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (BuildContext context) {
-        return Center(
-          child: Container(
-            padding: EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(15),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
-                  blurRadius: 10,
-                  spreadRadius: 1,
-                ),
-              ],
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                CircularProgressIndicator(
-                  valueColor:
-                      AlwaysStoppedAnimation<Color>(Colors.purple.shade600),
-                ),
-                SizedBox(height: 15),
-                Text(
-                  "Chargement de la politique de confidentialité...",
-                  style: TextStyle(
-                    color: Colors.grey.shade800,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-
     final Uri url = Uri.parse(
         'https://www.privacypolicies.com/live/12076de3-e527-407e-b179-24c0007dde47');
     try {
-      if (context.mounted && loadingDialogVisible) {
-        Navigator.of(context, rootNavigator: true).pop();
-        loadingDialogVisible = false;
-      }
-
       final opened = await launchUrl(
         url,
         // Sur Android, ce mode ouvre un Custom Tab avec une barre système
@@ -467,10 +417,6 @@ class DrawerScreen extends StatelessWidget {
         throw Exception('Ouverture refusée');
       }
     } catch (e) {
-      if (context.mounted && loadingDialogVisible) {
-        Navigator.of(context, rootNavigator: true).pop();
-        loadingDialogVisible = false;
-      }
       if (!context.mounted) return;
       // Afficher un message d'erreur plus élégant
       showDialog(
@@ -480,24 +426,24 @@ class DrawerScreen extends StatelessWidget {
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(15),
             ),
-            title: Row(
+            title: const Row(
               children: [
                 Icon(
                   Icons.error_outline,
                   color: Colors.red,
                 ),
                 SizedBox(width: 10),
-                Text("Échec de connexion"),
+                Text('Échec de connexion'),
               ],
             ),
-            content: Text(
+            content: const Text(
               "Impossible d'accéder à la politique de confidentialité. Veuillez vérifier votre connexion internet et réessayer.",
             ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(context).pop(),
-                child: Text(
-                  "OK",
+                child: const Text(
+                  'OK',
                   style: TextStyle(
                     color: CustomColor.primaryColor,
                     fontWeight: FontWeight.bold,
@@ -526,10 +472,10 @@ class DrawerScreen extends StatelessWidget {
                 color: Colors.red.shade600,
                 size: 28,
               ),
-              SizedBox(width: 10),
+              const SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  "Supprimer le compte",
+                  'Supprimer le compte',
                   style: TextStyle(
                     color: Colors.red.shade700,
                     fontWeight: FontWeight.bold,
@@ -544,32 +490,32 @@ class DrawerScreen extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                "⚠️ ATTENTION",
+                '⚠️ ATTENTION',
                 style: TextStyle(
                   color: Colors.red.shade700,
                   fontWeight: FontWeight.bold,
                   fontSize: 14,
                 ),
               ),
-              SizedBox(height: 10),
+              const SizedBox(height: 10),
               Text(
-                "Cette action est définitive et irréversible. Toutes vos données seront supprimées définitivement :",
+                'Cette action est définitive et irréversible. Toutes vos données seront supprimées définitivement :',
                 style: TextStyle(
                   color: Colors.grey.shade800,
                   fontSize: 15,
                 ),
               ),
-              SizedBox(height: 10),
+              const SizedBox(height: 10),
               Text(
-                "• Votre profil utilisateur\n• Vos données personnelles\n• Votre historique\n• Toutes vos informations",
+                '• Votre profil utilisateur\n• Vos données personnelles\n• Votre historique\n• Toutes vos informations',
                 style: TextStyle(
                   color: Colors.grey.shade700,
                   fontSize: 14,
                 ),
               ),
-              SizedBox(height: 15),
+              const SizedBox(height: 15),
               Text(
-                "Êtes-vous sûr(e) de vouloir continuer ?",
+                'Êtes-vous sûr(e) de vouloir continuer ?',
                 style: TextStyle(
                   color: Colors.grey.shade800,
                   fontWeight: FontWeight.w600,
@@ -582,7 +528,7 @@ class DrawerScreen extends StatelessWidget {
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
               child: Text(
-                "Annuler",
+                'Annuler',
                 style: TextStyle(
                   color: Colors.grey.shade600,
                   fontWeight: FontWeight.w600,
@@ -600,10 +546,11 @@ class DrawerScreen extends StatelessWidget {
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(10),
                 ),
-                padding: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
               ),
-              child: Text(
-                "Supprimer",
+              child: const Text(
+                'Supprimer',
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
                 ),
@@ -620,13 +567,13 @@ class DrawerScreen extends StatelessWidget {
     Get.dialog(
       Center(
         child: Container(
-          padding: EdgeInsets.all(20),
+          padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(15),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.1),
+                color: Colors.black.withValues(alpha: 0.1),
                 blurRadius: 10,
                 spreadRadius: 1,
               ),
@@ -638,9 +585,9 @@ class DrawerScreen extends StatelessWidget {
               CircularProgressIndicator(
                 valueColor: AlwaysStoppedAnimation<Color>(Colors.red.shade600),
               ),
-              SizedBox(height: 15),
+              const SizedBox(height: 15),
               Text(
-                "Suppression du compte en cours...",
+                'Suppression du compte en cours...',
                 style: TextStyle(
                   color: Colors.grey.shade800,
                   fontWeight: FontWeight.w600,
@@ -665,9 +612,10 @@ class DrawerScreen extends StatelessWidget {
 
       if (token == null || phone == null) {
         Get.back();
+        if (!context.mounted) return;
         _showErrorDialog(
           context,
-          "Erreur de données",
+          'Erreur de données',
           "Informations d'authentification manquantes. Veuillez vous reconnecter.",
         );
         return;
@@ -682,7 +630,7 @@ class DrawerScreen extends StatelessWidget {
       debugPrint('Headers de la requête: $headers');
 
       // Préparer le body de la requête
-      final requestBody = json.encode({"telephone": phone});
+      final requestBody = json.encode({'telephone': phone});
 
       debugPrint('Body de la requête: $requestBody');
 
@@ -729,9 +677,9 @@ class DrawerScreen extends StatelessWidget {
                   color: Colors.green.shade600,
                   size: 28,
                 ),
-                SizedBox(width: 10),
+                const SizedBox(width: 10),
                 Text(
-                  "Compte supprimé",
+                  'Compte supprimé',
                   style: TextStyle(
                     color: Colors.green.shade700,
                     fontWeight: FontWeight.bold,
@@ -741,7 +689,7 @@ class DrawerScreen extends StatelessWidget {
             ),
             content: Text(
               responseData['message'] ??
-                  "Votre compte a été supprimé avec succès.",
+                  'Votre compte a été supprimé avec succès.',
               style: TextStyle(
                 color: Colors.grey.shade800,
                 fontSize: 15,
@@ -760,7 +708,7 @@ class DrawerScreen extends StatelessWidget {
                     borderRadius: BorderRadius.circular(10),
                   ),
                 ),
-                child: Text("OK"),
+                child: const Text('OK'),
               ),
             ],
           ),
@@ -769,10 +717,11 @@ class DrawerScreen extends StatelessWidget {
       } else if (response.statusCode == 401) {
         // Non autorisé
         debugPrint('Erreur 401: Non autorisé');
+        if (!context.mounted) return;
         _showErrorDialog(
           context,
           "Erreur d'autorisation",
-          "Votre session a expiré. Veuillez vous reconnecter et réessayer.",
+          'Votre session a expiré. Veuillez vous reconnecter et réessayer.',
         );
       } else {
         // Autres erreurs
@@ -781,17 +730,19 @@ class DrawerScreen extends StatelessWidget {
         // Tenter de décoder la réponse d'erreur
         try {
           final errorData = json.decode(responseBody);
+          if (!context.mounted) return;
           _showErrorDialog(
             context,
-            "Erreur de suppression",
+            'Erreur de suppression',
             errorData['message'] ??
-                "Une erreur est survenue lors de la suppression du compte.",
+                'Une erreur est survenue lors de la suppression du compte.',
           );
         } catch (e) {
+          if (!context.mounted) return;
           _showErrorDialog(
             context,
-            "Erreur de suppression",
-            "Une erreur est survenue lors de la suppression du compte.",
+            'Erreur de suppression',
+            'Une erreur est survenue lors de la suppression du compte.',
           );
         }
       }
@@ -801,10 +752,11 @@ class DrawerScreen extends StatelessWidget {
 
       debugPrint('Exception lors de la suppression: $e');
 
+      if (!context.mounted) return;
       _showErrorDialog(
         context,
-        "Erreur de connexion",
-        "Impossible de contacter le serveur. Vérifiez votre connexion internet et réessayez.",
+        'Erreur de connexion',
+        'Impossible de contacter le serveur. Vérifiez votre connexion internet et réessayez.',
       );
     }
   }
@@ -822,7 +774,7 @@ class DrawerScreen extends StatelessWidget {
               color: Colors.red.shade600,
               size: 28,
             ),
-            SizedBox(width: 10),
+            const SizedBox(width: 10),
             Expanded(
               child: Text(
                 title,
@@ -851,7 +803,7 @@ class DrawerScreen extends StatelessWidget {
                 borderRadius: BorderRadius.circular(10),
               ),
             ),
-            child: Text("OK"),
+            child: const Text('OK'),
           ),
         ],
       ),

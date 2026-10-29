@@ -60,7 +60,15 @@
                             <div class="col-12">
                                 <div class="input-style-1">
                                     <label>Mot de passe</label>
-                                    <input type="password" name="password" class="form-control" placeholder="Votre mot de passe" autocomplete="current-password">
+                                    {{-- Bouton œil : vérifier ce qu'on a tapé avant de valider. --}}
+                                    <div style="position:relative">
+                                        <input type="password" id="motDePasse" name="password" class="form-control" placeholder="Votre mot de passe" autocomplete="current-password" style="padding-right:52px">
+                                        <button type="button" id="basculerMotDePasse" aria-label="Afficher le mot de passe" title="Afficher le mot de passe"
+                                                style="position:absolute;top:50%;right:8px;transform:translateY(-50%);border:0;background:transparent;padding:8px;line-height:0;color:#6b7c72;cursor:pointer">
+                                            <svg class="oeil-ouvert" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                                            <svg class="oeil-barre" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="display:none"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><path d="M14.12 14.12a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                                        </button>
+                                    </div>
                                     @error('password')
                                     <div class="text-danger">{{ $message }}</div>
                                     @enderror
@@ -88,4 +96,21 @@
     <!-- end row -->
     </div>
 </section>
+<script>
+    (function () {
+        var champ = document.getElementById('motDePasse');
+        var bouton = document.getElementById('basculerMotDePasse');
+        if (!champ || !bouton) return;
+        bouton.addEventListener('click', function () {
+            var visible = champ.type === 'password';
+            champ.type = visible ? 'text' : 'password';
+            bouton.querySelector('.oeil-ouvert').style.display = visible ? 'none' : '';
+            bouton.querySelector('.oeil-barre').style.display = visible ? '' : 'none';
+            var libelle = visible ? 'Masquer le mot de passe' : 'Afficher le mot de passe';
+            bouton.setAttribute('aria-label', libelle);
+            bouton.title = libelle;
+            champ.focus();
+        });
+    })();
+</script>
 @endsection

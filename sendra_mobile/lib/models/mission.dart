@@ -169,7 +169,13 @@ class MissionRemoval {
       this.sheetPhotoUrl,
       required this.received,
       required this.receptionPhotos,
-      required this.photos});
+      required this.photos,
+      this.signalementPhotos = const [],
+      this.thumbnailUrl,
+      this.latitude,
+      this.longitude,
+      this.commune,
+      this.adresse});
   final int id;
   final int? carPositionId;
   final int? truckId;
@@ -181,6 +187,17 @@ class MissionRemoval {
   final bool received;
   final Map<String, String> receptionPhotos;
   final Map<String, String> photos;
+
+  /// Signalement d'origine (véhicule ciblé) : photos du citoyen et de
+  /// l'agent qui l'a constaté, et sa position.
+  final List<SignalementPhoto> signalementPhotos;
+  final String? thumbnailUrl;
+  final double? latitude;
+  final double? longitude;
+  final String? commune;
+  final String? adresse;
+
+  String get lieu => _lieu(commune, adresse);
 
   factory MissionRemoval.fromJson(Map<String, dynamic> json) => MissionRemoval(
         id: int.tryParse('${json['id']}') ?? 0,
@@ -200,6 +217,12 @@ class MissionRemoval {
             ? Map<String, String>.from((json['photos'] as Map)
                 .map((key, value) => MapEntry('$key', '$value')))
             : const {},
+        signalementPhotos: SignalementPhoto.liste(json['photos_signalement']),
+        thumbnailUrl: json['thumbnail_url']?.toString(),
+        latitude: double.tryParse('${json['latitude'] ?? ''}'),
+        longitude: double.tryParse('${json['longitude'] ?? ''}'),
+        commune: json['commune']?.toString(),
+        adresse: json['adresse']?.toString(),
       );
 }
 
@@ -231,11 +254,27 @@ class MissionVehicle {
       {required this.id,
       required this.label,
       this.plate,
-      this.nonRemovalReason});
+      this.nonRemovalReason,
+      this.photos = const [],
+      this.thumbnailUrl,
+      this.latitude,
+      this.longitude,
+      this.commune,
+      this.adresse});
   final int id;
   final String label;
   final String? plate;
   final String? nonRemovalReason;
+
+  /// Photos du signalement (citoyen, puis agent qui l'a constaté).
+  final List<SignalementPhoto> photos;
+  final String? thumbnailUrl;
+  final double? latitude;
+  final double? longitude;
+  final String? commune;
+  final String? adresse;
+
+  String get lieu => _lieu(commune, adresse);
 
   factory MissionVehicle.fromJson(Map<String, dynamic> json) => MissionVehicle(
         id: int.tryParse('${json['id']}') ?? 0,
@@ -243,5 +282,38 @@ class MissionVehicle {
             '${json['label'] ?? json['marque'] ?? json['title'] ?? 'Véhicule'}',
         plate: json['plate']?.toString() ?? json['immatriculation']?.toString(),
         nonRemovalReason: json['non_removal_reason']?.toString(),
+        photos: SignalementPhoto.liste(json['photos_signalement']),
+        thumbnailUrl: json['thumbnail_url']?.toString(),
+        latitude: double.tryParse('${json['latitude'] ?? ''}'),
+        longitude: double.tryParse('${json['longitude'] ?? ''}'),
+        commune: json['commune']?.toString(),
+        adresse: json['adresse']?.toString(),
       );
+}
+
+String _lieu(String? commune, String? adresse) => [adresse, commune]
+    .map((t) => (t ?? '').trim())
+    .where((t) => t.isNotEmpty && t != 'null')
+    .join(' · ');
+
+/// Photo du signalement d'origine, prise par le citoyen ou par l'agent qui
+/// l'a constaté.
+class SignalementPhoto {
+  const SignalementPhoto({required this.url, required this.source});
+  final String url;
+
+  /// `citoyen` ou `agent`.
+  final String source;
+  bool get parAgent => source == 'agent';
+
+  static List<SignalementPhoto> liste(dynamic brut) => brut is List
+      ? brut
+          .whereType<Map>()
+          .map((e) => SignalementPhoto(
+                url: '${e['url'] ?? ''}',
+                source: '${e['source'] ?? 'citoyen'}',
+              ))
+          .where((p) => p.url.isNotEmpty)
+          .toList()
+      : const [];
 }

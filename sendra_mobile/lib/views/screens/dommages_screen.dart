@@ -15,6 +15,7 @@ import 'package:walletium/utils/signaler_flow.dart';
 import 'package:walletium/utils/strings.dart';
 
 import 'pv_screen.dart';
+import 'package:walletium/widgets/others/photo_reseau.dart';
 
 /// Élément de la légende des dommages, posé sur le véhicule.
 enum TypeDommage {
@@ -129,7 +130,8 @@ class _DommagesScreenState extends State<DommagesScreen> {
         }
         if ((details['pieces_manquantes']?.toString() ?? '').isNotEmpty &&
             _missingPartsController.text.isEmpty) {
-          _missingPartsController.text = details['pieces_manquantes'].toString();
+          _missingPartsController.text =
+              details['pieces_manquantes'].toString();
         }
         _photos
           ..clear()
@@ -168,7 +170,8 @@ class _DommagesScreenState extends State<DommagesScreen> {
       final url = json['dommages']?.toString() ?? '';
       // Sans image enregistrée, l'API renvoie le dossier seul.
       if (url.isEmpty || url.endsWith('/')) return;
-      final bytes = await http.get(Uri.parse(url)).timeout(const Duration(seconds: 15));
+      final bytes =
+          await http.get(Uri.parse(url)).timeout(const Duration(seconds: 15));
       if (bytes.statusCode != 200) return;
       final image = await _decodeImage(bytes.bodyBytes);
       if (!mounted || _reperes.isNotEmpty) return;
@@ -248,10 +251,12 @@ class _DommagesScreenState extends State<DommagesScreen> {
       final fichier = await SignalerFlow.optimiser(File(picked.path));
       final request = http.MultipartRequest(
         'POST',
-        Uri.parse('${Strings.apiURI}constatation/${widget.signalementId}/photos'),
+        Uri.parse(
+            '${Strings.apiURI}constatation/${widget.signalementId}/photos'),
       );
       request.headers.addAll(await _entetes(json: false));
-      request.files.add(await http.MultipartFile.fromPath('photo', fichier.path));
+      request.files
+          .add(await http.MultipartFile.fromPath('photo', fichier.path));
       final response = await http.Response.fromStream(
         await request.send().timeout(const Duration(seconds: 40)),
       );
@@ -293,7 +298,8 @@ class _DommagesScreenState extends State<DommagesScreen> {
     );
     if (ok != true) return;
     if (photo.id == null) {
-      _snack('Photo enregistrée par une ancienne version : actualisez la page.');
+      _snack(
+          'Photo enregistrée par une ancienne version : actualisez la page.');
       return;
     }
     try {
@@ -386,7 +392,10 @@ class _DommagesScreenState extends State<DommagesScreen> {
     final canvas = Canvas(recorder);
     canvas.drawRect(Rect.fromLTWH(0, 0, largeur, hauteurImage + bandeau),
         Paint()..color = Colors.white);
-    canvas.drawImageRect(image, source, Rect.fromLTWH(0, 0, largeur, hauteurImage),
+    canvas.drawImageRect(
+        image,
+        source,
+        Rect.fromLTWH(0, 0, largeur, hauteurImage),
         Paint()..filterQuality = FilterQuality.high);
     final taille = Size(largeur, hauteurImage);
     for (final r in _reperes) {
@@ -406,8 +415,8 @@ class _DommagesScreenState extends State<DommagesScreen> {
       ]),
       textDirection: TextDirection.ltr,
     )..layout(maxWidth: largeur - 20);
-    legende.paint(canvas,
-        Offset(10, hauteurImage + (bandeau - legende.height) / 2));
+    legende.paint(
+        canvas, Offset(10, hauteurImage + (bandeau - legende.height) / 2));
     final rendu = await recorder
         .endRecording()
         .toImage(largeur.round(), (hauteurImage + bandeau).round());
@@ -459,7 +468,8 @@ class _DommagesScreenState extends State<DommagesScreen> {
         builder: (_) => PvScreen(signalementId: widget.signalementId),
       ));
     } else {
-      String message = 'Échec de l’envoi des dommages (${response.statusCode}).';
+      String message =
+          'Échec de l’envoi des dommages (${response.statusCode}).';
       try {
         final corps = jsonDecode(response.body);
         if (corps is Map && corps['message'] != null) {
@@ -472,7 +482,8 @@ class _DommagesScreenState extends State<DommagesScreen> {
 
   void _snack(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
   }
 
   // ─────────────────────────── Interface ─────────────────────────────────
@@ -559,7 +570,8 @@ class _DommagesScreenState extends State<DommagesScreen> {
     );
   }
 
-  Widget _carte({required String titre, String? complement, required Widget child}) {
+  Widget _carte(
+      {required String titre, String? complement, required Widget child}) {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -641,7 +653,8 @@ class _DommagesScreenState extends State<DommagesScreen> {
         const Text(
           'Touchez un élément de la légende, puis touchez le véhicule pour le placer. '
           'Touchez un repère pour le retirer.',
-          style: TextStyle(color: SendraTheme.muted, fontSize: 13, height: 1.35),
+          style:
+              TextStyle(color: SendraTheme.muted, fontSize: 13, height: 1.35),
         ),
         const SizedBox(height: 10),
         Wrap(
@@ -681,8 +694,9 @@ class _DommagesScreenState extends State<DommagesScreen> {
         else
           LayoutBuilder(builder: (context, constraints) {
             final source = _sourceRectFor(_image!);
-            final hauteur = (constraints.maxWidth / (source.width / source.height))
-                .clamp(150.0, 420.0);
+            final hauteur =
+                (constraints.maxWidth / (source.width / source.height))
+                    .clamp(150.0, 420.0);
             final taille = Size(constraints.maxWidth, hauteur);
             return Container(
               height: hauteur,
@@ -690,7 +704,8 @@ class _DommagesScreenState extends State<DommagesScreen> {
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(14),
                 border: Border.all(
-                    color: _typeChoisi?.couleur ?? SendraTheme.border, width: 1.6),
+                    color: _typeChoisi?.couleur ?? SendraTheme.border,
+                    width: 1.6),
               ),
               clipBehavior: Clip.antiAlias,
               child: GestureDetector(
@@ -704,34 +719,54 @@ class _DommagesScreenState extends State<DommagesScreen> {
             );
           }),
         const SizedBox(height: 8),
-        Row(
-          children: [
-            Expanded(
-              child: Text(
-                _reperes.isEmpty
-                    ? 'Aucun repère'
-                    : '${_reperes.length} repère${_reperes.length > 1 ? 's' : ''}',
-                style: const TextStyle(color: SendraTheme.muted),
+        // Sur un écran étroit, les deux actions passent en icônes seules
+        // pour ne jamais déborder de la carte.
+        LayoutBuilder(builder: (context, c) {
+          final compact = c.maxWidth < 300;
+          void annuler() => setState(() => _reperes.removeLast());
+          void effacer() => setState(() => _reperes.clear());
+          final vide = _reperes.isEmpty;
+          return Row(
+            children: [
+              Expanded(
+                child: Text(
+                  vide
+                      ? 'Aucun repère'
+                      : '${_reperes.length} repère${_reperes.length > 1 ? 's' : ''}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: SendraTheme.muted),
+                ),
               ),
-            ),
-            TextButton.icon(
-              onPressed: _reperes.isEmpty
-                  ? null
-                  : () => setState(() => _reperes.removeLast()),
-              icon: const Icon(Icons.undo_rounded, size: 18),
-              label: const Text('Annuler'),
-            ),
-            TextButton.icon(
-              style: TextButton.styleFrom(
-                  foregroundColor: SendraTheme.statusSignale),
-              onPressed: _reperes.isEmpty
-                  ? null
-                  : () => setState(() => _reperes.clear()),
-              icon: const Icon(Icons.delete_outline, size: 18),
-              label: const Text('Effacer'),
-            ),
-          ],
-        ),
+              if (compact) ...[
+                IconButton(
+                  tooltip: 'Annuler',
+                  onPressed: vide ? null : annuler,
+                  icon: const Icon(Icons.undo_rounded),
+                ),
+                IconButton(
+                  tooltip: 'Effacer',
+                  color: SendraTheme.statusSignale,
+                  onPressed: vide ? null : effacer,
+                  icon: const Icon(Icons.delete_outline),
+                ),
+              ] else ...[
+                TextButton.icon(
+                  onPressed: vide ? null : annuler,
+                  icon: const Icon(Icons.undo_rounded, size: 18),
+                  label: const Text('Annuler'),
+                ),
+                TextButton.icon(
+                  style: TextButton.styleFrom(
+                      foregroundColor: SendraTheme.statusSignale),
+                  onPressed: vide ? null : effacer,
+                  icon: const Icon(Icons.delete_outline, size: 18),
+                  label: const Text('Effacer'),
+                ),
+              ],
+            ],
+          );
+        }),
       ],
     );
   }
@@ -739,8 +774,10 @@ class _DommagesScreenState extends State<DommagesScreen> {
 
 /// Dessin d'un repère : symbole de la légende dans une pastille colorée.
 class _RepereDessin {
-  static void dessiner(Canvas canvas, RepereDommage r, Size taille, double rayon) {
-    final centre = Offset(r.position.dx * taille.width, r.position.dy * taille.height);
+  static void dessiner(
+      Canvas canvas, RepereDommage r, Size taille, double rayon) {
+    final centre =
+        Offset(r.position.dx * taille.width, r.position.dy * taille.height);
     canvas.drawCircle(centre, rayon + 2, Paint()..color = Colors.white);
     canvas.drawCircle(centre, rayon, Paint()..color = r.type.couleur);
     final texte = TextPainter(
@@ -760,10 +797,14 @@ class _RepereDessin {
 }
 
 class _GabaritPainter extends CustomPainter {
-  _GabaritPainter(this.image, this.source, this.reperes);
+  _GabaritPainter(this.image, this.source, this.reperes)
+      : _nombre = reperes.length;
   final ui.Image image;
   final Rect source;
   final List<RepereDommage> reperes;
+  // La liste des repères est modifiée en place : on compare leur nombre
+  // pour ne redessiner que si quelque chose a changé.
+  final int _nombre;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -777,7 +818,7 @@ class _GabaritPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _GabaritPainter old) =>
-      true;
+      old.image != image || old.source != source || old._nombre != _nombre;
 }
 
 class _TuilePhoto extends StatelessWidget {
@@ -802,12 +843,10 @@ class _TuilePhoto extends StatelessWidget {
             color: const Color(0xFFEAF1ED),
             child: InkWell(
               onTap: onVoir,
-              child: Image.network(
+              child: PhotoReseau(
                 url,
-                fit: BoxFit.cover,
-                cacheWidth: 360,
-                errorBuilder: (_, __, ___) => const Icon(
-                    Icons.broken_image_outlined,
+                largeur: 120,
+                erreur: const Icon(Icons.broken_image_outlined,
                     color: SendraTheme.muted),
               ),
             ),
@@ -823,7 +862,8 @@ class _TuilePhoto extends StatelessWidget {
                 onTap: onSupprimer,
                 child: const Padding(
                   padding: EdgeInsets.all(5),
-                  child: Icon(Icons.close_rounded, color: Colors.white, size: 16),
+                  child:
+                      Icon(Icons.close_rounded, color: Colors.white, size: 16),
                 ),
               ),
             ),
@@ -831,7 +871,9 @@ class _TuilePhoto extends StatelessWidget {
           const Positioned(
             left: 6,
             bottom: 6,
-            child: Icon(Icons.zoom_in_rounded, color: Colors.white, size: 18,
+            child: Icon(Icons.zoom_in_rounded,
+                color: Colors.white,
+                size: 18,
                 shadows: [Shadow(blurRadius: 4)]),
           ),
         ],
@@ -921,7 +963,11 @@ class _VisionneusePhotosState extends State<_VisionneusePhotos> {
         itemBuilder: (_, i) => InteractiveViewer(
           maxScale: 5,
           child: Center(
-            child: Image.network(widget.urls[i], fit: BoxFit.contain),
+            child: PhotoReseau(
+              widget.urls[i],
+              fit: BoxFit.contain,
+              attente: const Center(child: CircularProgressIndicator()),
+            ),
           ),
         ),
       ),

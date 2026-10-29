@@ -5,7 +5,10 @@ import 'package:geolocator/geolocator.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:walletium/models/mission.dart';
 import 'package:walletium/services/mission_service.dart';
+import 'package:walletium/utils/ecran.dart';
 import 'package:walletium/utils/sendra_theme.dart';
+import 'package:walletium/utils/signaler_flow.dart';
+import 'package:walletium/widgets/others/photo_reseau.dart';
 
 class MissionDetailsScreen extends StatefulWidget {
   const MissionDetailsScreen(
@@ -39,15 +42,18 @@ class _MissionDetailsScreenState extends State<MissionDetailsScreen> {
   Future<void> _checkIn() async {
     setState(() => _busy = true);
     try {
-      if (!await Geolocator.isLocationServiceEnabled())
+      if (!await Geolocator.isLocationServiceEnabled()) {
         throw Exception('Activez la localisation du téléphone pour pointer.');
+      }
       var permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied)
+      if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
+      }
       if (permission == LocationPermission.denied ||
-          permission == LocationPermission.deniedForever)
+          permission == LocationPermission.deniedForever) {
         throw Exception(
             'L’autorisation de localisation est nécessaire pour pointer.');
+      }
       final position = await Geolocator.getCurrentPosition(
           desiredAccuracy: LocationAccuracy.high);
       final mission = await _service.checkIn(_mission.id, position.latitude,
@@ -391,48 +397,55 @@ class _MissionDetailsScreenState extends State<MissionDetailsScreen> {
   }
 
   ({Color color, IconData icon, Color background}) _sectionTone(String title) {
-    if (title.startsWith('Camions'))
+    if (title.startsWith('Camions')) {
       return (
         color: const Color(0xFF1976D2),
         icon: Icons.local_shipping_outlined,
         background: const Color(0xFFF7FAFF)
       );
-    if (title.startsWith('Fourrières'))
+    }
+    if (title.startsWith('Fourrières')) {
       return (
         color: const Color(0xFF7C4DFF),
         icon: Icons.warehouse_outlined,
         background: const Color(0xFFFBF9FF)
       );
-    if (title.startsWith('Véhicules'))
+    }
+    if (title.startsWith('Véhicules')) {
       return (
         color: SendraTheme.amber,
         icon: Icons.directions_car_outlined,
         background: const Color(0xFFFFFCF5)
       );
-    if (title.startsWith('Enlèvements'))
+    }
+    if (title.startsWith('Enlèvements')) {
       return (
         color: const Color(0xFF00897B),
         icon: Icons.photo_camera_outlined,
         background: const Color(0xFFF5FCFB)
       );
-    if (title.contains('réception') || title.contains('Réception'))
+    }
+    if (title.contains('réception') || title.contains('Réception')) {
       return (
         color: const Color(0xFF7C4DFF),
         icon: Icons.inventory_2_outlined,
         background: const Color(0xFFFBF9FF)
       );
-    if (title.contains('Pointage'))
+    }
+    if (title.contains('Pointage')) {
       return (
         color: const Color(0xFF1976D2),
         icon: Icons.my_location,
         background: const Color(0xFFF7FAFF)
       );
-    if (title.contains('Fin'))
+    }
+    if (title.contains('Fin')) {
       return (
         color: SendraTheme.green,
         icon: Icons.task_alt,
         background: const Color(0xFFF6FCF8)
       );
+    }
     return (
       color: SendraTheme.green,
       icon: Icons.info_outline,
@@ -572,8 +585,9 @@ class _RemovalScreenState extends State<_RemovalScreen> {
     _truckId = widget.existingRemoval?.truckId;
     _label.text = widget.existingRemoval?.label ?? '';
     _plate.text = widget.existingRemoval?.plate ?? '';
-    if (_truckId == null && widget.mission.trucks.length == 1)
+    if (_truckId == null && widget.mission.trucks.length == 1) {
       _truckId = widget.mission.trucks.first.id;
+    }
   }
 
   @override
@@ -586,7 +600,10 @@ class _RemovalScreenState extends State<_RemovalScreen> {
   Future<void> _take(String angle) async {
     final file = await _picker.pickImage(
         source: ImageSource.camera, imageQuality: 85, maxWidth: 1800);
-    if (file != null) setState(() => _photos[angle] = File(file.path));
+    if (file == null) return;
+    // Photo redressée et allégée avant l'envoi.
+    final photo = await SignalerFlow.optimiser(File(file.path));
+    if (mounted) setState(() => _photos[angle] = photo);
   }
 
   Future<void> _save() async {
@@ -620,9 +637,10 @@ class _RemovalScreenState extends State<_RemovalScreen> {
               sheet: _sheet);
       if (mounted) Navigator.pop(context, result);
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
             content: Text(e.toString().replaceFirst('Exception: ', ''))));
+      }
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -655,7 +673,7 @@ class _RemovalScreenState extends State<_RemovalScreen> {
                         widget.existingRemoval!.plate!))
           else if (widget.mission.isProgrammed && !widget.extraVehicle)
             DropdownButtonFormField<int?>(
-                value: _vehicleId,
+                initialValue: _vehicleId,
                 decoration: const InputDecoration(labelText: 'Véhicule'),
                 items: [
                   ...available.map((v) =>
@@ -680,7 +698,7 @@ class _RemovalScreenState extends State<_RemovalScreen> {
           ],
           const SizedBox(height: 12),
           DropdownButtonFormField<int>(
-              value: _truckId,
+              initialValue: _truckId,
               decoration: const InputDecoration(
                   labelText: 'Camion qui emporte le véhicule'),
               items: widget.mission.trucks
@@ -714,7 +732,8 @@ class _RemovalScreenState extends State<_RemovalScreen> {
                               image: _photoProvider(entry.key) == null
                                   ? null
                                   : DecorationImage(
-                                      image: _photoProvider(entry.key)!,
+                                      image: vignette(context,
+                                          _photoProvider(entry.key)!, 240),
                                       fit: BoxFit.cover)),
                           child: _photoProvider(entry.key) == null
                               ? Column(
@@ -742,7 +761,9 @@ class _RemovalScreenState extends State<_RemovalScreen> {
                     source: ImageSource.camera,
                     imageQuality: 85,
                     maxWidth: 1800);
-                if (image != null) setState(() => _sheet = File(image.path));
+                if (image == null) return;
+                final fiche = await SignalerFlow.optimiser(File(image.path));
+                if (mounted) setState(() => _sheet = fiche);
               },
               icon: Icon(_sheet != null ||
                       widget.existingRemoval?.sheetPhotoUrl != null
@@ -772,7 +793,7 @@ class _RemovalScreenState extends State<_RemovalScreen> {
     final local = _photos[angle];
     if (local != null) return FileImage(local);
     final remote = widget.existingRemoval?.photos[angle];
-    return remote == null ? null : NetworkImage(remote);
+    return remote == null ? null : photoReseauProvider(remote);
   }
 }
 
@@ -801,13 +822,15 @@ class _ReceptionPhotoScreenState extends State<_ReceptionPhotoScreen> {
   ImageProvider? _provider(String angle) {
     if (_photos[angle] != null) return FileImage(_photos[angle]!);
     final remote = widget.removal.receptionPhotos[angle];
-    return remote == null ? null : NetworkImage(remote);
+    return remote == null ? null : photoReseauProvider(remote);
   }
 
   Future<void> _take(String angle) async {
     final image = await _picker.pickImage(
         source: ImageSource.camera, imageQuality: 85, maxWidth: 1800);
-    if (image != null) setState(() => _photos[angle] = File(image.path));
+    if (image == null) return;
+    final photo = await SignalerFlow.optimiser(File(image.path));
+    if (mounted) setState(() => _photos[angle] = photo);
   }
 
   Future<void> _save() async {
@@ -826,9 +849,10 @@ class _ReceptionPhotoScreenState extends State<_ReceptionPhotoScreen> {
           .storeReception(widget.mission.id, widget.removal.id, _photos);
       if (mounted) Navigator.pop(context, mission);
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
             content: Text(e.toString().replaceFirst('Exception: ', ''))));
+      }
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -875,7 +899,8 @@ class _ReceptionPhotoScreenState extends State<_ReceptionPhotoScreen> {
                           image: image == null
                               ? null
                               : DecorationImage(
-                                  image: image, fit: BoxFit.cover)),
+                                  image: vignette(context, image, 240),
+                                  fit: BoxFit.cover)),
                       child: image == null
                           ? Column(
                               mainAxisAlignment: MainAxisAlignment.center,
@@ -942,9 +967,10 @@ class _TruckDestinationSheetState extends State<_TruckDestinationSheet> {
           .setTruckDestination(widget.mission.id, widget.truck.id, _pound!);
       if (mounted) Navigator.pop(context, result);
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
             content: Text(e.toString().replaceFirst('Exception: ', ''))));
+      }
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -1007,7 +1033,7 @@ class _TruckDestinationSheetState extends State<_TruckDestinationSheet> {
                 style: TextStyle(color: SendraTheme.muted)),
             const SizedBox(height: 14),
             DropdownButtonFormField<String>(
-                value: _pound,
+                initialValue: _pound,
                 isExpanded: true,
                 decoration: InputDecoration(
                     prefixIcon: const Icon(Icons.local_parking,
