@@ -17,7 +17,6 @@ use Illuminate\Validation\Rule;
 
 class MissionController extends Controller
 {
-    private const JOURS_MISSIONS_TERMINEES = 30;
 
     public function index(Request $request): JsonResponse
     {
@@ -39,11 +38,9 @@ class MissionController extends Controller
                 'removals.dispatch', 'removals.reception', 'dispatches', 'receptionAgent', 'receptionPound',
             ])
             ->whereNotIn('status', ['brouillon', 'annulee'])
-            // Les missions terminées depuis plus de 30 jours ne sont plus
-            // renvoyées : la liste grossissait sans fin. Toujours consultables
-            // une à une par GET /missions/{id}.
-            ->where(fn ($q) => $q->whereNull('completed_at')
-                ->orWhere('completed_at', '>=', now()->subDays(self::JOURS_MISSIONS_TERMINEES)))
+            // Toutes les missions terminées restent renvoyées : l'écran
+            // « Historique des missions » de l'app agent les lit ici
+            // (décision du 30/10/2026). Paginer si la liste devient longue.
             ->orderByRaw('scheduled_at IS NULL, scheduled_at')
             ->get()->map(fn (Mission $mission) => $this->serializeForAgent($mission));
 

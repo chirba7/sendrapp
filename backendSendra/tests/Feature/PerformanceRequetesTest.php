@@ -168,7 +168,7 @@ class PerformanceRequetesTest extends TestCase
         return $m;
     }
 
-    public function test_missions_photos_chargees_d_avance_et_vieilles_missions_terminees_masquees(): void
+    public function test_missions_photos_chargees_d_avance_et_historique_complet(): void
     {
         $agent = User::factory()->create(['role_id' => 2]);
         $h = ['Authorization' => 'Bearer '.JWTAuth::fromUser($agent)];
@@ -181,7 +181,8 @@ class PerformanceRequetesTest extends TestCase
         $ids = array_column($r->assertOk()->json('data'), 'id');
         $this->assertContains($enCours->id, $ids);
         $this->assertContains($recente->id, $ids);
-        $this->assertNotContains($vieille->id, $ids);
+        // L'historique de l'app agent garde aussi les missions anciennes.
+        $this->assertContains($vieille->id, $ids);
         $m = collect($r->json('data'))->firstWhere('id', $enCours->id);
         $this->assertCount(2, $m['vehicles']);
         $this->assertCount(1, $m['vehicles'][0]['photos_signalement']);
@@ -198,7 +199,7 @@ class PerformanceRequetesTest extends TestCase
         [, $avec12] = $this->mesurer(fn () => $this->getJson('/api/missions', $h));
         $this->assertSame($avec2, $avec12, "$avec2 requêtes avant, $avec12 après");
 
-        // La vieille mission reste consultable une à une.
+        // Et chacune reste consultable une à une.
         $this->getJson("/api/missions/{$vieille->id}", $h)->assertOk();
     }
 
