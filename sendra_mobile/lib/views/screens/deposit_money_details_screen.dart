@@ -72,14 +72,24 @@ class _DepositMoneyDetailsScreenState extends State<DepositMoneyDetailsScreen> {
         // Actualiser depuis l’API citoyenne pour refléter la décision de l’autorité.
         final initial = Map<String, dynamic>.from(args);
         signalementData = initial;
+        // Perf (30/10/2026) : la liste a déjà fourni de quoi afficher la
+        // fiche. On l'affiche tout de suite, puis on la met à jour en
+        // arrière-plan — avant, l'écran restait sur le chargement le temps
+        // de l'appel réseau (plusieurs secondes en 3G).
+        signalementDataFuture = Future.value(initial);
+        setState(() => isLoading = false);
         if (_isStaff && initial['signalementId'] != null) {
-          // Staff : détail complet et à jour (prise en charge, PV…).
+          // Staff : détail complet et à jour (prise en charge, PV…). La
+          // proposition de prise en charge attend ces données fraîches.
           try {
-            signalementData = await fetchSignalementDetails(
+            final frais = await fetchSignalementDetails(
                 int.parse(initial['signalementId'].toString()));
+            if (!mounted) return;
+            setState(() {
+              signalementData = frais;
+              signalementDataFuture = Future.value(frais);
+            });
           } catch (_) {}
-          signalementDataFuture = Future.value(signalementData);
-          setState(() => isLoading = false);
           _proposerPriseEnCharge();
           return;
         }
@@ -108,7 +118,10 @@ class _DepositMoneyDetailsScreenState extends State<DepositMoneyDetailsScreen> {
             // La dernière version connue reste consultable hors ligne.
           }
         }
-        signalementDataFuture = Future.value(signalementData);
+        if (!mounted) return;
+        setState(() {
+          signalementDataFuture = Future.value(signalementData);
+        });
       } else {
         // Reçu depuis un écran staff (liste globale, redirection après
         // enlèvement/dommages) : simple ID, on va chercher le détail à jour.
@@ -296,7 +309,10 @@ class _DepositMoneyDetailsScreenState extends State<DepositMoneyDetailsScreen> {
             : FutureBuilder<Map<String, dynamic>>(
                 future: signalementDataFuture,
                 builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
+                  // Mise à jour en arrière-plan : on garde la fiche affichée
+                  // au lieu de revenir une image sur l'écran de chargement.
+                  if (snapshot.connectionState == ConnectionState.waiting &&
+                      !snapshot.hasData) {
                     return _buildLoading();
                   } else if (snapshot.hasError) {
                     debugPrint('Erreur: ${snapshot.error}');

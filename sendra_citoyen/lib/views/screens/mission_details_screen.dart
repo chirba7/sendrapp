@@ -1,3 +1,4 @@
+import 'dart:async';
 
 
 import 'package:flutter/material.dart';
@@ -56,7 +57,8 @@ class _MissionDetailsScreenState extends State<MissionDetailsScreen> {
             'L’autorisation de localisation est nécessaire pour pointer.');
       }
       final position = await Geolocator.getCurrentPosition(
-          desiredAccuracy: LocationAccuracy.high);
+          desiredAccuracy: LocationAccuracy.high,
+          timeLimit: const Duration(seconds: 25));
       final mission = await _service.checkIn(_mission.id, position.latitude,
           position.longitude, position.accuracy);
       if (mounted) setState(() => _mission = mission);
@@ -82,7 +84,8 @@ class _MissionDetailsScreenState extends State<MissionDetailsScreen> {
         throw Exception('L’autorisation de localisation est nécessaire.');
       }
       final position = await Geolocator.getCurrentPosition(
-          desiredAccuracy: LocationAccuracy.high);
+          desiredAccuracy: LocationAccuracy.high,
+          timeLimit: const Duration(seconds: 25));
       final mission = await _service.checkInReception(
           _mission.id, position.latitude, position.longitude);
       if (mounted) setState(() => _mission = mission);
@@ -119,7 +122,9 @@ class _MissionDetailsScreenState extends State<MissionDetailsScreen> {
 
   void _error(Object error) =>
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(error.toString().replaceFirst('Exception: ', ''))));
+          content: Text(error is TimeoutException
+              ? 'Position GPS introuvable. Placez-vous à découvert et réessayez.'
+              : error.toString().replaceFirst('Exception: ', ''))));
 
   @override
   Widget build(BuildContext context) => Scaffold(

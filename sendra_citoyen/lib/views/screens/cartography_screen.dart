@@ -27,6 +27,29 @@ class _MapCache {
       DateTime.now().difference(fetchedAt!) < const Duration(minutes: 3);
 }
 
+/// Fond affiché le temps que la vue Google Maps soit créée. Volontairement
+/// sans animation : la création de la carte occupe le fil principal, un
+/// indicateur animé paraîtrait figé.
+class _FondCarte extends StatelessWidget {
+  const _FondCarte();
+
+  @override
+  Widget build(BuildContext context) => const ColoredBox(
+        color: Color(0xFFEAF1ED),
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.map_outlined, size: 48, color: SendraTheme.green),
+              SizedBox(height: 10),
+              Text('Chargement de la carte…',
+                  style: TextStyle(color: Colors.black54, fontSize: 15)),
+            ],
+          ),
+        ),
+      );
+}
+
 class CartographyScreen extends StatefulWidget {
   const CartographyScreen({super.key});
 
@@ -48,6 +71,14 @@ class _CartographyScreenState extends State<CartographyScreen>
 
   // Citoyen : tous les signalements, les siens ou ceux des autres.
   late final bool _isStaff = AppPrefs.isStaff;
+
+  // Perf (trace du 30/10/2026) : créer la vue Google Maps bloque le fil
+  // principal 1,4 à 1,6 s sur un téléphone d'entrée de gamme. Créée dans la
+  // même image que l'onglet, elle gelait l'app au moment du toucher, sans
+  // aucun retour. On affiche d'abord l'onglet avec un fond, puis la carte.
+  // L'onglet est conservé (IndexedStack + keep-alive) : une seule fois.
+  bool _creerCarte = false;
+  bool _localisationLancee = false;
   String _portee = 'tous';
 
   @override
@@ -57,6 +88,18 @@ class _CartographyScreenState extends State<CartographyScreen>
   void initState() {
     super.initState();
     if (!_MapCache.isFresh) _loadSignalements();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Future.delayed(const Duration(milliseconds: 350), () {
+        if (mounted) setState(() => _creerCarte = true);
+      });
+    });
+  }
+
+  void _carteCreee(GoogleMapController controller) {
+    _mapController = controller;
+    // La géolocalisation (appels natifs) attend que la carte soit là.
+    if (_localisationLancee) return;
+    _localisationLancee = true;
     _locateUser(recenter: _MapCache.camera == null);
   }
 
@@ -256,11 +299,14 @@ class _CartographyScreenState extends State<CartographyScreen>
       ),
       body: Stack(
         children: [
-          // La carte est créée immédiatement, une seule fois.
+          // La carte est créée une seule fois, juste après l'onglet.
+          if (!_creerCarte)
+            const _FondCarte()
+          else
           RepaintBoundary(
             child: GoogleMap(
               initialCameraPosition: _initialCamera,
-              onMapCreated: (controller) => _mapController = controller,
+              onMapCreated: _carteCreee,
               onCameraMove: (position) => _MapCache.camera = position,
               markers: _markers,
               myLocationEnabled: _userPosition != null,

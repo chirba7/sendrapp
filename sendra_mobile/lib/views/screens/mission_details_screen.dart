@@ -1,3 +1,4 @@
+import 'dart:async';
 
 
 import 'package:flutter/material.dart';
@@ -91,8 +92,15 @@ class _MissionDetailsScreenState extends State<MissionDetailsScreen> {
       throw Exception(
           'L’autorisation de localisation est nécessaire pour pointer.');
     }
-    return Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high);
+    // 30/10/2026 : sans limite, le pointage pouvait attendre le GPS
+    // indéfiniment (intérieur, GPS froid) avec l'écran sur « en cours ».
+    try {
+      return await Geolocator.getCurrentPosition(
+          desiredAccuracy: LocationAccuracy.high,
+          timeLimit: const Duration(seconds: 25));
+    } on TimeoutException {
+      throw Exception('Position GPS introuvable. Placez-vous à découvert et réessayez.');
+    }
   }
 
   Future<void> _action(Future<Mission> Function() appel) async {

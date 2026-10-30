@@ -1018,11 +1018,47 @@ class _SignalerHero extends StatefulWidget {
 
 class _SignalerHeroState extends State<_SignalerHero>
     with SingleTickerProviderStateMixin {
+  // Perf (trace du 30/10/2026) : l'animation tournait en boucle, ce qui
+  // forçait Flutter à redessiner l'écran 60 fois par seconde tant que
+  // l'accueil était affiché (~8 ms de rendu par image sur un téléphone
+  // d'entrée de gamme, et des saccades dès qu'on faisait défiler la liste).
+  // Elle joue maintenant quelques cycles à l'arrivée sur l'accueil, puis le
+  // bouton reste immobile.
+  static const _cycles = 3;
   late final AnimationController _anim = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 1800),
-  )..repeat();
+  )..addStatusListener(_finDeCycle);
+  int _cyclesJoues = 0;
+  bool _visible = false;
   bool _appuye = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // TickerMode passe à faux quand l'onglet Accueil est masqué : on relance
+    // l'animation à chaque retour sur l'accueil.
+    final visible = TickerMode.of(context);
+    if (visible && !_visible) _lancer();
+    _visible = visible;
+  }
+
+  void _lancer() {
+    if (MediaQuery.of(context).disableAnimations) return;
+    _cyclesJoues = 0;
+    _anim.forward(from: 0);
+  }
+
+  void _finDeCycle(AnimationStatus statut) {
+    if (statut != AnimationStatus.completed) return;
+    _cyclesJoues++;
+    if (_cyclesJoues < _cycles) {
+      _anim.forward(from: 0);
+    } else if (mounted) {
+      // Retour à l'état de repos (sans ondes) : plus aucune image à dessiner.
+      setState(() => _anim.value = 0);
+    }
+  }
 
   @override
   void dispose() {
@@ -1085,16 +1121,18 @@ class _SignalerHeroState extends State<_SignalerHero>
                                   child: AnimatedBuilder(
                                     animation: _anim,
                                     builder: (context, child) {
-                                      final t = reduit ? 0.0 : _anim.value;
+                                      // Au repos (animation finie), pas d'ondes.
+                                      final enCours = !reduit && _anim.isAnimating;
+                                      final t = enCours ? _anim.value : 0.0;
                                       // Respiration douce de l'icône.
-                                      final souffle = reduit
+                                      final souffle = !enCours
                                           ? 1.0
                                           : 1 + .06 * (1 - (2 * t - 1).abs());
                                       return Stack(
                                         alignment: Alignment.center,
                                         children: [
                                           // Deux ondes décalées qui s'élargissent.
-                                          if (!reduit)
+                                          if (enCours)
                                             for (final decalage in const [
                                               0.0,
                                               .5
