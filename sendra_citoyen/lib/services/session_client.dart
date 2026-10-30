@@ -24,19 +24,34 @@ import 'package:walletium/utils/strings.dart';
 ///    revient à l'écran de connexion ;
 ///  - 403 avec `code = compte_desactive` : compte archivé, même chose.
 ///
-/// Ajoute aussi `Accept: application/json` quand il manque : Laravel
+/// Ajoute aussi `Accept: application/json` aux appels /api/ quand il manque : Laravel
 /// renvoie alors ses erreurs de validation en JSON (422 + message) au lieu
 /// d'une redirection que l'app ne savait pas lire.
+///
+/// Cycle de vie (correctif du 30/10/2026) : `http.get/post/…` ferment le
+/// client reçu de la fabrique après CHAQUE requête. Un SessionClient possède
+/// donc son propre client réseau, créé par [_fabrique] et fermé avec lui —
+/// jamais un client partagé (la 1re fermeture coupait toutes les requêtes et
+/// le chargement des photos). La vérification /me, qui part après la
+/// réponse, ouvre et ferme son propre client pour la même raison.
 class SessionClient extends http.BaseClient {
-  SessionClient(this._interne);
+  SessionClient(http.Client Function() fabrique)
+      : _fabrique = fabrique,
+        _interne = fabrique();
 
+  /// Crée un client réseau réel. Doit être liée à la zone extérieure à
+  /// `runWithClient` (voir main.dart), sinon elle renverrait un SessionClient.
+  final http.Client Function() _fabrique;
   final http.Client _interne;
   static bool _verificationEnCours = false;
   static bool _expirationEnCours = false;
 
   @override
   Future<http.StreamedResponse> send(http.BaseRequest request) async {
-    if (!request.finalized && !request.headers.containsKey('Accept')) {
+    // Seulement pour l'API : les photos gardent leurs en-têtes habituels.
+    if (!request.finalized &&
+        request.url.path.contains('/api/') &&
+        !request.headers.containsKey('Accept')) {
       request.headers['Accept'] = 'application/json';
     }
 
@@ -99,8 +114,9 @@ class SessionClient extends http.BaseClient {
   Future<void> _verifier(String jeton) async {
     if (_verificationEnCours || _expirationEnCours) return;
     _verificationEnCours = true;
+    final client = _fabrique();
     try {
-      final reponse = await _interne.post(
+      final reponse = await client.post(
         Uri.parse('${Strings.apiURI}me'),
         headers: {'Authorization': 'Bearer $jeton', 'Accept': 'application/json'},
       ).timeout(const Duration(seconds: 15));
@@ -111,6 +127,7 @@ class SessionClient extends http.BaseClient {
       // Pas de réseau ou serveur injoignable : on ne déconnecte personne.
       if (kDebugMode) debugPrint('Vérification de session impossible : $e');
     } finally {
+      client.close();
       _verificationEnCours = false;
     }
   }

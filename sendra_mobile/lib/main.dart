@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
@@ -16,15 +18,19 @@ void main() {
   // Démo web (--dart-define=DEMO=true) : faux serveur, photos d'exemple et
   // position fixe à Dakar. Les versions Android ne sont pas concernées.
   if (kDemo) {
-    final reseau = http.Client();
     Demo.installer();
-    http.runWithClient(_demarrer, () => Demo.client(reseau));
+    // Un client réseau par appel : http.get/post… ferment le client reçu.
+    http.runWithClient(_demarrer, () => Demo.client(http.Client()));
     return;
   }
   // Toutes les requêtes de l'app passent par SessionClient : retour à
   // l'écran de connexion quand la session a expiré (30/10/2026).
-  final reseau = http.Client();
-  http.runWithClient(_demarrer, () => SessionClient(reseau));
+  // La fabrique est liée à la zone extérieure : elle crée un vrai client
+  // réseau, même appelée depuis l'app (vérification /me). Chaque
+  // SessionClient a le sien, fermé avec lui (correctif du 30/10/2026 :
+  // un client partagé était fermé dès la 1re requête).
+  final clientReel = Zone.current.bindCallback(() => http.Client());
+  http.runWithClient(_demarrer, () => SessionClient(clientReel));
 }
 
 Future<void> _demarrer() async {
