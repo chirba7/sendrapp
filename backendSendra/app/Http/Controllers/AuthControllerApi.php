@@ -16,6 +16,7 @@ use App\Services\OrangeSmsService;
 use App\Models\UserVerificationCode;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
+use Tymon\JWTAuth\Facades\JWTAuth;
 
 class AuthControllerApi extends Controller
 {
@@ -377,8 +378,20 @@ class AuthControllerApi extends Controller
         $user->password = Hash::make($request->password);
         $user->save();
 
+        // Les jetons émis avant ce changement sont maintenant refusés
+        // (empreinte `pwd`) : on renvoie un nouveau jeton pour cet appareil,
+        // et on met l'ancien sur liste noire. Les autres appareils (ou un
+        // voleur de jeton) devront se reconnecter avec le nouveau mot de passe.
+        $nouveauJeton = JWTAuth::fromUser($user);
+        try {
+            JWTAuth::parseToken()->invalidate(); // le jeton de CETTE requête
+        } catch (\Throwable $e) {
+            // jeton déjà invalide : sans conséquence
+        }
+
         return response()->json(['success' => true,
-        'message' => 'Mot de passe modifié avec succès.']);
+        'message' => 'Mot de passe modifié avec succès.',
+        'token' => $nouveauJeton]);
     }
 
     /**

@@ -10,6 +10,7 @@ import 'utils/app_prefs.dart';
 import 'utils/sendra_theme.dart';
 import 'package:http/http.dart' as http;
 import 'demo/demo.dart';
+import 'package:walletium/services/session_client.dart';
 
 void main() {
   // Démo web (--dart-define=DEMO=true) : faux serveur, photos d'exemple et
@@ -20,7 +21,10 @@ void main() {
     http.runWithClient(_demarrer, () => Demo.client(reseau));
     return;
   }
-  _demarrer();
+  // Toutes les requêtes de l'app passent par SessionClient : retour à
+  // l'écran de connexion quand la session a expiré (30/10/2026).
+  final reseau = http.Client();
+  http.runWithClient(_demarrer, () => SessionClient(reseau));
 }
 
 Future<void> _demarrer() async {

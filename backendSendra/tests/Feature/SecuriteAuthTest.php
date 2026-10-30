@@ -23,6 +23,18 @@ class SecuriteAuthTest extends TestCase
 
     // ---------------------------------------------------------------- 1. JWT
 
+    /**
+     * Dans un test, l'application (et les objets JWT de tymon) survit d'une
+     * requête à l'autre ; en production chaque requête repart de zéro. On
+     * oublie donc l'utilisateur et le jeton mémorisés entre deux appels.
+     */
+    private function nouvelleRequete(): void
+    {
+        auth()->guard()->forgetUser();
+        app('tymon.jwt')->unsetToken();
+        app('tymon.jwt.auth')->unsetToken();
+    }
+
     public function test_un_jeton_de_connexion_expire_apres_trente_jours(): void
     {
         User::factory()->create(['telephone' => '771110001', 'role_id' => 5]);
@@ -92,6 +104,68 @@ class SecuriteAuthTest extends TestCase
         $nouveau = $this->postJson('/api/login', ['telephone' => '771110004', 'password' => 'password'])->json('token');
         auth()->forgetGuards();
         $this->withToken($nouveau)->postJson('/api/me')->assertOk();
+    }
+
+    public function test_changer_son_mot_de_passe_deconnecte_les_autres_sessions(): void
+    {
+        User::factory()->create(['telephone' => '771110005', 'role_id' => 5]);
+        $telephone = $this->postJson('/api/login', ['telephone' => '771110005', 'password' => 'password'])->json('token');
+        $tablette = $this->postJson('/api/login', ['telephone' => '771110005', 'password' => 'password'])->json('token');
+
+        $reponse = $this->withToken($telephone)->putJson('/api/change-password', [
+            'current_password' => 'password', 'password' => 'nouveau1', 'password_confirmation' => 'nouveau1',
+        ])->assertOk()->assertJsonPath('success', true);
+        $nouveau = $reponse->json('token');
+        $this->assertNotEmpty($nouveau);
+
+        // L'autre appareil est refusé, avec le code lu par les apps…
+        $this->nouvelleRequete();
+        $this->withToken($tablette)->postJson('/api/me')
+            ->assertStatus(401)->assertJsonPath('code', 'session_expiree');
+        // … et l'ancien jeton de ce téléphone aussi (liste noire).
+        $this->nouvelleRequete();
+        $this->withToken($telephone)->postJson('/api/me')->assertStatus(401);
+
+        // … le nouveau jeton fonctionne, et survit à un /refresh.
+        $this->nouvelleRequete();
+        $this->withToken($nouveau)->postJson('/api/me')->assertOk();
+        $this->nouvelleRequete();
+        $rafraichi = $this->withToken($nouveau)->postJson('/api/refresh')->assertOk()->json('token');
+        $this->nouvelleRequete();
+        $this->withToken($rafraichi)->postJson('/api/me')->assertOk();
+    }
+
+    public function test_reinitialiser_son_mot_de_passe_deconnecte_toutes_les_sessions(): void
+    {
+        User::factory()->create(['telephone' => '771110006', 'role_id' => 5]);
+        $jeton = $this->postJson('/api/login', ['telephone' => '771110006', 'password' => 'password'])->json('token');
+        $this->code('771110006');
+        $this->postJson('/api/verify-code', ['telephone' => '771110006', 'code' => '123456'])->assertOk();
+
+        $this->postJson('/api/reset-password', [
+            'telephone' => '771110006', 'password' => 'nouveau1', 'password_confirmation' => 'nouveau1',
+        ])->assertOk();
+
+        auth()->guard()->forgetUser();
+        $this->withToken($jeton)->postJson('/api/me')->assertStatus(401)->assertJsonPath('code', 'session_expiree');
+        $this->postJson('/api/login', ['telephone' => '771110006', 'password' => 'nouveau1'])->assertOk();
+    }
+
+    public function test_un_jeton_sans_empreinte_reste_accepte(): void
+    {
+        $user = User::factory()->create(['telephone' => '771110007', 'role_id' => 5]);
+        // Jeton émis avant la correction : pas de réclamation `pwd`.
+        $ancien = JWTAuth::claims(['pwd' => null])->fromUser($user);
+
+        $this->withToken($ancien)->postJson('/api/me')->assertOk();
+    }
+
+    public function test_le_compte_archive_porte_un_code_pour_les_apps(): void
+    {
+        $user = User::factory()->create(['telephone' => '771110008', 'role_id' => 2, 'deleted' => true]);
+
+        $this->withToken(JWTAuth::fromUser($user))->postJson('/api/me')
+            ->assertForbidden()->assertJsonPath('code', 'compte_desactive');
     }
 
     // ---------------------------------------------------------------- 2. OTP

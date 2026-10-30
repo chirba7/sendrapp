@@ -44,7 +44,16 @@ class User extends Authenticatable implements JWTSubject
      */
     public function getJWTCustomClaims()
     {
-        return [];
+        // Empreinte courte du mot de passe (audit sécurité, 30/10/2026) :
+        // changer ou réinitialiser le mot de passe invalide tous les jetons
+        // émis avant (EnsureApiAccountActive). Dérivée du hash bcrypt, elle ne
+        // révèle rien du mot de passe.
+        return ['pwd' => $this->empreinteMotDePasse()];
+    }
+
+    public function empreinteMotDePasse(): string
+    {
+        return substr(hash('sha256', (string) $this->password), 0, 16);
     }
 
     /**

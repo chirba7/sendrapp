@@ -277,6 +277,12 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
       final Map<String, dynamic> data = json.decode(response.body);
 
       if (response.statusCode == 200 && data['success'] == true) {
+        // Le serveur invalide les jetons émis avant le changement et
+        // renvoie un nouveau jeton pour cet appareil (30/10/2026).
+        final nouveauJeton = data['token']?.toString();
+        if (nouveauJeton != null && nouveauJeton.isNotEmpty) {
+          await prefs.setString('token', nouveauJeton);
+        }
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
           content: Text('Le mot de passe a été modifié avec succès.'),

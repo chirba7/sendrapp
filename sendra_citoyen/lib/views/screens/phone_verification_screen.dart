@@ -56,19 +56,16 @@ class _PhoneVerificationScreenState extends State<PhoneVerificationScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Un nouveau code a été envoyé.')),
         );
-        setState(() => _resendSeconds = 60);
-        _resendTimer?.cancel();
-        _resendTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-          if (!mounted || _resendSeconds <= 1) {
-            timer.cancel();
-            if (mounted) setState(() => _resendSeconds = 0);
-          } else {
-            setState(() => _resendSeconds--);
-          }
-        });
+        _demarrerCompteARebours(60);
       } else {
         setState(() => _error =
             body['message']?.toString() ?? 'Le code n’a pas pu être renvoyé.');
+        // 429 : le serveur dit combien de temps attendre (60 s entre deux
+        // codes, 5 par jour) — le bouton « Renvoyer » suit ce délai.
+        final attente = int.tryParse(body['retry_after']?.toString() ?? '');
+        if (response.statusCode == 429 && attente != null && attente > 0) {
+          _demarrerCompteARebours(attente);
+        }
       }
     } catch (_) {
       if (mounted) {
@@ -77,6 +74,19 @@ class _PhoneVerificationScreenState extends State<PhoneVerificationScreen> {
     } finally {
       if (mounted) setState(() => _resending = false);
     }
+  }
+
+  void _demarrerCompteARebours(int secondes) {
+    setState(() => _resendSeconds = secondes);
+    _resendTimer?.cancel();
+    _resendTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted || _resendSeconds <= 1) {
+        timer.cancel();
+        if (mounted) setState(() => _resendSeconds = 0);
+      } else {
+        setState(() => _resendSeconds--);
+      }
+    });
   }
 
   Future<void> _verify() async {
@@ -97,8 +107,11 @@ class _PhoneVerificationScreenState extends State<PhoneVerificationScreen> {
       if (response.statusCode == 200 && body['success'] == true) {
         Get.toNamed(Routes.signUpFinalScreen);
       } else {
-        setState(
-            () => _error = body['message']?.toString() ?? 'Code invalide.');
+        final restants = int.tryParse(body['essais_restants']?.toString() ?? '');
+        final message = body['message']?.toString() ?? 'Code invalide.';
+        setState(() => _error = (restants != null && restants > 0)
+            ? '$message ($restants essai${restants > 1 ? 's' : ''} restant${restants > 1 ? 's' : ''})'
+            : message);
       }
     } catch (_) {
       if (mounted) {

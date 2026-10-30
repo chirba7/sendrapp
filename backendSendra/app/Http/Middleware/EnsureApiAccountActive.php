@@ -26,6 +26,15 @@ use Tymon\JWTAuth\Facades\JWTAuth;
  *    La date d'émission (`iat`) est le seul critère fiable : au décodage,
  *    tymon/jwt-auth ajoute une expiration aux jetons qui n'en ont pas.
  *
+ * 3. Mot de passe changé ou réinitialisé (30/10/2026) : les jetons portent une
+ *    empreinte du mot de passe (`pwd`, User::getJWTCustomClaims). Si elle ne
+ *    correspond plus, le jeton date d'avant le changement : refusé. Les jetons
+ *    émis avant cette correction n'ont pas d'empreinte et restent acceptés
+ *    (voir point 2 pour les retirer).
+ *
+ * Chaque refus porte un `code` (`compte_desactive`, `session_expiree`) que
+ * les apps lisent pour renvoyer vers l'écran de connexion.
+ *
  * Aucune requête SQL en plus : l'utilisateur est déjà chargé par jwt.auth.
  */
 class EnsureApiAccountActive
@@ -35,21 +44,25 @@ class EnsureApiAccountActive
         $user = $request->user();
 
         if ($user && $user->deleted) {
-            return $this->refuser('Ce compte a été désactivé.', 403);
+            return $this->refuser('Ce compte a été désactivé.', 403, 'compte_desactive');
         }
 
+        $payload = JWTAuth::parseToken()->getPayload();
+
         $limite = config('jwt.refuser_jetons_emis_avant');
-        if ($limite) {
-            $iat = (int) JWTAuth::parseToken()->getPayload()->get('iat');
-            if ($iat < strtotime($limite)) {
-                return $this->refuser('Session expirée, veuillez vous reconnecter.', 401);
-            }
+        if ($limite && (int) $payload->get('iat') < strtotime($limite)) {
+            return $this->refuser('Session expirée, veuillez vous reconnecter.', 401, 'session_expiree');
+        }
+
+        $empreinte = $payload->get('pwd');
+        if ($user && $empreinte !== null && !hash_equals($user->empreinteMotDePasse(), (string) $empreinte)) {
+            return $this->refuser('Votre mot de passe a changé, veuillez vous reconnecter.', 401, 'session_expiree');
         }
 
         return $next($request);
     }
 
-    private function refuser(string $message, int $statut)
+    private function refuser(string $message, int $statut, string $code)
     {
         try {
             auth('api')->logout(); // liste noire du jeton présenté
@@ -57,6 +70,6 @@ class EnsureApiAccountActive
             // jeton déjà invalide : rien à faire
         }
 
-        return response()->json(['success' => false, 'message' => $message], $statut);
+        return response()->json(['success' => false, 'code' => $code, 'message' => $message], $statut);
     }
 }

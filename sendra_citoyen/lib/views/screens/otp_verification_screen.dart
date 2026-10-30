@@ -60,8 +60,8 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
       }
 
       setState(() {
-        _errorMessage = jsonResponse['message']?.toString() ??
-            'Code de vérification invalide.';
+        _errorMessage = _avecEssaisRestants(jsonResponse,
+            'Code de vérification invalide.');
         _isVerifying = false;
       });
     } catch (_) {
@@ -71,6 +71,15 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
         _isVerifying = false;
       });
     }
+  }
+
+  /// Message du serveur, suivi du nombre d'essais restants s'il est donné
+  /// (5 essais par code depuis le 29/10/2026).
+  String _avecEssaisRestants(Map<String, dynamic> corps, String parDefaut) {
+    final message = corps['message']?.toString() ?? parDefaut;
+    final restants = int.tryParse(corps['essais_restants']?.toString() ?? '');
+    if (restants == null || restants <= 0) return message;
+    return '$message ($restants essai${restants > 1 ? 's' : ''} restant${restants > 1 ? 's' : ''})';
   }
 
   @override
