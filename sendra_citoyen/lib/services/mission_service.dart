@@ -5,6 +5,8 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:walletium/models/mission.dart';
 import 'package:walletium/utils/strings.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:walletium/utils/photo_locale.dart';
 
 class MissionService {
   Future<Map<String, String>> _headers() async {
@@ -75,8 +77,8 @@ class MissionService {
       int? truckId,
       String? vehicleLabel,
       String? plate,
-      required Map<String, File> photos,
-      File? sheet}) async {
+      required Map<String, XFile> photos,
+      XFile? sheet}) async {
     final request = http.MultipartRequest(
         'POST', Uri.parse('${Strings.apiURI}missions/$missionId/enlevements'));
     request.headers.addAll(await _authHeaders());
@@ -90,10 +92,10 @@ class MissionService {
     if ((plate ?? '').isNotEmpty) request.fields['plate'] = plate!;
     for (final entry in photos.entries) {
       request.files
-          .add(await http.MultipartFile.fromPath(entry.key, entry.value.path));
+          .add(await multipartPhoto(entry.key, entry.value));
     }
     if (sheet != null) {
-      request.files.add(await http.MultipartFile.fromPath('sheet', sheet.path));
+      request.files.add(await multipartPhoto('sheet', sheet));
     }
     final response = await http.Response.fromStream(await request.send())
         .timeout(const Duration(seconds: 60));
@@ -109,8 +111,8 @@ class MissionService {
       {required int truckId,
       String? vehicleLabel,
       String? plate,
-      required Map<String, File> photos,
-      File? sheet}) async {
+      required Map<String, XFile> photos,
+      XFile? sheet}) async {
     final request = http.MultipartRequest(
         'POST',
         Uri.parse(
@@ -123,10 +125,10 @@ class MissionService {
     if ((plate ?? '').isNotEmpty) request.fields['plate'] = plate!;
     for (final entry in photos.entries) {
       request.files
-          .add(await http.MultipartFile.fromPath(entry.key, entry.value.path));
+          .add(await multipartPhoto(entry.key, entry.value));
     }
     if (sheet != null) {
-      request.files.add(await http.MultipartFile.fromPath('sheet', sheet.path));
+      request.files.add(await multipartPhoto('sheet', sheet));
     }
     final response = await http.Response.fromStream(await request.send())
         .timeout(const Duration(seconds: 60));
@@ -168,7 +170,7 @@ class MissionService {
       _postMission('$missionId/terminer', {});
 
   Future<Mission> storeReception(
-      int missionId, int removalId, Map<String, File> photos) async {
+      int missionId, int removalId, Map<String, XFile> photos) async {
     final request = http.MultipartRequest(
         'POST',
         Uri.parse(
@@ -176,7 +178,7 @@ class MissionService {
     request.headers.addAll(await _authHeaders());
     for (final entry in photos.entries) {
       request.files
-          .add(await http.MultipartFile.fromPath(entry.key, entry.value.path));
+          .add(await multipartPhoto(entry.key, entry.value));
     }
     final response = await http.Response.fromStream(await request.send())
         .timeout(const Duration(seconds: 90));

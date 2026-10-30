@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link href="img/sendra.ico" rel="icon">
+    <title>SENDRA APP</title>
+    <meta name="description" content="Démo du back-office EPAVIE de SENDRA (données fictives)">
+    <link rel="stylesheet" href="assets/css/lineicons.css" type="text/css" />
+    <link rel="stylesheet" href="assets/css/materialdesignicons.min.css" type="text/css" />
+    <link rel="stylesheet" href="assets/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="assets/css/main.css" />
+    <link rel="stylesheet" href="assets/css/sendra-refresh.css?v=4" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        /* Bandeau discret propre à la démo (absent du vrai back-office). */
+        .demo-badge{position:fixed;left:12px;bottom:12px;z-index:2000;display:flex;align-items:center;gap:8px;background:#0f2a1c;color:#d9efe2;
+            border-radius:12px;padding:7px 10px;font:600 12px Inter,system-ui,sans-serif;box-shadow:0 8px 24px rgba(0,0,0,.25)}
+        .demo-badge a{color:#fff;text-decoration:none;padding:3px 8px;border-radius:8px;background:rgba(255,255,255,.1)}
+        .demo-badge a:hover{background:rgba(255,255,255,.2)}
+        @media (max-width:600px){.demo-badge span{display:none}}
+        /* Choix du rôle à la connexion (propre à la démo). */
+        .demo-roles-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+        .demo-roles-grid input{position:absolute;opacity:0;pointer-events:none}
+        .demo-roles-grid span{display:flex;align-items:center;gap:8px;min-height:48px;padding:8px 12px;border:2px solid #dce5df;border-radius:12px;font-weight:600;font-size:14px;cursor:pointer;transition:.15s}
+        .demo-roles-grid span i{font-size:18px;color:#048b44}
+        .demo-roles-grid input:checked+span{border-color:#048b44;background:#e8f5ed;color:#03703a}
+        .demo-roles-grid input:focus-visible+span{outline:2px solid #048b44;outline-offset:2px}
+    </style>
+</head>
+<body class="role-admin">
+    <div id="preloader"><div class="spinner"></div></div>
+    <div id="app"></div>
+    <div class="demo-badge" role="note"><span>Démo · données fictives</span><a href="/public/">PUBLIC</a><a href="/pro/">PRO</a><a href="#" onclick="BO.reinit();return false" title="Effacer les modifications de la démo">Réinitialiser</a></div>
+    <script src="assets/js/bootstrap.bundle.min.js"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>

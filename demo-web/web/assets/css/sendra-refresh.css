@@ -1,0 +1,466 @@
+/* =============================================================
+   SENDRA — rafraîchissement visuel du back-office
+   -------------------------------------------------------------
+   Chargé APRÈS main.css : ce fichier ne contient que des
+   surcharges, rien n'est retiré du gabarit d'origine. Supprimer
+   la ligne <link> dans resources/views/layouts/base.blade.php
+   restaure l'apparence précédente à l'identique.
+
+   Accent : #048b44, le vert du logo SENDRA (le gabarit PlainAdmin
+   utilisait le bleu #365cf5 pour les états actifs et #219653 pour
+   les boutons « success » — deux accents concurrents).
+   ============================================================= */
+
+:root {
+    --sendra-vert: #048b44;
+    --sendra-vert-fonce: #037237;
+    --sendra-vert-tint: rgba(4, 139, 68, 0.1);
+    --sendra-encre: #1a2142;
+    --sendra-gris: #5d657b;
+    --sendra-gris-clair: #8f9aad;
+    --sendra-filet: #eef1f6;
+    --sendra-bord: #e6ebf3;
+
+    /* Bootstrap : recolore .text-success (toutes les icônes du menu
+       et les titres de page) et .btn-success d'un seul coup. */
+    --bs-success: #048b44;
+    --bs-success-rgb: 4, 139, 68;
+}
+
+/* ---------------------------------------------------- Boutons */
+.main-btn {
+    padding: 11px 20px;
+    border-radius: 8px;
+    font-weight: 600;
+    transition: background 0.2s ease-out, color 0.2s ease-out;
+}
+.success-btn { background: var(--sendra-vert); }
+.success-btn:hover { background: var(--sendra-vert-fonce); color: #fff; }
+.success-btn-outline { color: var(--sendra-vert); border-color: var(--sendra-vert); }
+.success-btn-outline:hover { background: var(--sendra-vert); }
+.success-btn-light { color: var(--sendra-vert); background: var(--sendra-vert-tint); }
+.success-btn-light:hover { background: var(--sendra-vert); color: #fff; }
+
+/* ----------------------------------------------------- Cartes */
+.card-style {
+    padding: 20px 24px;
+    border-radius: 10px;
+    box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04),
+        0 8px 20px -8px rgba(145, 158, 171, 0.18);
+}
+@media (max-width: 767px) {
+    .card-style { padding: 18px; }
+}
+
+/* --------------------------------------------------- Tableaux */
+.table th h6 {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--sendra-gris-clair);
+}
+.table > :not(caption) > * > * {
+    border-bottom-width: 0;
+    box-shadow: none;
+    padding: 12px 5px;
+    vertical-align: middle;
+}
+.table tbody tr { border-top: 1px solid var(--sendra-filet); }
+.table tbody tr:hover { background: #f8fafc; }
+.table td p { color: var(--sendra-gris); }
+.table td p a:hover { color: var(--sendra-vert); }
+/* Vignette de la photo du signalement */
+.top-selling-table td img {
+    width: 44px;
+    height: 44px;
+    object-fit: cover;
+    border-radius: 8px;
+}
+
+/* ---------------------------------------------- Pastilles d'état */
+/* La couleur par état (SIGNALE / EN COURS / ENLEVE / REJETE) arrive
+   avec la passe sur les gabarits : aujourd'hui toutes les lignes
+   sortent en .status-btn.close-btn, donc toutes en rouge. Ici on ne
+   règle que la forme. */
+.status-btn {
+    padding: 6px 13px;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+}
+.status-btn.success-btn { color: var(--sendra-vert); background: var(--sendra-vert-tint); }
+
+/* ------------------------------------------------ Barre latérale */
+.sidebar-nav-wrapper .sidebar-nav ul .nav-item > a { padding: 9px 25px; }
+.sidebar-nav-wrapper .sidebar-nav ul .nav-item.active > a,
+.sidebar-nav-wrapper .sidebar-nav ul .nav-item.active > a.collapsed,
+.sidebar-nav-wrapper .sidebar-nav ul .nav-item:hover > a,
+.sidebar-nav-wrapper .sidebar-nav ul .nav-item:hover > a.collapsed {
+    color: var(--sendra-vert);
+    background: var(--sendra-vert-tint);
+    box-shadow: inset 3px 0 0 var(--sendra-vert);
+}
+.sidebar-nav-wrapper .sidebar-nav ul .nav-item.active > a .icon,
+.sidebar-nav-wrapper .sidebar-nav ul .nav-item.active > a.collapsed .icon,
+.sidebar-nav-wrapper .sidebar-nav ul .nav-item:hover > a .icon,
+.sidebar-nav-wrapper .sidebar-nav ul .nav-item:hover > a.collapsed .icon,
+.sidebar-nav-wrapper .sidebar-nav ul .nav-item.nav-item-has-children > a:not(.collapsed) .icon {
+    color: var(--sendra-vert);
+}
+.sidebar-nav-wrapper .sidebar-nav ul .nav-item.nav-item-has-children > a::after { right: 20px; }
+.sidebar-nav-wrapper .sidebar-nav ul .dropdown-nav li a.active {
+    color: var(--sendra-vert);
+    font-weight: 600;
+}
+.sidebar-nav-wrapper .navbar-logo { padding: 0 22px; }
+
+/* ------------------------------------------------------ En-tête */
+.header { border-bottom: 1px solid var(--sendra-filet); }
+.header .header-left .header-search form input:focus { border-color: var(--sendra-vert); }
+.header .header-right .profile-box .profile-info .info .image { border-color: var(--sendra-bord); }
+
+/* ------------------------------------------- Titres et messages */
+.title h2.text-success { color: var(--sendra-encre) !important; }
+.alert-box.success-alert .left,
+.success-alert .left { background: var(--sendra-vert); }
+
+/* ---------------------------------------------------- Formulaires */
+.form-control:focus,
+.form-select:focus,
+input:focus,
+textarea:focus,
+select:focus {
+    border-color: var(--sendra-vert);
+    box-shadow: 0 0 0 3px var(--sendra-vert-tint);
+}
+
+/* ----------------------------------------------------- Pagination */
+.page-link {
+    color: var(--sendra-encre);
+    border-color: var(--sendra-bord);
+    border-radius: 8px !important;
+    margin: 0 3px;
+}
+.page-link:hover { background: var(--sendra-vert-tint); color: var(--sendra-vert); }
+.page-item.active .page-link {
+    background: var(--sendra-vert);
+    border-color: var(--sendra-vert);
+    color: #fff;
+}
+.page-link:focus { box-shadow: 0 0 0 3px var(--sendra-vert-tint); }
+
+/* --------------------------------------------------------- Liens */
+a:hover { color: var(--sendra-vert); }
+
+/* =============================================================
+   V2 (21/10/2026) — alignement sur les applications mobiles
+   -------------------------------------------------------------
+   - police Inter (embarquée, comme dans epaVie / epaVie Pro) ;
+   - neutres identiques au mobile (encre, gris, fonds) ;
+   - habillage par rôle : chaque espace (Administration, Agent,
+     Autorité communale, Autorité préfectorale, Opérateur) a sa
+     couleur d'accent, visible sur la carte « Espace de travail »,
+     le liseré de l'en-tête et le bandeau d'accueil du tableau de
+     bord. Le vert SENDRA reste la couleur des actions (boutons).
+   - composants Bootstrap des pages récentes (Missions, Pointage,
+     Communes, Fourrières) au même style que le reste.
+   ============================================================= */
+
+@font-face { font-family: "Inter"; font-weight: 400; font-display: swap; src: url("../fonts/Inter-Regular.ttf") format("truetype"); }
+@font-face { font-family: "Inter"; font-weight: 500; font-display: swap; src: url("../fonts/Inter-Medium.ttf") format("truetype"); }
+@font-face { font-family: "Inter"; font-weight: 600; font-display: swap; src: url("../fonts/Inter-SemiBold.ttf") format("truetype"); }
+@font-face { font-family: "Inter"; font-weight: 700; font-display: swap; src: url("../fonts/Inter-Bold.ttf") format("truetype"); }
+@font-face { font-family: "Inter"; font-weight: 800; font-display: swap; src: url("../fonts/Inter-ExtraBold.ttf") format("truetype"); }
+
+:root {
+    --sendra-encre: #15201a;
+    --sendra-gris: #5f6b65;
+    --sendra-gris-clair: #8a958f;
+    --sendra-filet: #edf1ef;
+    --sendra-bord: #e1e8e4;
+    --sendra-fond: #f5f7f6;
+    --bs-body-font-family: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+
+    /* Accent du rôle (Administration par défaut) */
+    --role-accent: #048b44;
+    --role-tint: rgba(4, 139, 68, 0.1);
+}
+body.role-admin      { --role-accent: #048b44; --role-tint: rgba(4, 139, 68, 0.10); }
+body.role-agent      { --role-accent: #1a73e8; --role-tint: rgba(26, 115, 232, 0.10); }
+body.role-commune    { --role-accent: #0f8a7e; --role-tint: rgba(15, 138, 126, 0.10); }
+body.role-prefecture { --role-accent: #7b3fc4; --role-tint: rgba(123, 63, 196, 0.10); }
+body.role-operateur  { --role-accent: #e37400; --role-tint: rgba(227, 116, 0, 0.10); }
+
+/* ------------------------------------------------------ Typographie */
+body,
+button, input, select, textarea,
+h1, h2, h3, h4, h5, h6,
+.main-btn, .btn, .table, .dropdown-menu {
+    font-family: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+body { background: var(--sendra-fond); color: var(--sendra-encre); -webkit-font-smoothing: antialiased; }
+h1, h2, h3, h4, h5, h6 { color: var(--sendra-encre); letter-spacing: -0.01em; }
+.title-wrapper h2,
+.title h2 { font-size: 26px; font-weight: 800; }
+.text-muted, .text-medium, p { color: var(--sendra-gris); }
+.icon-card h3 { font-weight: 800; color: var(--sendra-encre); }
+.icon-card h6 { color: var(--sendra-gris); font-weight: 600; }
+
+/* --------------------------------------------- Habillage par rôle */
+.role-card {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 0 16px 16px;
+    padding: 12px 14px;
+    border-radius: 12px;
+    background: var(--role-tint);
+    border-left: 4px solid var(--role-accent);
+}
+.role-card .role-icon {
+    flex: 0 0 38px;
+    height: 38px;
+    border-radius: 10px;
+    display: grid;
+    place-items: center;
+    background: var(--role-accent);
+    color: #fff;
+    font-size: 18px;
+}
+.role-card small { display: block; color: var(--sendra-gris); font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; }
+.role-card strong { color: var(--sendra-encre); font-size: 14px; font-weight: 700; }
+.header { box-shadow: inset 0 3px 0 var(--role-accent); }
+.header .header-right .profile-box .profile-info .info p {
+    display: inline-block;
+    margin-top: 2px;
+    padding: 1px 8px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--role-accent);
+    background: var(--role-tint);
+}
+.role-banner {
+    border-left: 5px solid var(--role-accent) !important;
+    background: linear-gradient(90deg, var(--role-tint), #fff 55%);
+}
+.title-wrapper .title p.text-muted { font-weight: 500; }
+
+/* ------------------------------------------------ Boutons Bootstrap */
+.btn { border-radius: 8px; font-weight: 600; }
+.btn-success { background: var(--sendra-vert); border-color: var(--sendra-vert); }
+.btn-success:hover, .btn-success:focus { background: var(--sendra-vert-fonce); border-color: var(--sendra-vert-fonce); }
+.btn-outline-success { color: var(--sendra-vert); border-color: var(--sendra-vert); }
+.btn-outline-success:hover, .btn-outline-success.active { background: var(--sendra-vert); border-color: var(--sendra-vert); color: #fff; }
+.btn-outline-secondary { color: var(--sendra-gris); border-color: var(--sendra-bord); }
+.btn-outline-secondary:hover { background: var(--sendra-fond); color: var(--sendra-encre); border-color: var(--sendra-bord); }
+.btn-outline-danger:hover { color: #fff; }
+
+/* ------------------------------------------- Pastilles / badges */
+.badge { padding: 5px 9px; border-radius: 6px; font-weight: 700; font-size: 11.5px; letter-spacing: .02em; }
+.badge.bg-success { background: var(--sendra-vert-tint) !important; color: var(--sendra-vert); }
+.badge.bg-warning { background: rgba(227, 116, 0, .12) !important; color: #b45c00 !important; }
+.badge.bg-danger  { background: rgba(217, 48, 37, .12) !important; color: #c5221f; }
+.badge.bg-secondary { background: #eef1f4 !important; color: var(--sendra-gris); }
+
+/* -------------------------------------- Tableaux des pages récentes */
+.table > thead th {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .07em;
+    text-transform: uppercase;
+    color: var(--sendra-gris-clair);
+    background: transparent;
+    white-space: nowrap;
+}
+.table td { color: var(--sendra-encre); font-size: 14px; }
+.table td small { color: var(--sendra-gris); }
+
+/* ------------------------------------------------------ Alertes */
+.alert { border: 0; border-radius: 10px; font-weight: 500; }
+.alert-success { background: var(--sendra-vert-tint); color: var(--sendra-vert-fonce); }
+.alert-danger { background: rgba(217, 48, 37, .1); color: #a1271d; }
+
+/* ------------------------------------------------- Formulaires */
+.form-label, .input-style-1 label { font-weight: 600; color: var(--sendra-encre); font-size: 14px; }
+.form-control, .form-select, .input-style-1 input {
+    border-radius: 10px;
+    border-color: var(--sendra-bord);
+    min-height: 44px;
+}
+
+/* --------------------------------------------- Connexion (login) */
+.signin-section .auth-cover-wrapper {
+    background: linear-gradient(135deg, #07883f, #075c32) !important;
+    border-radius: 20px;
+}
+.signin-section .auth-cover-wrapper h1 { color: #fff !important; font-weight: 800; }
+.signin-section .auth-cover-wrapper p { color: rgba(255, 255, 255, .85); }
+.signin-section .auth-cover-wrapper .auth-logo {
+    display: inline-block;
+    background: #fff;
+    border-radius: 18px;
+    padding: 14px 22px;
+    margin-bottom: 24px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, .12);
+}
+.signin-section .signin-wrapper h2 { font-weight: 800; }
+
+/* ===========================================================================
+   V3 — menu latéral par sections, pastilles d'icônes, échelle typographique
+   Le menu était une liste à plat de 9 entrées, toutes avec une icône verte de
+   même teinte : rien ne séparait le suivi des signalements de l'administration.
+   =========================================================================== */
+
+/* ------------------------------------------------- titres de section */
+.sidebar-nav .nav-section {
+    margin: 22px 25px 8px;
+    font-size: 10.5px;
+    font-weight: 800;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: #9aa5b1;
+}
+.sidebar-nav .nav-group + .nav-section { border-top: 1px solid var(--sendra-filet); padding-top: 18px; }
+.sidebar-nav .nav-group { margin: 0; padding: 0; list-style: none; }
+
+/* ------------------------------------------------- pastilles d'icônes */
+.sidebar-nav-wrapper .sidebar-nav ul .nav-item > a {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 2px 14px;
+    padding: 9px 11px;
+    border-radius: 11px;
+    font-weight: 600;
+    color: var(--sendra-gris);
+    transition: background .15s ease, color .15s ease;
+}
+.sidebar-nav-wrapper .sidebar-nav ul .nav-item > a .icon {
+    width: 34px;
+    height: 34px;
+    min-width: 34px;
+    margin: 0;
+    border-radius: 10px;
+    display: grid;
+    place-items: center;
+    background: #f1f4f7;
+    color: #6b7684;
+    font-size: 17px;
+    transition: background .15s ease, color .15s ease;
+}
+.sidebar-nav-wrapper .sidebar-nav ul .nav-item > a .text { font-size: 14.5px; }
+
+/* état survolé et actif : la couleur d'accent dépend du rôle connecté */
+.sidebar-nav-wrapper .sidebar-nav ul .nav-item:hover > a { background: var(--sendra-fond); color: var(--sendra-encre); }
+.sidebar-nav-wrapper .sidebar-nav ul .nav-item:hover > a .icon { background: var(--role-tint, var(--sendra-vert-tint)); color: var(--role-accent, var(--sendra-vert)); }
+.sidebar-nav-wrapper .sidebar-nav ul .nav-item.active > a,
+.sidebar-nav-wrapper .sidebar-nav ul .nav-item.active > a.collapsed {
+    background: var(--role-tint, var(--sendra-vert-tint));
+    color: var(--role-accent, var(--sendra-vert));
+}
+.sidebar-nav-wrapper .sidebar-nav ul .nav-item.active > a .icon,
+.sidebar-nav-wrapper .sidebar-nav ul .nav-item.active > a.collapsed .icon {
+    background: var(--role-accent, var(--sendra-vert));
+    color: #fff;
+}
+
+/* sous-menu Comptes : aligné sous le libellé, sans pastille */
+.sidebar-nav-wrapper .sidebar-nav ul .dropdown-nav { margin: 2px 14px 6px 60px; }
+.sidebar-nav-wrapper .sidebar-nav ul .dropdown-nav li a {
+    padding: 7px 10px;
+    border-radius: 8px;
+    font-size: 13.5px;
+    color: var(--sendra-gris);
+}
+.sidebar-nav-wrapper .sidebar-nav ul .dropdown-nav li a:hover { background: var(--sendra-fond); color: var(--sendra-encre); }
+.sidebar-nav-wrapper .sidebar-nav ul .dropdown-nav li a.active { background: var(--role-tint, var(--sendra-vert-tint)); color: var(--role-accent, var(--sendra-vert)); font-weight: 700; }
+
+/* le menu peut dépasser la hauteur d'écran : il défile sans emporter la page */
+.sidebar-nav-wrapper .sidebar-nav { max-height: calc(100vh - 190px); overflow-y: auto; padding-bottom: 20px; }
+.sidebar-nav-wrapper .sidebar-nav::-webkit-scrollbar { width: 6px; }
+.sidebar-nav-wrapper .sidebar-nav::-webkit-scrollbar-thumb { background: #dfe5ea; border-radius: 3px; }
+
+/* ------------------------------------------------- échelle typographique */
+h1, .h1 { font-size: 28px; font-weight: 800; letter-spacing: -.01em; }
+h2, .h2 { font-size: 23px; font-weight: 800; letter-spacing: -.01em; }
+h3, .h3 { font-size: 19px; font-weight: 700; }
+h4, .h4 { font-size: 17px; font-weight: 700; }
+h5, .h5 { font-size: 15.5px; font-weight: 700; }
+h6, .h6 { font-size: 14px; font-weight: 600; }
+body { font-size: 14.5px; line-height: 1.6; }
+small, .small, .text-sm { font-size: 12.5px; }
+.fw-bold, strong, b { font-weight: 700; }
+.table > thead th { font-size: 12px; letter-spacing: .04em; text-transform: uppercase; color: var(--sendra-gris); font-weight: 700; }
+.card-style h4, .card-style h5 { color: var(--sendra-encre); }
+.form-text, .invalid-feedback { font-size: 12.5px; }
+
+/* ------------------------------------------------- confort de lecture */
+.card-style { margin-bottom: 24px; }
+.table td, .table th { vertical-align: middle; }
+.table-responsive { border-radius: 12px; }
+.pagination { gap: 4px; }
+
+/* ===========================================================================
+   V4 — ajustements demandés après revue : bannière de connexion, défilement
+   du menu, lisibilité du sous-menu Comptes.
+   =========================================================================== */
+
+/* ------------------------------------------------- bannière de connexion */
+.signin-section .auth-cover-wrapper .auth-title {
+    color: #fff !important;
+    font-size: 40px;
+    font-weight: 800;
+    letter-spacing: -.02em;
+    line-height: 1.1;
+    margin: 0 0 14px;
+}
+.signin-section .auth-cover-wrapper .auth-subtitle {
+    color: rgba(255, 255, 255, .88) !important;
+    font-size: 17px;
+    font-weight: 500;
+    line-height: 1.55;
+    max-width: 380px;
+    margin: 0 auto;
+}
+@media (max-width: 991px) {
+    .signin-section .auth-cover-wrapper .auth-title { font-size: 31px; }
+    .signin-section .auth-cover-wrapper .auth-subtitle { font-size: 15.5px; }
+}
+
+/* --------------------------------------- menu : plus de glissement latéral */
+/* Le conteneur défilait aussi horizontalement : une barre apparaissait en bas
+   du menu dès qu'un libellé dépassait d'un pixel. */
+.sidebar-nav-wrapper .sidebar-nav {
+    overflow-x: hidden;
+    scrollbar-width: thin;
+}
+.sidebar-nav-wrapper .sidebar-nav ul,
+.sidebar-nav-wrapper .sidebar-nav .nav-group { overflow-x: hidden; }
+.sidebar-nav-wrapper .sidebar-nav ul .nav-item > a .text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ------------------------------------------- sous-menu Comptes : pastilles */
+.sidebar-nav-wrapper .sidebar-nav ul .dropdown-nav li a {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+}
+.role-dot {
+    width: 9px;
+    height: 9px;
+    min-width: 9px;
+    border-radius: 50%;
+    box-shadow: 0 0 0 3px rgba(0, 0, 0, .04);
+}
+.role-dot-icon { font-size: 14px; }
+.sidebar-nav-wrapper .sidebar-nav ul .dropdown-nav li a.active .role-dot { box-shadow: 0 0 0 3px #fff; }
+.sidebar-nav-wrapper .sidebar-nav ul .dropdown-nav {
+    margin-left: 46px;
+    padding-left: 14px;
+    border-left: 2px solid var(--sendra-filet);
+}

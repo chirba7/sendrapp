@@ -61,7 +61,9 @@ Route::group([
 });
 
 // Protected routes (Authentication required with JWT)
-Route::middleware('jwt.auth')->group(function () {
+// `compte.actif` : un compte archivé depuis le back-office perd l'accès même
+// avec un jeton obtenu avant l'archivage (audit sécurité du 29/10/2026).
+Route::middleware(['jwt.auth', 'compte.actif'])->group(function () {
     Route::prefix('pointage')->group(function () {
         Route::get('/statut', [\App\Http\Controllers\AttendanceEnrollmentController::class, 'status']);
         Route::post('/adhesion', [\App\Http\Controllers\AttendanceEnrollmentController::class, 'join'])->middleware('throttle:5,1');

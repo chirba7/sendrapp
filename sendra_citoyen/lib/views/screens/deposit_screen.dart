@@ -12,6 +12,8 @@ import 'package:walletium/services/offline_signalement_service.dart';
 import 'package:walletium/utils/app_prefs.dart';
 import 'package:walletium/utils/sendra_theme.dart';
 import 'package:walletium/utils/signaler_flow.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:walletium/utils/photo_locale.dart';
 
 /// Formulaire de signalement, ouvert juste après la photo.
 ///
@@ -46,8 +48,8 @@ class _DepositScreenState extends State<DepositScreen> {
   final _description = TextEditingController();
   late final bool _isStaff = AppPrefs.isStaff;
 
-  File? _photo;
-  final Map<String, File> _angles = {};
+  XFile? _photo;
+  final Map<String, XFile> _angles = {};
   String? _type;
   bool _envoi = false;
   bool _typeManquant = false;
@@ -64,7 +66,7 @@ class _DepositScreenState extends State<DepositScreen> {
   void initState() {
     super.initState();
     final argument = Get.arguments;
-    if (argument is File) {
+    if (argument is XFile) {
       _photo = argument;
     } else {
       // Ouvert sans photo (ancien lien) : on lance l'appareil photo.
@@ -127,14 +129,14 @@ class _DepositScreenState extends State<DepositScreen> {
       if (_photo == null && mounted) Get.back();
       return;
     }
-    final photo = await SignalerFlow.optimiser(File(prise.path));
+    final photo = await SignalerFlow.optimiser(prise);
     if (mounted) setState(() => _photo = photo);
   }
 
   Future<void> _ajouterAngle(String angle) async {
     final prise = await SignalerFlow.prendrePhoto();
     if (prise == null) return;
-    final photo = await SignalerFlow.optimiser(File(prise.path));
+    final photo = await SignalerFlow.optimiser(prise);
     if (mounted) setState(() => _angles[angle] = photo);
   }
 
@@ -332,7 +334,7 @@ class _DepositScreenState extends State<DepositScreen> {
           fit: StackFit.expand,
           children: [
             if (_photo != null)
-              Image.file(_photo!, fit: BoxFit.cover, cacheWidth: 1000)
+              imagePhoto(_photo!, fit: BoxFit.cover, cacheWidth: 1000)
             else
               const ColoredBox(
                 color: Color(0xFFEAF1ED),
@@ -504,7 +506,7 @@ class _TuileAngle extends StatelessWidget {
   });
 
   final String libelle;
-  final File? photo;
+  final XFile? photo;
   final VoidCallback onTap;
   final VoidCallback onRetirer;
 
@@ -525,7 +527,7 @@ class _TuileAngle extends StatelessWidget {
           fit: StackFit.expand,
           children: [
             if (photo != null)
-              Image.file(photo!, fit: BoxFit.cover, cacheWidth: 300)
+              imagePhoto(photo!, fit: BoxFit.cover, cacheWidth: 300)
             else
               Column(
                 mainAxisAlignment: MainAxisAlignment.center,

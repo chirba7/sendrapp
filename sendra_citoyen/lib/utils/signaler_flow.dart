@@ -42,7 +42,7 @@ class SignalerFlow {
       }
       await prefs.remove(_cleCapture);
       if (prise == null) return;
-      final photo = await optimiser(File(prise.path));
+      final photo = await optimiser(prise);
       await Get.toNamed(Routes.depositScreen, arguments: photo);
     } finally {
       _ouvert = false;
@@ -63,7 +63,7 @@ class SignalerFlow {
   /// À appeler à l'arrivée sur l'accueil : si l'app a été tuée pendant la
   /// capture, on récupère la photo et on rouvre le formulaire.
   static Future<void> recupererPhotoPerdue() async {
-    if (!Platform.isAndroid) return;
+    if (kIsWeb || !Platform.isAndroid) return;
     final prefs = await AppPrefs.init();
     if (prefs.getBool(_cleCapture) != true) return;
     await prefs.remove(_cleCapture);
@@ -71,7 +71,7 @@ class SignalerFlow {
       final perdue = await ImagePicker().retrieveLostData();
       final fichier = perdue.file;
       if (perdue.isEmpty || fichier == null) return;
-      final photo = await optimiser(File(fichier.path));
+      final photo = await optimiser(fichier);
       Get.toNamed(Routes.depositScreen, arguments: photo);
     } catch (_) {
       // Rien à récupérer : l'utilisateur relancera la capture.
@@ -81,7 +81,9 @@ class SignalerFlow {
   /// Redresse la photo selon l'orientation du téléphone (EXIF appliquée aux
   /// pixels), la réduit à ~1600 px et la réencode en JPEG : l'envoi est
   /// 3 à 5 fois plus léger et la photo n'apparaît plus pivotée.
-  static Future<File> optimiser(File source) async {
+  static Future<XFile> optimiser(XFile source) async {
+    // Web (démo) : pas de recompression, le navigateur garde la photo telle quelle.
+    if (kIsWeb) return source;
     try {
       final dossier = await getTemporaryDirectory();
       final cible =
@@ -96,7 +98,7 @@ class SignalerFlow {
         keepExif: false,
         format: CompressFormat.jpeg,
       );
-      if (resultat != null) return File(resultat.path);
+      if (resultat != null) return XFile(resultat.path);
     } catch (e) {
       if (kDebugMode) debugPrint('Optimisation photo impossible : $e');
     }

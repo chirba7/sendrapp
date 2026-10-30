@@ -29,6 +29,10 @@ dependencies:
   # déduplication (uuid) réémise à chaque tentative de synchronisation.
   connectivity_plus: ^6.0.5
   uuid: ^4.4.0
+  # Démo web uniquement (lib/demo) : remplacer GPS, géocodage et appareil photo.
+  geolocator_platform_interface: any
+  geocoding_platform_interface: any
+  image_picker_platform_interface: any
 
 dependency_overrides:
   modal_bottom_sheet: ^3.0.0-pre

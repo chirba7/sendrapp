@@ -67,5 +67,8 @@ class Kernel extends HttpKernel
         'jwt.refresh' => \Tymon\JWTAuth\Http\Middleware\RefreshToken::class,
         // Correction API-C-3 : contrôle de rôle sur les routes métier
         'role' => \App\Http\Middleware\EnsureUserHasRole::class,
+        // Correction sécurité (29/10/2026) : refuse le jeton d'un compte
+        // archivé et, après la date de transition, les jetons sans expiration.
+        'compte.actif' => \App\Http\Middleware\EnsureApiAccountActive::class,
     ];
 }

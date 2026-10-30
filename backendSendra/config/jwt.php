@@ -101,9 +101,12 @@ return [
     |
     */
 
-    // La session mobile reste active jusqu'à une déconnexion explicite.
-    // La blacklist permet toujours de révoquer un jeton lors du logout.
-    'ttl' => env('JWT_TTL', null),
+    // Correction sécurité (audit du 29/10/2026) : les jetons n'expiraient
+    // jamais (ttl null) — un jeton volé ou celui d'un ancien collaborateur
+    // restait valable à vie. 30 jours par défaut : assez long pour ne pas
+    // obliger un citoyen à se reconnecter à chaque ouverture de l'app.
+    // ATTENTION : une ligne JWT_TTL=null dans le .env annule ce défaut.
+    'ttl' => env('JWT_TTL', 43200),
 
     /*
     |--------------------------------------------------------------------------
@@ -122,7 +125,15 @@ return [
     |
     */
 
-    'refresh_ttl' => env('JWT_REFRESH_TTL', null),
+    // 60 jours après l'émission, /api/refresh n'accepte plus le jeton.
+    'refresh_ttl' => env('JWT_REFRESH_TTL', 86400),
+
+    // Jetons émis avant cette date (AAAA-MM-JJ) refusés
+    // (App\Http\Middleware\EnsureApiAccountActive). Transition : les jetons
+    // émis avant JWT_TTL n'ont pas d'expiration ; on renseigne ici la date
+    // de mise en service de JWT_TTL une fois les apps mises à jour (retour à
+    // l'écran de connexion sur un 401). Aussi coupe-circuit en cas de fuite.
+    'refuser_jetons_emis_avant' => env('JWT_REFUSER_JETONS_EMIS_AVANT'),
 
     /*
     |--------------------------------------------------------------------------
@@ -152,7 +163,10 @@ return [
         'nbf',
         'sub',
         'jti',
-    ], env('JWT_TTL', null) === null ? [] : ['exp']),
+        // `exp` n'est pas exigé pour accepter, pendant la transition, les
+        // jetons émis sans expiration ; il reste vérifié quand il est présent
+        // (tous les nouveaux jetons en portent un).
+    ]),
 
     /*
     |--------------------------------------------------------------------------

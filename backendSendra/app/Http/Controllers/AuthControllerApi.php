@@ -14,6 +14,8 @@ use Illuminate\Support\Facades\Storage;
 
 use App\Services\OrangeSmsService;
 use App\Models\UserVerificationCode;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\RateLimiter;
 
 class AuthControllerApi extends Controller
 {
@@ -110,11 +112,52 @@ class AuthControllerApi extends Controller
     {
         // Correction API-C-5 : idem checkPhone(), clé statique retirée au
         // profit du throttling de route.
+        // Correction sécurité (29/10/2026) : seuls les mobiles sénégalais
+        // (70, 75, 76, 77, 78) reçoivent un SMS, et l'envoi est plafonné par
+        // numéro et globalement (config/otp.php) — la limite par IP seule
+        // laissait envoyer des milliers de SMS payants vers des numéros
+        // différents.
         $request->validate([
-            'telephone' => 'required|regex:/^\d{9}$/', // Phone number format validation
+            'telephone' => ['required', 'regex:'.config('otp.format_numero')],
+        ], [
+            'telephone.regex' => 'Le numéro doit être un mobile sénégalais à 9 chiffres (70, 75, 76, 77 ou 78).',
         ]);
 
-        $verificationCode = rand(100000, 999999); // Generate a 6-digit code
+        $telephone = $request->telephone;
+        $cleDelai = 'otp-envoi-delai:'.$telephone;
+        $cleJour = 'otp-envoi-jour:'.$telephone;
+        $cleGlobal = 'otp-envoi-global';
+
+        if (RateLimiter::tooManyAttempts($cleDelai, 1)) {
+            return $this->tropDeSms(
+                'Un code vient d’être envoyé à ce numéro. Patientez avant d’en demander un autre.',
+                RateLimiter::availableIn($cleDelai)
+            );
+        }
+        if (RateLimiter::tooManyAttempts($cleJour, config('otp.max_par_numero_par_jour'))) {
+            return $this->tropDeSms(
+                'Nombre maximal de codes atteint pour ce numéro. Réessayez demain.',
+                RateLimiter::availableIn($cleJour)
+            );
+        }
+        if (RateLimiter::tooManyAttempts($cleGlobal, config('otp.max_global_par_jour'))) {
+            Log::error('OTP : plafond global de SMS atteint, envois suspendus', [
+                'plafond' => config('otp.max_global_par_jour'),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Le service d’envoi de SMS est momentanément indisponible. Veuillez réessayer plus tard.',
+            ], 503);
+        }
+
+        // Chaque tentative qui part chez le prestataire compte, réussie ou non.
+        RateLimiter::hit($cleDelai, config('otp.delai_renvoi_secondes'));
+        RateLimiter::hit($cleJour, 86400);
+        RateLimiter::hit($cleGlobal, 86400);
+
+        // random_int : générateur cryptographique (rand() est prévisible).
+        $verificationCode = (string) random_int(100000, 999999);
 
         $smsResult = $this->smsService->sendSms(
             'Code de vérification',
@@ -131,11 +174,14 @@ class AuthControllerApi extends Controller
         }
 
         // Le code n'est valable qu'après confirmation de l'envoi par le prestataire.
+        // Nouveau code : nouveau quota d'essais.
+        RateLimiter::clear('otp-essais:'.$telephone);
+
         UserVerificationCode::updateOrCreate(
             ['phone' => $request->telephone],
             [
                 'code' => $verificationCode,
-                'expires_at' => now()->addMinutes(10),
+                'expires_at' => now()->addMinutes(config('otp.validite_minutes')),
                 'verified_at' => null,
             ]
         );
@@ -187,10 +233,32 @@ class AuthControllerApi extends Controller
         // (string) et une valeur potentiellement numérique côté client
         // mobile — toujours fausse dans ce cas. On compare en string des
         // deux côtés.
-        if ((string) $verification->code !== (string) $request->code) {
+        // Correction sécurité (29/10/2026) : sans limite d'essais par numéro,
+        // un code à 6 chiffres se devinait par essais répétés (60/min par IP,
+        // multipliables en changeant d'IP) — et /reset-password n'exige que
+        // ce code. Après OTP_ESSAIS_MAX mauvais codes, le code est détruit :
+        // il faut en redemander un (lui-même plafonné par numéro et par jour).
+        $cleEssais = 'otp-essais:'.$request->telephone;
+
+        if (!hash_equals((string) $verification->code, (string) $request->code)) {
+            RateLimiter::hit($cleEssais, config('otp.validite_minutes') * 60);
+            $restants = config('otp.essais_max') - RateLimiter::attempts($cleEssais);
+
+            if ($restants <= 0) {
+                $verification->delete();
+                RateLimiter::clear($cleEssais);
+
+                return response()->json(['success' => false,
+                'message' => 'Trop de codes erronés. Demandez un nouveau code.',
+                'essais_restants' => 0], 429);
+            }
+
             return response()->json(['success' => false,
-            'message' => 'Le code de vérification est invalide.'], 400);
+            'message' => 'Le code de vérification est invalide.',
+            'essais_restants' => $restants], 400);
         }
+
+        RateLimiter::clear($cleEssais);
 
         // Correction API-H-6 : marquer explicitement la vérification comme
         // réussie, pour que register() puisse s'appuyer dessus au lieu de
@@ -417,4 +485,13 @@ class AuthControllerApi extends Controller
         return response()->json(['message' => 'Utilisateur supprimé avec succès.']);
     }
     
+
+    private function tropDeSms(string $message, int $secondes)
+    {
+        return response()->json([
+            'success' => false,
+            'message' => $message,
+            'retry_after' => $secondes,
+        ], 429)->header('Retry-After', $secondes);
+    }
 }

@@ -8,8 +8,22 @@ import 'package:walletium/services/offline_signalement_service.dart';
 import 'firebase_options.dart';
 import 'utils/app_prefs.dart';
 import 'utils/sendra_theme.dart';
+import 'package:http/http.dart' as http;
+import 'demo/demo.dart';
 
-void main() async {
+void main() {
+  // Démo web (--dart-define=DEMO=true) : faux serveur, photos d'exemple et
+  // position fixe à Dakar. Les versions Android ne sont pas concernées.
+  if (kDemo) {
+    final reseau = http.Client();
+    Demo.installer();
+    http.runWithClient(_demarrer, () => Demo.client(reseau));
+    return;
+  }
+  _demarrer();
+}
+
+Future<void> _demarrer() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // En production, les traces de débogage ne doivent ni ralentir l'app ni
@@ -43,7 +57,7 @@ void main() async {
   // Firebase et les préférences sont chargés en parallèle : le splash natif
   // reste affiché pendant ce temps, sans écran blanc intermédiaire.
   await Future.wait([
-    Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform),
+    if (!kDemo) Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform),
     AppPrefs.init(),
   ]);
 

@@ -1,59 +1,96 @@
 <!DOCTYPE html>
-<html>
+<html lang="fr">
 <head>
-  <!--
-    If you are serving your web app in a path other than the root, change the
-    href value below to reflect the base path you are serving from.
-
-    The path provided below has to start and end with a slash "/" in order for
-    it to work correctly.
-
-    For more details:
-    * https://developer.mozilla.org/en-US/docs/Web/HTML/Element/base
-
-    This is a placeholder for base href that will be replaced by the value of
-    the `--base-href` argument provided to `flutter build`.
-  -->
   <base href="$FLUTTER_BASE_HREF">
-
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
-  <meta name="description" content="A new Flutter project.">
-
-  <!-- iOS meta tags & icons -->
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="description" content="Démo de l’application epaVie pour les citoyens">
+  <meta name="theme-color" content="#075C32">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black">
-  <meta name="apple-mobile-web-app-title" content="EPAVIE">
+  <meta name="apple-mobile-web-app-title" content="EPAVIE PUBLIC">
   <link rel="apple-touch-icon" href="icons/Icon-192.png">
-
-  <!-- Favicon -->
-  <link rel="icon" type="image/png" href="favicon.png"/>
-
-  <title>EPAVIE</title>
+  <link rel="icon" type="image/png" href="favicon.png">
   <link rel="manifest" href="manifest.json">
-
-  <script>
-    // The value below is injected by flutter build, do not touch.
-    var serviceWorkerVersion = null;
-  </script>
-  <!-- This script adds the flutter initialization JS code -->
-  <script src="flutter.js" defer></script>
+  <title>EPAVIE PUBLIC · Démo</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
+  <script src="https://maps.googleapis.com/maps/api/js?key=__MAPS_KEY__&loading=async"></script>
+  <style>
+    :root{--bg:#eef3f0;--dot:#d3ddd7;--panel:#fff;--ink:#14211a;--mut:#5d6b64;--line:#dbe4df;--acc:#07883F;--accs:#e3f3ea;--frame:#1b2420}
+    @media (prefers-color-scheme: dark){:root{--bg:#0f1512;--dot:#1f2a24;--panel:#161e1a;--ink:#e6efe9;--mut:#9aaba2;--line:#26322c;--acc:#3fbf74;--accs:#173325;--frame:#050806}}
+    *{box-sizing:border-box}
+    html,body{height:100%;margin:0}
+    body{background:var(--bg);background-image:radial-gradient(var(--dot) 1px,transparent 1px);background-size:22px 22px;color:var(--ink);
+      font-family:Inter,system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;overflow:hidden}
+    .stage{height:100%;display:grid;grid-template-columns:minmax(290px,370px) 1fr}
+    .panel{background:var(--panel);border-right:1px solid var(--line);overflow-y:auto;padding:28px 24px;display:flex;flex-direction:column;gap:20px}
+    .brand{display:flex;align-items:center;gap:12px}
+    .brand img{width:46px;height:46px;border-radius:12px}
+    .brand b{font-size:21px;display:block;line-height:1.1}
+    .brand small{color:var(--mut);font-size:12px;letter-spacing:.06em;text-transform:uppercase}
+    .lead{margin:0;color:var(--mut);line-height:1.55;font-size:14px}
+    .box{border:1px dashed var(--line);border-radius:14px;padding:12px 14px;font-size:13px;line-height:1.6;color:var(--mut)}
+    .box b{color:var(--ink)}
+    h2{font-size:11.5px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--mut);margin:0 0 8px}
+    ul{margin:0;padding-left:18px;font-size:13.5px;line-height:1.7}
+    .apps{display:flex;flex-direction:column;gap:6px}
+    .apps a{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:12px;border:1px solid var(--line);color:var(--ink);text-decoration:none;font-size:13.5px;font-weight:600}
+    .apps a.cur{border-color:var(--acc);background:var(--accs)}
+    .apps a em{font-style:normal;color:var(--mut);font-weight:500;margin-left:auto;font-size:12px}
+    .apps a:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+    .note{font-size:12px;color:var(--mut);line-height:1.5;margin-top:auto}
+    .vp{display:grid;place-items:center;padding:20px;min-width:0;min-height:0}
+    .frame{background:var(--frame);border-radius:56px;padding:13px;box-shadow:0 30px 80px -20px rgba(10,30,20,.45)}
+    #flutter_host{position:relative;border-radius:44px;overflow:hidden;background:#075C32}
+    .load{position:absolute;inset:0;display:grid;place-items:center;align-content:center;gap:16px;color:#fff;font-weight:600;font-size:14px;z-index:0}
+    .load img{width:84px;height:84px;border-radius:22px;box-shadow:0 12px 30px rgba(0,0,0,.25)}
+    .spin{width:26px;height:26px;border-radius:50%;border:3px solid rgba(255,255,255,.3);border-top-color:#fff;animation:t .8s linear infinite;margin:0 auto}
+    @keyframes t{to{transform:rotate(360deg)}}
+    .fab{display:none}
+    @media (max-width:700px){
+      .stage{grid-template-columns:1fr}
+      .panel{position:fixed;inset:auto 0 0 0;max-height:80%;z-index:20;border-radius:22px 22px 0 0;transform:translateY(105%);transition:transform .3s;box-shadow:0 -20px 50px rgba(0,0,0,.25);padding-bottom:calc(20px + env(safe-area-inset-bottom,0px))}
+      .panel.open{transform:none}
+      .vp{padding:0}
+      .frame{padding:0;border-radius:0;box-shadow:none;width:100vw;height:100dvh}
+      #flutter_host{border-radius:0;width:100%!important;height:100%!important}
+      .fab{display:flex;position:fixed;z-index:21;right:12px;bottom:calc(92px + env(safe-area-inset-bottom,0px));align-items:center;gap:6px;border:0;background:#14211a;color:#fff;border-radius:20px;padding:8px 13px;font:700 12.5px Inter,sans-serif;box-shadow:0 6px 18px rgba(0,0,0,.3);cursor:pointer}
+    }
+  </style>
 </head>
 <body>
+  <div class="stage">
+    <aside class="panel" id="panel" aria-label="À propos de la démo">
+      <div class="brand"><img src="icons/Icon-192.png" alt=""><div><b>EPAVIE PUBLIC</b><small>Démo · citoyens</small></div></div>
+      <p class="lead">L’application epaVie des citoyens, telle qu’elle est sur le téléphone : signaler un véhicule abandonné en une photo et suivre son traitement jusqu’à l’enlèvement.</p>
+      <div class="box"><b>Connexion</b> : n’importe quel numéro à 9 chiffres (ex. <b>77 123 45 67</b>) et n’importe quel mot de passe. Vous pouvez aussi <b>créer un compte</b> : le code reçu « par SMS » est n’importe quel code à 6 chiffres.</div>
+      <div><h2>À essayer</h2><ul><li>Toucher <b>Signaler</b>, choisir une photo d’exemple, le type de véhicule, puis valider.</li><li>Ouvrir un signalement pour voir ses photos et son avancement.</li><li>Passer sur <b>Les autres</b> et filtrer par commune.</li><li>Ouvrir la <b>cartographie</b>.</li></ul></div>
+      <div><h2>Plateforme EPAVIE</h2><nav class="apps">
+        <a href="/public/" class="cur">EPAVIE PUBLIC<em>citoyens</em></a>
+        <a href="/pro/" class="">EPAVIE PRO<em>agents</em></a>
+        <a href="/web/">EPAVIE WEB<em>back-office</em></a>
+      </nav></div>
+      <p class="note">Version de démonstration : c’est l’application réelle, mais branchée sur des données fictives. Rien n’est envoyé à SENDRA et chaque visiteur a sa propre copie.</p>
+    </aside>
+    <main class="vp">
+      <div class="frame"><div id="flutter_host"><div class="load"><img src="icons/Icon-192.png" alt=""><div class="spin"></div><span>Chargement de EPAVIE PUBLIC…</span></div></div></div>
+    </main>
+  </div>
+  <button class="fab" id="fab" type="button">ⓘ Démo</button>
   <script>
-    window.addEventListener('load', function(ev) {
-      // Download main.dart.js
-      _flutter.loader.loadEntrypoint({
-        serviceWorker: {
-          serviceWorkerVersion: serviceWorkerVersion,
-        },
-        onEntrypointLoaded: function(engineInitializer) {
-          engineInitializer.initializeEngine().then(function(appRunner) {
-            appRunner.runApp();
-          });
-        }
-      });
-    });
+    (function () {
+      var host = document.getElementById('flutter_host');
+      function taille() {
+        if (innerWidth <= 700) { host.style.width = ''; host.style.height = ''; return; }
+        var h = Math.min(852, innerHeight - 66), w = Math.round(h * 393 / 852);
+        host.style.width = w + 'px'; host.style.height = h + 'px';
+      }
+      taille(); addEventListener('resize', taille);
+      var p = document.getElementById('panel');
+      document.getElementById('fab').onclick = function () { p.classList.toggle('open'); };
+    })();
   </script>
+  <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>

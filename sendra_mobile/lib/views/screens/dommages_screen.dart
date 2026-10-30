@@ -16,6 +16,7 @@ import 'package:walletium/utils/strings.dart';
 
 import 'pv_screen.dart';
 import 'package:walletium/widgets/others/photo_reseau.dart';
+import 'package:walletium/utils/photo_locale.dart';
 
 /// Élément de la légende des dommages, posé sur le véhicule.
 enum TypeDommage {
@@ -248,7 +249,7 @@ class _DommagesScreenState extends State<DommagesScreen> {
     if (picked == null || !mounted) return;
     setState(() => _uploadingPhoto = true);
     try {
-      final fichier = await SignalerFlow.optimiser(File(picked.path));
+      final fichier = await SignalerFlow.optimiser(picked);
       final request = http.MultipartRequest(
         'POST',
         Uri.parse(
@@ -256,7 +257,7 @@ class _DommagesScreenState extends State<DommagesScreen> {
       );
       request.headers.addAll(await _entetes(json: false));
       request.files
-          .add(await http.MultipartFile.fromPath('photo', fichier.path));
+          .add(await multipartPhoto('photo', fichier));
       final response = await http.Response.fromStream(
         await request.send().timeout(const Duration(seconds: 40)),
       );

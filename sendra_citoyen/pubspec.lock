@@ -361,7 +361,7 @@ packages:
     source: hosted
     version: "3.1.0"
   geocoding_platform_interface:
-    dependency: transitive
+    dependency: "direct main"
     description:
       name: geocoding_platform_interface
       sha256: "8c2c8226e5c276594c2e18bfe88b19110ed770aeb7c1ab50ede570be8b92229b"
@@ -393,7 +393,7 @@ packages:
     source: hosted
     version: "2.3.14"
   geolocator_platform_interface:
-    dependency: transitive
+    dependency: "direct main"
     description:
       name: geolocator_platform_interface
       sha256: cdb082e4f048b69da244117b7914cc60d2a8897546ffaa4f2529c786ded7aee2
@@ -561,7 +561,7 @@ packages:
     source: hosted
     version: "0.2.2+1"
   image_picker_platform_interface:
-    dependency: transitive
+    dependency: "direct main"
     description:
       name: image_picker_platform_interface
       sha256: "567e056716333a1647c64bb6bd873cff7622233a5c3f694be28a583d4715690c"

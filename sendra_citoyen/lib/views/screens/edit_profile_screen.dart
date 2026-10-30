@@ -10,6 +10,7 @@ import 'package:walletium/utils/ecran.dart';
 import 'package:walletium/utils/signaler_flow.dart';
 import 'package:walletium/utils/strings.dart';
 import 'package:walletium/widgets/others/photo_reseau.dart';
+import 'package:walletium/utils/photo_locale.dart';
 
 class EditProfileScreen extends StatefulWidget {
   const EditProfileScreen({super.key});
@@ -22,7 +23,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   final _formKey = GlobalKey<FormState>();
   final _firstName = TextEditingController();
   final _lastName = TextEditingController();
-  File? _photo;
+  XFile? _photo;
   String? _photoUrl;
   bool _saving = false;
 
@@ -76,7 +77,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     if (file == null) return;
     // Redressée et allégée avant l'envoi (même traitement que les photos de
     // signalement) : la photo de profil n'apparaît plus couchée.
-    final photo = await SignalerFlow.optimiser(File(file.path));
+    final photo = await SignalerFlow.optimiser(file);
     if (mounted) setState(() => _photo = photo);
   }
 
@@ -96,7 +97,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       request.fields['last_name'] = _lastName.text.trim();
       if (_photo != null) {
         request.files
-            .add(await http.MultipartFile.fromPath('photo', _photo!.path));
+            .add(await multipartPhoto('photo', _photo!));
       }
       final response = await http.Response.fromStream(await request.send());
       if (response.statusCode == 404) {
@@ -139,7 +140,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final image = _photo != null
-        ? FileImage(_photo!) as ImageProvider
+        ? providerPhoto(_photo!) as ImageProvider
         : (_photoUrl != null && _photoUrl!.isNotEmpty
             ? photoReseauProvider(_photoUrl!)
             : null);

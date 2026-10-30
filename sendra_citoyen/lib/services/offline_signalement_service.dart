@@ -9,6 +9,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 import 'package:walletium/utils/strings.dart';
+import 'package:flutter/foundation.dart';
 
 /// Les cinq angles de prise de vue d'un signalement, dans l'ordre d'affichage.
 /// La clé est la valeur envoyée au backend (`car_photos.position`) ; la valeur
@@ -143,6 +144,7 @@ class OfflineSignalementService {
 
   /// Enregistre un signalement en attente d'envoi.
   Future<void> enfiler(PendingSignalement signalement) async {
+    if (kIsWeb) return;
     final dir = await _dossier();
     final fichier = File('${dir.path}/${signalement.uuid}.json');
     await fichier.writeAsString(jsonEncode(signalement.toJson()));
@@ -150,6 +152,7 @@ class OfflineSignalementService {
 
   /// Liste les signalements encore en attente, du plus ancien au plus récent.
   Future<List<PendingSignalement>> enAttente() async {
+    if (kIsWeb) return const [];
     final dir = await _dossier();
     final fichiers = dir
         .listSync()
@@ -387,6 +390,8 @@ class OfflineSignalementService {
   /// À appeler une fois au démarrage de l'app : tente une synchro immédiate
   /// puis en relance une à chaque retour de connexion.
   void demarrerSynchroAuto() {
+    // Web (démo) : pas de file hors ligne.
+    if (kIsWeb) return;
     _reintegrerRejetesUneFois().whenComplete(synchroniser);
     _subscription ??= Connectivity().onConnectivityChanged.listen((etats) {
       final enLigne = etats.any((e) => e != ConnectivityResult.none);

@@ -9,6 +9,7 @@ import 'package:walletium/utils/ecran.dart';
 import 'package:walletium/utils/sendra_theme.dart';
 import 'package:walletium/utils/signaler_flow.dart';
 import 'package:walletium/widgets/others/photo_reseau.dart';
+import 'package:walletium/utils/photo_locale.dart';
 
 class MissionDetailsScreen extends StatefulWidget {
   const MissionDetailsScreen(
@@ -566,8 +567,8 @@ class _RemovalScreenState extends State<_RemovalScreen> {
   final _picker = ImagePicker();
   final _label = TextEditingController();
   final _plate = TextEditingController();
-  final Map<String, File> _photos = {};
-  File? _sheet;
+  final Map<String, XFile> _photos = {};
+  XFile? _sheet;
   int? _vehicleId;
   int? _truckId;
   bool _saving = false;
@@ -602,7 +603,7 @@ class _RemovalScreenState extends State<_RemovalScreen> {
         source: ImageSource.camera, imageQuality: 85, maxWidth: 1800);
     if (file == null) return;
     // Photo redressée et allégée avant l'envoi.
-    final photo = await SignalerFlow.optimiser(File(file.path));
+    final photo = await SignalerFlow.optimiser(file);
     if (mounted) setState(() => _photos[angle] = photo);
   }
 
@@ -762,7 +763,7 @@ class _RemovalScreenState extends State<_RemovalScreen> {
                     imageQuality: 85,
                     maxWidth: 1800);
                 if (image == null) return;
-                final fiche = await SignalerFlow.optimiser(File(image.path));
+                final fiche = await SignalerFlow.optimiser(image);
                 if (mounted) setState(() => _sheet = fiche);
               },
               icon: Icon(_sheet != null ||
@@ -791,7 +792,7 @@ class _RemovalScreenState extends State<_RemovalScreen> {
 
   ImageProvider? _photoProvider(String angle) {
     final local = _photos[angle];
-    if (local != null) return FileImage(local);
+    if (local != null) return providerPhoto(local);
     final remote = widget.existingRemoval?.photos[angle];
     return remote == null ? null : photoReseauProvider(remote);
   }
@@ -809,7 +810,7 @@ class _ReceptionPhotoScreen extends StatefulWidget {
 
 class _ReceptionPhotoScreenState extends State<_ReceptionPhotoScreen> {
   final _picker = ImagePicker();
-  final Map<String, File> _photos = {};
+  final Map<String, XFile> _photos = {};
   bool _saving = false;
   static const _labels = {
     'front': 'Devant',
@@ -820,7 +821,7 @@ class _ReceptionPhotoScreenState extends State<_ReceptionPhotoScreen> {
   };
 
   ImageProvider? _provider(String angle) {
-    if (_photos[angle] != null) return FileImage(_photos[angle]!);
+    if (_photos[angle] != null) return providerPhoto(_photos[angle]!);
     final remote = widget.removal.receptionPhotos[angle];
     return remote == null ? null : photoReseauProvider(remote);
   }
@@ -829,7 +830,7 @@ class _ReceptionPhotoScreenState extends State<_ReceptionPhotoScreen> {
     final image = await _picker.pickImage(
         source: ImageSource.camera, imageQuality: 85, maxWidth: 1800);
     if (image == null) return;
-    final photo = await SignalerFlow.optimiser(File(image.path));
+    final photo = await SignalerFlow.optimiser(image);
     if (mounted) setState(() => _photos[angle] = photo);
   }
 

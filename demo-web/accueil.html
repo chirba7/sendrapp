@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Plateforme EPAVIE · Démo</title>
+<meta name="description" content="Démonstration de la plateforme EPAVIE de SENDRA : applications citoyen, agent et back-office.">
+<link rel="icon" href="/web/img/sendra.ico">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
+<style>
+:root{--bg:#f3f6f4;--ink:#15201a;--mut:#5f6b65;--line:#dfe7e2;--g:#07883F;--f:#075C32}
+*{box-sizing:border-box}body{margin:0;font-family:Inter,system-ui,sans-serif;background:var(--bg);color:var(--ink)}
+header{background:linear-gradient(140deg,#0a9a4a,#053d22);color:#fff;padding:56px 20px 90px}
+.w{max-width:1040px;margin:0 auto}
+header img{height:40px;background:#fff;border-radius:12px;padding:8px 12px}
+h1{font-size:clamp(28px,4vw,42px);line-height:1.1;margin:24px 0 12px;letter-spacing:-.02em;max-width:640px}
+header p{opacity:.9;line-height:1.6;max-width:620px;margin:0}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:18px;margin-top:-56px;padding:0 20px}
+a.c{display:flex;flex-direction:column;gap:10px;background:#fff;border:1px solid var(--line);border-radius:20px;padding:22px;color:inherit;text-decoration:none;box-shadow:0 14px 34px rgba(10,40,25,.08);transition:transform .15s,border-color .15s}
+a.c:hover{transform:translateY(-3px);border-color:var(--g)}
+a.c:focus-visible{outline:3px solid #9fd8b6;outline-offset:3px}
+.c small{font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--g)}
+.c b{font-size:22px}.c p{margin:0;color:var(--mut);line-height:1.55;font-size:14.5px}
+.c span{margin-top:auto;font-weight:700;color:var(--f)}
+.info{padding:34px 20px 50px;color:var(--mut);font-size:14px;line-height:1.6}
+.info b{color:var(--ink)}
+</style>
+</head>
+<body>
+<header><div class="w"><img src="/web/img/EPAVIE.png" alt="epaVie"><h1>Plateforme EPAVIE · démonstration</h1>
+<p>Les trois applications de SENDRA pour libérer l’espace public des véhicules abandonnés : le signalement par les citoyens, la constatation et l’enlèvement par les agents, le pilotage par l’administration et les autorités.</p></div></header>
+<div class="w cards">
+<a class="c" href="/public/"><small>Citoyens</small><b>EPAVIE PUBLIC</b><p>Signaler un véhicule en une photo, suivre son traitement, voir les signalements de sa commune.</p><span>Ouvrir l’application →</span></a>
+<a class="c" href="/pro/"><small>Agents de terrain</small><b>EPAVIE PRO</b><p>Prise en charge, constatation, procès-verbal signé, missions d’enlèvement et réception en fourrière.</p><span>Ouvrir l’application →</span></a>
+<a class="c" href="/web/"><small>Administration</small><b>EPAVIE WEB</b><p>Tableau de bord, décisions des autorités, missions, fourrières, communes et comptes.</p><span>Ouvrir le back-office →</span></a>
+</div>
+<div class="w info"><b>Accès de démonstration</b> : applications mobiles avec n’importe quel numéro à 9 chiffres et n’importe quel mot de passe ; back-office avec n’importe quelle adresse e-mail et n’importe quel mot de passe. Toutes les données sont fictives, rien n’est transmis à SENDRA, et chaque visiteur dispose de sa propre copie.</div>
+</body></html>

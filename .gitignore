@@ -7,3 +7,6 @@ output/apk/
 # elles ne se compressent pas — six archives pesaient déjà 39 Mo dans le dépôt.
 tmp/
 output/pdf/
+
+# Site de démo assemblé par demo-web/build_demo.ps1 (régénérable)
+demo-web/site/

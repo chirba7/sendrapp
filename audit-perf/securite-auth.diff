@@ -1,0 +1,569 @@
+--- /tmp/claude-0/-home-claude/9570022f-2924-5cbb-89b2-963b3de66ea3/scratchpad/app/Http/Controllers/AuthControllerApi.php	2026-10-21 11:48:51.000000000 +0000
++++ app/Http/Controllers/AuthControllerApi.php	2026-10-29 16:13:57.552962544 +0000
+@@ -14,6 +14,8 @@
+ 
+ use App\Services\OrangeSmsService;
+ use App\Models\UserVerificationCode;
++use Illuminate\Support\Facades\Log;
++use Illuminate\Support\Facades\RateLimiter;
+ 
+ class AuthControllerApi extends Controller
+ {
+@@ -110,11 +112,52 @@
+     {
+         // Correction API-C-5 : idem checkPhone(), clé statique retirée au
+         // profit du throttling de route.
++        // Correction sécurité (29/10/2026) : seuls les mobiles sénégalais
++        // (70, 75, 76, 77, 78) reçoivent un SMS, et l'envoi est plafonné par
++        // numéro et globalement (config/otp.php) — la limite par IP seule
++        // laissait envoyer des milliers de SMS payants vers des numéros
++        // différents.
+         $request->validate([
+-            'telephone' => 'required|regex:/^\d{9}$/', // Phone number format validation
++            'telephone' => ['required', 'regex:'.config('otp.format_numero')],
++        ], [
++            'telephone.regex' => 'Le numéro doit être un mobile sénégalais à 9 chiffres (70, 75, 76, 77 ou 78).',
+         ]);
+ 
+-        $verificationCode = rand(100000, 999999); // Generate a 6-digit code
++        $telephone = $request->telephone;
++        $cleDelai = 'otp-envoi-delai:'.$telephone;
++        $cleJour = 'otp-envoi-jour:'.$telephone;
++        $cleGlobal = 'otp-envoi-global';
++
++        if (RateLimiter::tooManyAttempts($cleDelai, 1)) {
++            return $this->tropDeSms(
++                'Un code vient d’être envoyé à ce numéro. Patientez avant d’en demander un autre.',
++                RateLimiter::availableIn($cleDelai)
++            );
++        }
++        if (RateLimiter::tooManyAttempts($cleJour, config('otp.max_par_numero_par_jour'))) {
++            return $this->tropDeSms(
++                'Nombre maximal de codes atteint pour ce numéro. Réessayez demain.',
++                RateLimiter::availableIn($cleJour)
++            );
++        }
++        if (RateLimiter::tooManyAttempts($cleGlobal, config('otp.max_global_par_jour'))) {
++            Log::error('OTP : plafond global de SMS atteint, envois suspendus', [
++                'plafond' => config('otp.max_global_par_jour'),
++            ]);
++
++            return response()->json([
++                'success' => false,
++                'message' => 'Le service d’envoi de SMS est momentanément indisponible. Veuillez réessayer plus tard.',
++            ], 503);
++        }
++
++        // Chaque tentative qui part chez le prestataire compte, réussie ou non.
++        RateLimiter::hit($cleDelai, config('otp.delai_renvoi_secondes'));
++        RateLimiter::hit($cleJour, 86400);
++        RateLimiter::hit($cleGlobal, 86400);
++
++        // random_int : générateur cryptographique (rand() est prévisible).
++        $verificationCode = (string) random_int(100000, 999999);
+ 
+         $smsResult = $this->smsService->sendSms(
+             'Code de vérification',
+@@ -131,11 +174,14 @@
+         }
+ 
+         // Le code n'est valable qu'après confirmation de l'envoi par le prestataire.
++        // Nouveau code : nouveau quota d'essais.
++        RateLimiter::clear('otp-essais:'.$telephone);
++
+         UserVerificationCode::updateOrCreate(
+             ['phone' => $request->telephone],
+             [
+                 'code' => $verificationCode,
+-                'expires_at' => now()->addMinutes(10),
++                'expires_at' => now()->addMinutes(config('otp.validite_minutes')),
+                 'verified_at' => null,
+             ]
+         );
+@@ -187,11 +233,33 @@
+         // (string) et une valeur potentiellement numérique côté client
+         // mobile — toujours fausse dans ce cas. On compare en string des
+         // deux côtés.
+-        if ((string) $verification->code !== (string) $request->code) {
++        // Correction sécurité (29/10/2026) : sans limite d'essais par numéro,
++        // un code à 6 chiffres se devinait par essais répétés (60/min par IP,
++        // multipliables en changeant d'IP) — et /reset-password n'exige que
++        // ce code. Après OTP_ESSAIS_MAX mauvais codes, le code est détruit :
++        // il faut en redemander un (lui-même plafonné par numéro et par jour).
++        $cleEssais = 'otp-essais:'.$request->telephone;
++
++        if (!hash_equals((string) $verification->code, (string) $request->code)) {
++            RateLimiter::hit($cleEssais, config('otp.validite_minutes') * 60);
++            $restants = config('otp.essais_max') - RateLimiter::attempts($cleEssais);
++
++            if ($restants <= 0) {
++                $verification->delete();
++                RateLimiter::clear($cleEssais);
++
++                return response()->json(['success' => false,
++                'message' => 'Trop de codes erronés. Demandez un nouveau code.',
++                'essais_restants' => 0], 429);
++            }
++
+             return response()->json(['success' => false,
+-            'message' => 'Le code de vérification est invalide.'], 400);
++            'message' => 'Le code de vérification est invalide.',
++            'essais_restants' => $restants], 400);
+         }
+ 
++        RateLimiter::clear($cleEssais);
++
+         // Correction API-H-6 : marquer explicitement la vérification comme
+         // réussie, pour que register() puisse s'appuyer dessus au lieu de
+         // se contenter de l'existence d'un code non expiré.
+@@ -417,4 +485,13 @@
+         return response()->json(['message' => 'Utilisateur supprimé avec succès.']);
+     }
+     
++
++    private function tropDeSms(string $message, int $secondes)
++    {
++        return response()->json([
++            'success' => false,
++            'message' => $message,
++            'retry_after' => $secondes,
++        ], 429)->header('Retry-After', $secondes);
++    }
+ }
+--- /tmp/claude-0/-home-claude/9570022f-2924-5cbb-89b2-963b3de66ea3/scratchpad/app/Http/Kernel.php	2026-08-12 13:16:40.000000000 +0000
++++ app/Http/Kernel.php	2026-10-29 16:13:19.627957654 +0000
+@@ -67,5 +67,8 @@
+         'jwt.refresh' => \Tymon\JWTAuth\Http\Middleware\RefreshToken::class,
+         // Correction API-C-3 : contrôle de rôle sur les routes métier
+         'role' => \App\Http\Middleware\EnsureUserHasRole::class,
++        // Correction sécurité (29/10/2026) : refuse le jeton d'un compte
++        // archivé et, après la date de transition, les jetons sans expiration.
++        'compte.actif' => \App\Http\Middleware\EnsureApiAccountActive::class,
+     ];
+ }
+--- /tmp/claude-0/-home-claude/9570022f-2924-5cbb-89b2-963b3de66ea3/scratchpad/config/jwt.php	2026-09-28 10:34:34.000000000 +0000
++++ config/jwt.php	2026-10-29 16:27:56.869950433 +0000
+@@ -101,9 +101,12 @@
+     |
+     */
+ 
+-    // La session mobile reste active jusqu'à une déconnexion explicite.
+-    // La blacklist permet toujours de révoquer un jeton lors du logout.
+-    'ttl' => env('JWT_TTL', null),
++    // Correction sécurité (audit du 29/10/2026) : les jetons n'expiraient
++    // jamais (ttl null) — un jeton volé ou celui d'un ancien collaborateur
++    // restait valable à vie. 30 jours par défaut : assez long pour ne pas
++    // obliger un citoyen à se reconnecter à chaque ouverture de l'app.
++    // ATTENTION : une ligne JWT_TTL=null dans le .env annule ce défaut.
++    'ttl' => env('JWT_TTL', 43200),
+ 
+     /*
+     |--------------------------------------------------------------------------
+@@ -122,7 +125,15 @@
+     |
+     */
+ 
+-    'refresh_ttl' => env('JWT_REFRESH_TTL', null),
++    // 60 jours après l'émission, /api/refresh n'accepte plus le jeton.
++    'refresh_ttl' => env('JWT_REFRESH_TTL', 86400),
++
++    // Jetons émis avant cette date (AAAA-MM-JJ) refusés
++    // (App\Http\Middleware\EnsureApiAccountActive). Transition : les jetons
++    // émis avant JWT_TTL n'ont pas d'expiration ; on renseigne ici la date
++    // de mise en service de JWT_TTL une fois les apps mises à jour (retour à
++    // l'écran de connexion sur un 401). Aussi coupe-circuit en cas de fuite.
++    'refuser_jetons_emis_avant' => env('JWT_REFUSER_JETONS_EMIS_AVANT'),
+ 
+     /*
+     |--------------------------------------------------------------------------
+@@ -152,7 +163,10 @@
+         'nbf',
+         'sub',
+         'jti',
+-    ], env('JWT_TTL', null) === null ? [] : ['exp']),
++        // `exp` n'est pas exigé pour accepter, pendant la transition, les
++        // jetons émis sans expiration ; il reste vérifié quand il est présent
++        // (tous les nouveaux jetons en portent un).
++    ]),
+ 
+     /*
+     |--------------------------------------------------------------------------
+--- /tmp/claude-0/-home-claude/9570022f-2924-5cbb-89b2-963b3de66ea3/scratchpad/routes/api.php	2026-10-23 11:09:56.000000000 +0000
++++ routes/api.php	2026-10-29 16:13:19.628613992 +0000
+@@ -61,7 +61,9 @@
+ });
+ 
+ // Protected routes (Authentication required with JWT)
+-Route::middleware('jwt.auth')->group(function () {
++// `compte.actif` : un compte archivé depuis le back-office perd l'accès même
++// avec un jeton obtenu avant l'archivage (audit sécurité du 29/10/2026).
++Route::middleware(['jwt.auth', 'compte.actif'])->group(function () {
+     Route::prefix('pointage')->group(function () {
+         Route::get('/statut', [\App\Http\Controllers\AttendanceEnrollmentController::class, 'status']);
+         Route::post('/adhesion', [\App\Http\Controllers\AttendanceEnrollmentController::class, 'join'])->middleware('throttle:5,1');
+--- /tmp/claude-0/-home-claude/9570022f-2924-5cbb-89b2-963b3de66ea3/scratchpad/.env.example	2026-10-01 13:56:07.000000000 +0000
++++ .env.example	2026-10-29 16:27:56.870374250 +0000
+@@ -74,5 +74,6 @@
+ VITE_PUSHER_APP_CLUSTER="${PUSHER_APP_CLUSTER}"
+ 
+ JWT_SECRET=
+-JWT_TTL=null
+-JWT_REFRESH_TTL=null
++JWT_TTL=43200
++JWT_REFRESH_TTL=86400
++JWT_REFUSER_JETONS_EMIS_AVANT=
+--- /dev/null	2026-10-28 21:24:45.159920034 +0000
++++ app/Http/Middleware/EnsureApiAccountActive.php	2026-10-29 16:27:56.866983735 +0000
+@@ -0,0 +1,62 @@
++<?php
++
++namespace App\Http\Middleware;
++
++use Closure;
++use Illuminate\Http\Request;
++use Tymon\JWTAuth\Facades\JWTAuth;
++
++/**
++ * Correction sécurité (audit du 29/10/2026), à placer après `jwt.auth`.
++ *
++ * 1. Compte archivé : `login()` refusait déjà un compte supprimé depuis le
++ *    back-office (`users.deleted`), mais un jeton obtenu AVANT l'archivage
++ *    restait accepté sur toutes les routes — et les jetons n'expiraient pas.
++ *    Un ancien collaborateur gardait donc l'accès à l'API. Le jeton est
++ *    maintenant refusé (403, comme le module de pointage le faisait déjà)
++ *    et mis sur liste noire.
++ *
++ * 2. Jetons émis avant une date (JWT_REFUSER_JETONS_EMIS_AVANT, AAAA-MM-JJ) :
++ *    refusés. Sert d'abord à la transition — les jetons émis avant JWT_TTL
++ *    n'ont pas d'expiration et restent acceptés tant que la date est vide,
++ *    pour ne pas déconnecter d'un coup les utilisateurs des apps actuelles
++ *    (qui ne renvoient pas vers l'écran de connexion sur un 401) ; on la
++ *    renseigne une fois les apps mises à jour. Sert ensuite de coupe-circuit
++ *    (fuite de JWT_SECRET, vol de jetons) : tout le monde se reconnecte.
++ *    La date d'émission (`iat`) est le seul critère fiable : au décodage,
++ *    tymon/jwt-auth ajoute une expiration aux jetons qui n'en ont pas.
++ *
++ * Aucune requête SQL en plus : l'utilisateur est déjà chargé par jwt.auth.
++ */
++class EnsureApiAccountActive
++{
++    public function handle(Request $request, Closure $next)
++    {
++        $user = $request->user();
++
++        if ($user && $user->deleted) {
++            return $this->refuser('Ce compte a été désactivé.', 403);
++        }
++
++        $limite = config('jwt.refuser_jetons_emis_avant');
++        if ($limite) {
++            $iat = (int) JWTAuth::parseToken()->getPayload()->get('iat');
++            if ($iat < strtotime($limite)) {
++                return $this->refuser('Session expirée, veuillez vous reconnecter.', 401);
++            }
++        }
++
++        return $next($request);
++    }
++
++    private function refuser(string $message, int $statut)
++    {
++        try {
++            auth('api')->logout(); // liste noire du jeton présenté
++        } catch (\Throwable $e) {
++            // jeton déjà invalide : rien à faire
++        }
++
++        return response()->json(['success' => false, 'message' => $message], $statut);
++    }
++}
+--- /dev/null	2026-10-28 21:24:45.159920034 +0000
++++ config/otp.php	2026-10-29 16:12:48.394929733 +0000
+@@ -0,0 +1,41 @@
++<?php
++
++/*
++|--------------------------------------------------------------------------
++| Codes de vérification SMS (OTP)
++|--------------------------------------------------------------------------
++|
++| Correction sécurité (audit du 29/10/2026) :
++|  - un code à 6 chiffres sans limite d'essais par numéro se devine par
++|    essais répétés depuis plusieurs IP, et /reset-password n'exige que ce
++|    code : prise de contrôle de n'importe quel compte ;
++|  - l'envoi n'était limité que par IP : on pouvait faire partir des
++|    milliers de SMS payants vers des numéros différents.
++|
++| Les compteurs vivent dans le cache par défaut (CACHE_DRIVER).
++*/
++
++return [
++    // Durée de validité d'un code, en minutes.
++    'validite_minutes' => (int) env('OTP_VALIDITE_MINUTES', 10),
++
++    // Mauvais codes tolérés avant que le code soit détruit (il faut alors
++    // en redemander un).
++    'essais_max' => (int) env('OTP_ESSAIS_MAX', 5),
++
++    // Délai minimal entre deux SMS vers le même numéro (l'app affiche un
++    // compte à rebours de 60 s avant « Renvoyer »).
++    'delai_renvoi_secondes' => (int) env('OTP_DELAI_RENVOI_SECONDES', 60),
++
++    // SMS maximum par numéro et par 24 h.
++    'max_par_numero_par_jour' => (int) env('OTP_MAX_PAR_NUMERO_PAR_JOUR', 5),
++
++    // Disjoncteur budgétaire : SMS maximum par 24 h, tous numéros confondus.
++    // Au-delà, l'envoi est suspendu (503) jusqu'au lendemain et une erreur
++    // est journalisée. À ajuster au trafic réel.
++    'max_global_par_jour' => (int) env('OTP_MAX_GLOBAL_PAR_JOUR', 500),
++
++    // Préfixes mobiles sénégalais (70, 75, 76, 77, 78) : seuls numéros
++    // capables de recevoir un SMS.
++    'format_numero' => '/^7[05678]\d{7}$/',
++];
+--- /dev/null	2026-10-28 21:24:45.159920034 +0000
++++ tests/Feature/SecuriteAuthTest.php	2026-10-29 16:27:56.871738787 +0000
+@@ -0,0 +1,243 @@
++<?php
++
++namespace Tests\Feature;
++
++use App\Models\User;
++use App\Models\UserVerificationCode;
++use App\Services\OrangeSmsService;
++use Illuminate\Foundation\Testing\RefreshDatabase;
++use Mockery;
++use Tests\TestCase;
++use Tymon\JWTAuth\Facades\JWTAuth;
++
++/**
++ * Corrections de sécurité de l'audit du 29/10/2026 :
++ *  1. jetons JWT avec expiration, compte archivé refusé même avec un ancien
++ *     jeton, période de transition pour les jetons émis sans expiration ;
++ *  2. nombre d'essais limité sur le code OTP ;
++ *  3. envoi de SMS plafonné par numéro et globalement.
++ */
++class SecuriteAuthTest extends TestCase
++{
++    use RefreshDatabase;
++
++    // ---------------------------------------------------------------- 1. JWT
++
++    public function test_un_jeton_de_connexion_expire_apres_trente_jours(): void
++    {
++        User::factory()->create(['telephone' => '771110001', 'role_id' => 5]);
++
++        $jeton = $this->postJson('/api/login', ['telephone' => '771110001', 'password' => 'password'])
++            ->assertOk()->json('token');
++
++        $exp = JWTAuth::setToken($jeton)->getPayload()->get('exp');
++        $this->assertNotNull($exp, 'le jeton doit porter une date d’expiration');
++        $this->assertEqualsWithDelta(now()->addDays(30)->timestamp, $exp, 60);
++
++        $this->travel(31)->days();
++        auth()->forgetGuards();
++        $this->withToken($jeton)->postJson('/api/me')->assertStatus(401);
++    }
++
++    public function test_un_compte_archive_apres_connexion_perd_l_acces_et_son_jeton(): void
++    {
++        $user = User::factory()->create(['telephone' => '771110002', 'role_id' => 2]);
++        $jeton = $this->postJson('/api/login', ['telephone' => '771110002', 'password' => 'password'])->json('token');
++
++        $this->withToken($jeton)->postJson('/api/me')->assertOk();
++
++        // Archivage depuis le back-office pendant que la session est ouverte.
++        $user->forceFill(['deleted' => true])->save();
++        auth()->forgetGuards();
++        $this->withToken($jeton)->getJson('/api/listerSignalements')
++            ->assertForbidden()
++            ->assertJsonPath('message', 'Ce compte a été désactivé.');
++
++        // Le jeton est sur liste noire : même réactivé, il ne sert plus.
++        $user->forceFill(['deleted' => null])->save();
++        auth()->forgetGuards();
++        $this->withToken($jeton)->postJson('/api/me')->assertStatus(401);
++    }
++
++    public function test_les_comptes_historiques_a_deleted_null_ne_sont_pas_bloques(): void
++    {
++        $user = User::factory()->create(['telephone' => '771110003', 'role_id' => 5, 'deleted' => null]);
++
++        $this->withToken(JWTAuth::fromUser($user))->postJson('/api/me')->assertOk();
++    }
++
++    public function test_jeton_sans_expiration_accepte_pendant_la_transition_puis_refuse(): void
++    {
++        $user = User::factory()->create(['telephone' => '771110004', 'role_id' => 5]);
++
++        // Jeton tel qu'émis avant la correction (ttl null : pas de `exp`).
++        JWTAuth::factory()->setTTL(null);
++        $ancien = JWTAuth::fromUser($user);
++        JWTAuth::factory()->setTTL(43200)->setDefaultClaims(['iss', 'iat', 'exp', 'nbf', 'jti']);
++        $this->assertArrayNotHasKey('exp', json_decode(base64_decode(strtr(explode('.', $ancien)[1], '-_', '+/')), true));
++
++        // Transition : accepté tant que la date de coupure est vide.
++        auth()->forgetGuards();
++        $this->withToken($ancien)->postJson('/api/me')->assertOk();
++
++        // Date de coupure renseignée (mise en service de JWT_TTL) : refusé.
++        $this->travel(2)->days();
++        config(['jwt.refuser_jetons_emis_avant' => now()->subDay()->toDateString()]);
++        auth()->forgetGuards();
++        $this->withToken($ancien)->postJson('/api/me')
++            ->assertStatus(401)
++            ->assertJsonPath('message', 'Session expirée, veuillez vous reconnecter.');
++
++        // Un jeton émis après la coupure n'est pas concerné.
++        $nouveau = $this->postJson('/api/login', ['telephone' => '771110004', 'password' => 'password'])->json('token');
++        auth()->forgetGuards();
++        $this->withToken($nouveau)->postJson('/api/me')->assertOk();
++    }
++
++    // ---------------------------------------------------------------- 2. OTP
++
++    private function code(string $telephone, string $code = '123456'): void
++    {
++        UserVerificationCode::create([
++            'phone' => $telephone,
++            'code' => $code,
++            'expires_at' => now()->addMinutes(10),
++        ]);
++    }
++
++    public function test_le_code_est_detruit_apres_cinq_mauvais_essais(): void
++    {
++        $this->code('771110010');
++
++        foreach ([4, 3, 2, 1] as $restants) {
++            $this->postJson('/api/verify-code', ['telephone' => '771110010', 'code' => '000000'])
++                ->assertStatus(400)
++                ->assertJsonPath('essais_restants', $restants);
++        }
++
++        $this->postJson('/api/verify-code', ['telephone' => '771110010', 'code' => '000000'])
++            ->assertStatus(429)
++            ->assertJsonPath('essais_restants', 0);
++
++        $this->assertDatabaseMissing('user_verification_codes', ['phone' => '771110010']);
++
++        // Même le bon code ne passe plus : il faut en redemander un.
++        $this->postJson('/api/verify-code', ['telephone' => '771110010', 'code' => '123456'])
++            ->assertNotFound();
++
++        // Et le mot de passe ne peut pas être réinitialisé.
++        User::factory()->create(['telephone' => '771110010']);
++        $this->postJson('/api/reset-password', [
++            'telephone' => '771110010', 'password' => 'nouveau1', 'password_confirmation' => 'nouveau1',
++        ])->assertStatus(400);
++    }
++
++    public function test_le_bon_code_apres_quelques_erreurs_passe_et_remet_le_compteur_a_zero(): void
++    {
++        $this->code('771110011');
++
++        $this->postJson('/api/verify-code', ['telephone' => '771110011', 'code' => '000000'])->assertStatus(400);
++        $this->postJson('/api/verify-code', ['telephone' => '771110011', 'code' => '111111'])->assertStatus(400);
++        $this->postJson('/api/verify-code', ['telephone' => '771110011', 'code' => '123456'])->assertOk();
++
++        $this->assertNotNull(UserVerificationCode::where('phone', '771110011')->value('verified_at'));
++    }
++
++    public function test_les_essais_sont_comptes_par_numero(): void
++    {
++        $this->code('771110012');
++        $this->code('771110013');
++
++        for ($i = 0; $i < 4; $i++) {
++            $this->postJson('/api/verify-code', ['telephone' => '771110012', 'code' => '000000'])->assertStatus(400);
++        }
++
++        $this->postJson('/api/verify-code', ['telephone' => '771110013', 'code' => '000000'])
++            ->assertStatus(400)
++            ->assertJsonPath('essais_restants', 4);
++    }
++
++    // ---------------------------------------------------------------- 3. SMS
++
++    private function smsReussis(int $fois): void
++    {
++        $sms = Mockery::mock(OrangeSmsService::class);
++        $sms->shouldReceive('sendSms')->times($fois)->andReturn(['success' => true]);
++        $this->app->instance(OrangeSmsService::class, $sms);
++    }
++
++    public function test_code_genere_a_six_chiffres_et_nouveau_quota_d_essais(): void
++    {
++        $this->smsReussis(1);
++        $this->code('771110020');
++        for ($i = 0; $i < 4; $i++) {
++            $this->postJson('/api/verify-code', ['telephone' => '771110020', 'code' => '000000']);
++        }
++
++        $this->postJson('/api/send-verification-code', ['telephone' => '771110020'])->assertOk();
++
++        $code = UserVerificationCode::where('phone', '771110020')->value('code');
++        $this->assertMatchesRegularExpression('/^\d{6}$/', (string) $code);
++
++        $faux = $code === '000000' ? '111111' : '000000';
++        $this->postJson('/api/verify-code', ['telephone' => '771110020', 'code' => $faux])
++            ->assertJsonPath('essais_restants', 4);
++    }
++
++    public function test_pas_de_renvoi_avant_soixante_secondes(): void
++    {
++        $this->smsReussis(2);
++
++        $this->postJson('/api/send-verification-code', ['telephone' => '771110021'])->assertOk();
++        $this->postJson('/api/send-verification-code', ['telephone' => '771110021'])
++            ->assertStatus(429)
++            ->assertHeader('Retry-After');
++
++        $this->travel(61)->seconds();
++        $this->postJson('/api/send-verification-code', ['telephone' => '771110021'])->assertOk();
++    }
++
++    public function test_cinq_sms_maximum_par_numero_et_par_jour(): void
++    {
++        // 5 envois aujourd'hui + 1 demain ; le 6e du jour n'atteint pas Orange.
++        $this->smsReussis(6);
++
++        for ($i = 0; $i < 5; $i++) {
++            $this->postJson('/api/send-verification-code', ['telephone' => '771110022'])->assertOk();
++            $this->travel(61)->seconds();
++        }
++
++        $this->postJson('/api/send-verification-code', ['telephone' => '771110022'])
++            ->assertStatus(429)
++            ->assertJsonPath('message', 'Nombre maximal de codes atteint pour ce numéro. Réessayez demain.');
++
++        // Le lendemain, le numéro peut à nouveau recevoir un code.
++        $this->travel(1)->days();
++        $this->postJson('/api/send-verification-code', ['telephone' => '771110022'])->assertOk();
++    }
++
++    public function test_le_plafond_global_suspend_les_envois(): void
++    {
++        config(['otp.max_global_par_jour' => 2]);
++        $this->smsReussis(2);
++
++        $this->postJson('/api/send-verification-code', ['telephone' => '771110023'])->assertOk();
++        $this->postJson('/api/send-verification-code', ['telephone' => '771110024'])->assertOk();
++        $this->postJson('/api/send-verification-code', ['telephone' => '771110025'])
++            ->assertStatus(503)
++            ->assertJson(['success' => false]);
++
++        $this->assertDatabaseMissing('user_verification_codes', ['phone' => '771110025']);
++    }
++
++    public function test_seuls_les_mobiles_senegalais_recoivent_un_sms(): void
++    {
++        $sms = Mockery::mock(OrangeSmsService::class);
++        $sms->shouldNotReceive('sendSms');
++        $this->app->instance(OrangeSmsService::class, $sms);
++
++        foreach (['331234567', '701234', '791234567', '601234567'] as $numero) {
++            $this->postJson('/api/send-verification-code', ['telephone' => $numero])->assertStatus(422);
++        }
++    }
++}
