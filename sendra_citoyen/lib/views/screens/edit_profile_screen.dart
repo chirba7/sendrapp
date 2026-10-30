@@ -1,5 +1,5 @@
 import 'dart:convert';
-import 'dart:io';
+
 
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -140,7 +140,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final image = _photo != null
-        ? providerPhoto(_photo!) as ImageProvider
+        ? providerPhoto(_photo!)
         : (_photoUrl != null && _photoUrl!.isNotEmpty
             ? photoReseauProvider(_photoUrl!)
             : null);

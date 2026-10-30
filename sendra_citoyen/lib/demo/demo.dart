@@ -91,7 +91,7 @@ class _DemoGeolocator extends GeolocatorPlatform {
 class _DemoGeocoding extends GeocodingPlatform {
   @override
   Future<List<Placemark>> placemarkFromCoordinates(double latitude, double longitude) async => [
-        Placemark(
+        const Placemark(
           street: 'Rue 11 × Avenue Blaise Diagne',
           subLocality: 'Médina',
           locality: 'Dakar',
@@ -316,7 +316,7 @@ class _Serveur {
   void _graines() {
     final j = DateTime(2026, 10, 29, 9, 41);
     DateTime il(int jours, int h, int m) => DateTime(j.year, j.month, j.day - jours, h, m);
-    final citoyen = AppBrand.isPro ? _citoyenAutre : _citoyenMoi;
+    const citoyen = AppBrand.isPro ? _citoyenAutre : _citoyenMoi;
     _sigs.addAll([
       _sig(1088, 'Voiture', 'Hyundai', 'H100', 'DK-5502-AH', 'Ouakam', 'Cité Avion, rue OKM-12', 'SIGNALE', il(0, 7, 48), dLat: .012, dLng: -.03, desc: 'Fourgon abandonné, pneus à plat.'),
       _sig(1087, 'Voiture', 'Mitsubishi', 'L200', 'DK-2658-AH', 'Cambérène', 'Cambérène 2', 'SIGNALE', il(0, 6, 55), dLat: .07, dLng: .02),

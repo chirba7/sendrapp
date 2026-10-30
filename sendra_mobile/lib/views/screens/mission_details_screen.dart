@@ -1,4 +1,4 @@
-import 'dart:io';
+
 
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
@@ -549,7 +549,7 @@ class _MissionDetailsScreenState extends State<MissionDetailsScreen> {
       statut: notRemoved
           ? ('Non enlevé', SendraTheme.amber)
           : done
-              ? (removal?.sheetPhotoUrl == null
+              ? (removal.sheetPhotoUrl == null
                   ? ('Enlevé · fiche manquante', SendraTheme.amber)
                   : ('Enlevé', SendraTheme.green))
               : ('À enlever', _bleu),
