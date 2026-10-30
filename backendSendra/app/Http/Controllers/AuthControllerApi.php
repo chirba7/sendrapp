@@ -112,15 +112,14 @@ class AuthControllerApi extends Controller
     {
         // Correction API-C-5 : idem checkPhone(), clé statique retirée au
         // profit du throttling de route.
-        // Correction sécurité (29/10/2026) : seuls les mobiles sénégalais
-        // (70, 75, 76, 77, 78) reçoivent un SMS, et l'envoi est plafonné par
-        // numéro et globalement (config/otp.php) — la limite par IP seule
-        // laissait envoyer des milliers de SMS payants vers des numéros
-        // différents.
+        // Correction sécurité (29/10/2026) : l'envoi est plafonné par numéro
+        // et globalement (config/otp.php) — la limite par IP seule laissait
+        // envoyer des milliers de SMS payants vers des numéros différents.
+        // Le SMS part toujours vers +221 : un numéro étranger ne passe pas.
         $request->validate([
             'telephone' => ['required', 'regex:'.config('otp.format_numero')],
         ], [
-            'telephone.regex' => 'Le numéro doit être un mobile sénégalais à 9 chiffres (70, 75, 76, 77 ou 78).',
+            'telephone.regex' => 'Le numéro doit comporter 9 chiffres, sans l’indicatif +221.',
         ]);
 
         $telephone = $request->telephone;

@@ -35,7 +35,8 @@ return [
     // est journalisée. À ajuster au trafic réel.
     'max_global_par_jour' => (int) env('OTP_MAX_GLOBAL_PAR_JOUR', 500),
 
-    // Préfixes mobiles sénégalais (70, 75, 76, 77, 78) : seuls numéros
-    // capables de recevoir un SMS.
-    'format_numero' => '/^7[05678]\d{7}$/',
+    // Numéro à 9 chiffres, sans indicatif : l'app préfixe déjà +221 (écrit
+    // en dur à côté du champ) et le serveur envoie toujours vers 221 + numéro.
+    // Aucune restriction de préfixe : les plans de numérotation évoluent.
+    'format_numero' => '/^\d{9}$/',
 ];

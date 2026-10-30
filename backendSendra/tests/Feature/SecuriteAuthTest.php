@@ -230,14 +230,24 @@ class SecuriteAuthTest extends TestCase
         $this->assertDatabaseMissing('user_verification_codes', ['phone' => '771110025']);
     }
 
-    public function test_seuls_les_mobiles_senegalais_recoivent_un_sms(): void
+    public function test_le_numero_doit_avoir_neuf_chiffres_sans_indicatif(): void
     {
         $sms = Mockery::mock(OrangeSmsService::class);
         $sms->shouldNotReceive('sendSms');
         $this->app->instance(OrangeSmsService::class, $sms);
 
-        foreach (['331234567', '701234', '791234567', '601234567'] as $numero) {
+        foreach (['701234', '2217712345678', '+221771234567', '77 123 45 67', '7712345678'] as $numero) {
             $this->postJson('/api/send-verification-code', ['telephone' => $numero])->assertStatus(422);
         }
+    }
+
+    public function test_aucun_prefixe_n_est_refuse(): void
+    {
+        $sms = Mockery::mock(OrangeSmsService::class);
+        $sms->shouldReceive('sendSms')->with(Mockery::any(), Mockery::any(), '221711234567', Mockery::any())
+            ->once()->andReturn(['success' => true]);
+        $this->app->instance(OrangeSmsService::class, $sms);
+
+        $this->postJson('/api/send-verification-code', ['telephone' => '711234567'])->assertOk();
     }
 }
