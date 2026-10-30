@@ -17,6 +17,8 @@ use Illuminate\Validation\Rule;
 
 class MissionController extends Controller
 {
+    private const JOURS_MISSIONS_TERMINEES = 30;
+
     public function index(Request $request): JsonResponse
     {
         $userId = $request->user()->id;
@@ -28,12 +30,20 @@ class MissionController extends Controller
                         $direct->where('type', 'brute')->doesntHave('agents');
                     });
             })
+            // Correction perf (29/10/2026) : les photos des véhicules étaient
+            // relues une par une (une requête par véhicule de chaque mission) ;
+            // elles sont chargées d'avance.
             ->with([
                 'agents' => fn ($query) => $query->where('users.id', $userId),
-                'commune', 'trucks', 'vehicles', 'removals.photos', 'removals.vehicle',
+                'commune', 'trucks', 'vehicles.photo', 'removals.photos', 'removals.vehicle.photo',
                 'removals.dispatch', 'removals.reception', 'dispatches', 'receptionAgent', 'receptionPound',
             ])
             ->whereNotIn('status', ['brouillon', 'annulee'])
+            // Les missions terminées depuis plus de 30 jours ne sont plus
+            // renvoyées : la liste grossissait sans fin. Toujours consultables
+            // une à une par GET /missions/{id}.
+            ->where(fn ($q) => $q->whereNull('completed_at')
+                ->orWhere('completed_at', '>=', now()->subDays(self::JOURS_MISSIONS_TERMINEES)))
             ->orderByRaw('scheduled_at IS NULL, scheduled_at')
             ->get()->map(fn (Mission $mission) => $this->serializeForAgent($mission));
 

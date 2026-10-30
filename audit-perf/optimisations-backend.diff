@@ -1,0 +1,523 @@
+--- /tmp/claude-0/-home-claude/9570022f-2924-5cbb-89b2-963b3de66ea3/scratchpad/orig2/be/app/Support/HistoriqueSignalement.php	2026-10-23 11:09:56.000000000 +0000
++++ app/Support/HistoriqueSignalement.php	2026-10-30 09:55:39.389996527 +0000
+@@ -60,18 +60,66 @@
+      */
+     public static function pour(CarPosition $carPosition): array
+     {
++        // Préchargé par precharger() : aucune requête de plus.
++        if ($carPosition->relationLoaded(self::RELATION)) {
++            return $carPosition->getRelation(self::RELATION);
++        }
++
+         return DB::table('signalement_status_history')
+             ->where('car_position_id', $carPosition->id)
+             ->orderBy('created_at')
+             ->orderBy('id')
+             ->get(['event', 'etat', 'is_approve', 'motif', 'created_at'])
+-            ->map(fn ($l) => [
+-                'event' => $l->event,
+-                'libelle' => self::LIBELLES[$l->event] ?? $l->event,
+-                'etat' => $l->etat,
+-                'motif' => $l->motif,
+-                'date' => $l->created_at,
+-            ])
++            ->map(fn ($l) => self::ligne($l))
+             ->all();
+     }
++
++    /**
++     * Correction perf (audit du 29/10/2026) : SignalementRessource appelait
++     * pour() une fois par signalement — jusqu'à 201 requêtes pour un
++     * citoyen qui ouvre l'app (voirSignalements, 200 lignes). Une seule
++     * requête pour toute la liste ; le résultat est rangé sur chaque modèle
++     * et pour() le relit. Même contenu, même ordre qu'avant.
++     *
++     * @param  iterable<CarPosition>  $signalements
++     */
++    public static function precharger(iterable $signalements): void
++    {
++        $parId = [];
++        foreach ($signalements as $s) {
++            $parId[$s->id] = $s;
++        }
++        if (!$parId) {
++            return;
++        }
++
++        $lignes = [];
++        foreach (array_chunk(array_keys($parId), 500) as $ids) {
++            DB::table('signalement_status_history')
++                ->whereIn('car_position_id', $ids)
++                ->orderBy('created_at')
++                ->orderBy('id')
++                ->get(['car_position_id', 'event', 'etat', 'is_approve', 'motif', 'created_at'])
++                ->each(function ($l) use (&$lignes) {
++                    $lignes[$l->car_position_id][] = self::ligne($l);
++                });
++        }
++
++        foreach ($parId as $id => $s) {
++            $s->setRelation(self::RELATION, $lignes[$id] ?? []);
++        }
++    }
++
++    private const RELATION = 'historique_precharge';
++
++    private static function ligne(object $l): array
++    {
++        return [
++            'event' => $l->event,
++            'libelle' => self::LIBELLES[$l->event] ?? $l->event,
++            'etat' => $l->etat,
++            'motif' => $l->motif,
++            'date' => $l->created_at,
++        ];
++    }
+ }
+--- /tmp/claude-0/-home-claude/9570022f-2924-5cbb-89b2-963b3de66ea3/scratchpad/orig2/be/app/Http/Controllers/CarPositionController.php	2026-10-23 11:50:51.000000000 +0000
++++ app/Http/Controllers/CarPositionController.php	2026-10-30 09:56:06.772079233 +0000
+@@ -9,7 +9,9 @@
+ use App\Models\CarPosition;
+ use App\Support\HistoriqueSignalement;
+ use App\Support\ImageOptimizer;
++use Illuminate\Http\Request;
+ use Illuminate\Support\Facades\Auth;
++use Illuminate\Support\Facades\Cache;
+ use Illuminate\Support\Facades\DB;
+ use Illuminate\Support\Facades\Storage;
+ 
+@@ -109,6 +111,7 @@
+         }
+ 
+         HistoriqueSignalement::enregistrer($carPosition, 'cree');
++        self::oublierCacheCommunaute();
+ 
+         return response()->json(['message' => 'Signalisation effectuée avec succès'], 200);
+     }
+@@ -120,6 +123,7 @@
+     {
+         $carPosition->is_deleted = true;
+         $carPosition->update();
++        self::oublierCacheCommunaute();
+ 
+         return response()->json(['Signalisation supprimée avec success']);
+     }
+@@ -133,11 +137,15 @@
+         // changer le format de réponse (pas de pagination ici, pour rester
+         // compatible avec l'app mobile qui traite ce endpoint comme un
+         // tableau brut, contrairement à listerSignalements).
++        // Correction perf (29/10/2026) : 'agent' chargé d'avance (nom de
++        // l'agent pour le personnel) et historique préchargé en une requête,
++        // au lieu d'une requête par signalement (jusqu'à 201 par appel).
+         $signalement = CarPosition::where([['user_id', Auth::user()->id], ['is_deleted', false]])
+-            ->with('photo')
++            ->with(['photo', 'agent'])
+             ->orderBy('created_at', 'desc')
+             ->limit(200)
+             ->get();
++        HistoriqueSignalement::precharger($signalement);
+         // return response()->json($signalement);
+         return response()->json(SignalementRessource::collection($signalement));
+     }
+@@ -149,6 +157,7 @@
+             ->with(['photo', 'agent'])
+             ->orderBy('created_at', 'desc')
+             ->paginate(10);
++        HistoriqueSignalement::precharger($signalement->getCollection());
+         // dd($signalement);
+         // return response()->json($signalement);
+         return SignalementRessource::collection($signalement);
+@@ -186,15 +195,46 @@
+      * précise, ni historique, ni identité de l'auteur — seulement de quoi
+      * savoir qu'un véhicule est déjà signalé et où en est son traitement.
+      */
+-    public function signalementsCommunaute()
++    public function signalementsCommunaute(Request $request)
+     {
+-        $signalements = CarPosition::where('is_deleted', false)
+-            ->with('photo')
+-            ->orderBy('created_at', 'desc')
+-            ->limit(300)
+-            ->get();
++        // Correction perf (29/10/2026) : la liste est la même pour tous les
++        // citoyens et l'app la relit à chaque ouverture de l'onglet « Autres »
++        // ou de la carte. Elle est mise en cache 60 s (vidée à chaque nouveau
++        // signalement) ; seul `est_mien` dépend de l'appelant, il est calculé
++        // après le cache à partir de l'auteur, qui n'est jamais renvoyé.
++        // La clé porte l'hôte appelé (image_url en dépend) et un numéro de
++        // version, incrémenté pour invalider sans connaître tous les hôtes.
++        $cle = self::CLE_CACHE_COMMUNAUTE.':v'.(int) Cache::get(self::CLE_CACHE_COMMUNAUTE.':version', 0)
++            .':'.$request->getSchemeAndHttpHost();
++        $lignes = Cache::remember($cle, self::DUREE_CACHE_COMMUNAUTE, function () use ($request) {
++            $signalements = CarPosition::where('is_deleted', false)
++                ->with('photo')
++                ->orderBy('created_at', 'desc')
++                ->limit(300)
++                ->get();
++
++            return $signalements->map(fn ($s) => [
++                'auteur' => (int) $s->user_id,
++                'donnees' => (new SignalementPublicRessource($s))->toArray($request),
++            ])->all();
++        });
++
++        $moi = (int) Auth::id();
++
++        return response()->json(array_map(
++            fn ($l) => array_merge($l['donnees'], ['est_mien' => $l['auteur'] === $moi]),
++            $lignes
++        ));
++    }
++
++    public const CLE_CACHE_COMMUNAUTE = 'signalements-communaute';
++    private const DUREE_CACHE_COMMUNAUTE = 60;
+ 
+-        return response()->json(SignalementPublicRessource::collection($signalements));
++    /** Invalide la liste publique en cache (nouvelle version de clé). */
++    public static function oublierCacheCommunaute(): void
++    {
++        $cle = self::CLE_CACHE_COMMUNAUTE.':version';
++        Cache::forever($cle, (int) Cache::get($cle, 0) + 1);
+     }
+ 
+     public function listerSignalement(CarPosition $carPosition)
+--- /tmp/claude-0/-home-claude/9570022f-2924-5cbb-89b2-963b3de66ea3/scratchpad/orig2/be/app/Http/Controllers/MissionController.php	2026-10-29 09:45:11.000000000 +0000
++++ app/Http/Controllers/MissionController.php	2026-10-30 09:56:29.376068826 +0000
+@@ -17,6 +17,8 @@
+ 
+ class MissionController extends Controller
+ {
++    private const JOURS_MISSIONS_TERMINEES = 30;
++
+     public function index(Request $request): JsonResponse
+     {
+         $userId = $request->user()->id;
+@@ -28,12 +30,20 @@
+                         $direct->where('type', 'brute')->doesntHave('agents');
+                     });
+             })
++            // Correction perf (29/10/2026) : les photos des véhicules étaient
++            // relues une par une (une requête par véhicule de chaque mission) ;
++            // elles sont chargées d'avance.
+             ->with([
+                 'agents' => fn ($query) => $query->where('users.id', $userId),
+-                'commune', 'trucks', 'vehicles', 'removals.photos', 'removals.vehicle',
++                'commune', 'trucks', 'vehicles.photo', 'removals.photos', 'removals.vehicle.photo',
+                 'removals.dispatch', 'removals.reception', 'dispatches', 'receptionAgent', 'receptionPound',
+             ])
+             ->whereNotIn('status', ['brouillon', 'annulee'])
++            // Les missions terminées depuis plus de 30 jours ne sont plus
++            // renvoyées : la liste grossissait sans fin. Toujours consultables
++            // une à une par GET /missions/{id}.
++            ->where(fn ($q) => $q->whereNull('completed_at')
++                ->orWhere('completed_at', '>=', now()->subDays(self::JOURS_MISSIONS_TERMINEES)))
+             ->orderByRaw('scheduled_at IS NULL, scheduled_at')
+             ->get()->map(fn (Mission $mission) => $this->serializeForAgent($mission));
+ 
+--- /tmp/claude-0/-home-claude/9570022f-2924-5cbb-89b2-963b3de66ea3/scratchpad/orig2/be/app/Http/Controllers/DommagesController.php	2026-10-23 11:09:56.000000000 +0000
++++ app/Http/Controllers/DommagesController.php	2026-10-30 09:56:21.576380710 +0000
+@@ -25,7 +25,7 @@
+         // ~15M caractères ≈ 11 Mo décodés, largement suffisant pour une
+         // signature/composite dessiné(e) sur une image de constatation.
+         $request->validate([
+-            'signature' => 'required|string|max:15000000',
++            'signature' => 'required|string|max:5000000', // comme la signature du PV (29/10/2026)
+             'pieces_manquantes' => 'nullable|string|max:2000',
+         ]);
+ 
+--- /tmp/claude-0/-home-claude/9570022f-2924-5cbb-89b2-963b3de66ea3/scratchpad/orig2/be/app/Http/Requests/StoreCarPositionRequest.php	2026-10-23 11:09:56.000000000 +0000
++++ app/Http/Requests/StoreCarPositionRequest.php	2026-10-30 09:56:21.576086556 +0000
+@@ -37,17 +37,20 @@
+             'latitude' => 'required|numeric',
+             'longitude' => 'required|numeric',
+             // Correction perf : aucune limite de taille sur le payload
+-            // base64 entrant. ~15M caractères ≈ 11 Mo décodés.
++            // base64 entrant. Abaissée le 29/10/2026 de 15M à 5,6M caractères
++            // (≈ 4 Mo décodés) : une photo de 1600 px redimensionnée par l'app
++            // pèse moins de 1 Mo, et chaque Mo accepté coûte plusieurs Mo de
++            // RAM côté PHP (texte, binaire, image décompressée par GD).
+             // `image` (une seule photo) : anciennes versions de l'app.
+             // `photos` (une par angle) : app avec mode hors ligne.
+-            'image' => 'required_without:photos|string|max:15000000',
++            'image' => 'required_without:photos|string|max:5600000',
+             'photos' => (int) auth()->user()->role_id === 5
+                 ? 'required_without:image|array|size:1'
+                 : 'required_without:image|array|min:1|max:5',
+             'photos.*.position' => (int) auth()->user()->role_id === 5
+                 ? 'required|string|in:vue_ensemble'
+                 : 'required|string|in:vue_ensemble,devant,derriere,cote_gauche,cote_droit|distinct',
+-            'photos.*.image' => 'required|string|max:15000000',
++            'photos.*.image' => 'required|string|max:5600000',
+             // Clé de déduplication : un envoi rejoué (synchro hors ligne,
+             // réseau instable) ne doit pas créer de doublon.
+             'uuid' => 'nullable|string|max:254',
+--- /dev/null	2026-10-30 03:44:05.965887829 +0000
++++ database/migrations/2026_10_30_000001_add_uuid_index_to_car_positions_table.php	2026-10-30 09:56:37.543297540 +0000
+@@ -0,0 +1,51 @@
++<?php
++
++use Illuminate\Database\Migrations\Migration;
++use Illuminate\Database\Schema\Blueprint;
++use Illuminate\Support\Facades\DB;
++use Illuminate\Support\Facades\Schema;
++
++/**
++ * Correction perf (audit du 29/10/2026) : chaque envoi de signalement vérifie
++ * d'abord qu'il n'est pas un renvoi (`uuid` + `user_id`, synchro hors ligne).
++ * Sans index sur `uuid`, MySQL parcourt tous les signalements du citoyen.
++ * Idempotente sur MySQL (SHOW INDEX), comme 2026_09_02_000002.
++ */
++return new class extends Migration
++{
++    private const INDEX = 'car_positions_uuid_index';
++
++    public function up(): void
++    {
++        if ($this->indexExists()) {
++            return;
++        }
++
++        Schema::table('car_positions', function (Blueprint $table) {
++            $table->index('uuid', self::INDEX);
++        });
++    }
++
++    public function down(): void
++    {
++        if (!$this->indexExists()) {
++            return;
++        }
++
++        Schema::table('car_positions', function (Blueprint $table) {
++            $table->dropIndex(self::INDEX);
++        });
++    }
++
++    private function indexExists(): bool
++    {
++        if (DB::getDriverName() === 'mysql') {
++            return collect(DB::select('SHOW INDEX FROM car_positions WHERE Key_name = ?', [self::INDEX]))->isNotEmpty();
++        }
++        if (DB::getDriverName() === 'sqlite') {
++            return collect(DB::select("SELECT name FROM sqlite_master WHERE type = 'index' AND name = ?", [self::INDEX]))->isNotEmpty();
++        }
++
++        return false;
++    }
++};
+--- /dev/null	2026-10-30 03:44:05.965887829 +0000
++++ tests/Feature/PerformanceRequetesTest.php	2026-10-30 09:58:52.582850547 +0000
+@@ -0,0 +1,213 @@
++<?php
++
++namespace Tests\Feature;
++
++use App\Models\CarPhoto;
++use App\Models\CarPosition;
++use App\Models\Mission;
++use App\Models\User;
++use App\Support\HistoriqueSignalement;
++use Illuminate\Foundation\Testing\RefreshDatabase;
++use Illuminate\Support\Facades\DB;
++use Illuminate\Support\Facades\Schema;
++use Tests\TestCase;
++use Tymon\JWTAuth\Facades\JWTAuth;
++
++/**
++ * Optimisations de l'audit du 29/10/2026 : moins de requêtes SQL, même
++ * contenu de réponse.
++ */
++class PerformanceRequetesTest extends TestCase
++{
++    use RefreshDatabase;
++
++    private array $dernieresRequetes = [];
++
++    private const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
++
++    private function signalements(User $auteur, int $n): void
++    {
++        for ($i = 0; $i < $n; $i++) {
++            $s = CarPosition::factory()->create(['user_id' => $auteur->id, 'is_deleted' => false, 'created_at' => now()->subMinutes($n - $i)]);
++            CarPhoto::forceCreate(['card_id' => $s->id, 'filepath' => "signalement/photo/p{$i}.jpg", 'position' => 'vue_ensemble', 'source' => 'citoyen']);
++            DB::table('signalement_status_history')->insert([
++                ['car_position_id' => $s->id, 'event' => 'cree', 'etat' => 'SIGNALE', 'is_approve' => null, 'motif' => null, 'user_id' => $auteur->id, 'created_at' => now()->subMinutes(10)],
++                ['car_position_id' => $s->id, 'event' => 'pris_en_charge', 'etat' => 'SIGNALE', 'is_approve' => null, 'motif' => "m{$i}", 'user_id' => $auteur->id, 'created_at' => now()->subMinutes(5)],
++            ]);
++        }
++    }
++
++    /** @return array{0: mixed, 1: int} réponse et nombre de requêtes SQL */
++    private function mesurer(callable $appel): array
++    {
++        DB::flushQueryLog();
++        DB::enableQueryLog();
++        $reponse = $appel();
++        $n = count(DB::getQueryLog());
++        $this->dernieresRequetes = array_column(DB::getQueryLog(), 'query');
++        DB::disableQueryLog();
++
++        return [$reponse, $n];
++    }
++
++    // ---------------------------------------------------- 1. historique
++
++    public function test_voir_signalements_ne_fait_plus_une_requete_par_signalement(): void
++    {
++        $citoyen = User::factory()->create(['role_id' => 5]);
++        $this->signalements($citoyen, 25);
++        $entetes = ['Authorization' => 'Bearer '.JWTAuth::fromUser($citoyen)];
++
++        [$r, $requetes] = $this->mesurer(fn () => $this->getJson('/api/voirSignalements', $entetes));
++
++        $r->assertOk()->assertJsonCount(25);
++        // jeton + signalements + photos + agents + historique (et non 25 de plus)
++        $this->assertLessThanOrEqual(6, $requetes, "$requetes requêtes");
++
++        // Même historique qu'une lecture signalement par signalement.
++        foreach ($r->json() as $ligne) {
++            $attendu = HistoriqueSignalement::pour(CarPosition::find($ligne['signalementId']));
++            $this->assertSame(json_decode(json_encode($attendu), true), $ligne['historique']);
++            $this->assertSame(['cree', 'pris_en_charge'], array_column($ligne['historique'], 'event'));
++        }
++    }
++
++    public function test_lister_signalements_du_personnel_precharge_aussi_l_historique(): void
++    {
++        $citoyen = User::factory()->create(['role_id' => 5]);
++        $this->signalements($citoyen, 12);
++        $agent = User::factory()->create(['role_id' => 2]);
++        $entetes = ['Authorization' => 'Bearer '.JWTAuth::fromUser($agent)];
++
++        [$r, $requetes] = $this->mesurer(fn () => $this->getJson('/api/listerSignalements', $entetes));
++
++        $r->assertOk()->assertJsonCount(10, 'data');
++        $this->assertLessThanOrEqual(7, $requetes, "$requetes requêtes");
++        $this->assertSame('m11', $r->json('data.0.historique.1.motif'));
++    }
++
++    // ---------------------------------------------------- 2. cache public
++
++    public function test_la_liste_publique_est_mise_en_cache_et_est_mien_reste_personnel(): void
++    {
++        $alice = User::factory()->create(['role_id' => 5]);
++        $bob = User::factory()->create(['role_id' => 5]);
++        $this->signalements($alice, 3);
++        $hA = ['Authorization' => 'Bearer '.JWTAuth::fromUser($alice)];
++        $hB = ['Authorization' => 'Bearer '.JWTAuth::fromUser($bob)];
++
++        [$r1, $q1] = $this->mesurer(fn () => $this->getJson('/api/signalementsCommunaute', $hA));
++        auth()->guard()->forgetUser();
++        [$r2, $q2] = $this->mesurer(fn () => $this->getJson('/api/signalementsCommunaute', $hB));
++
++        $r1->assertOk()->assertJsonCount(3);
++        $this->assertTrue($r1->json('0.est_mien'));
++        $this->assertFalse($r2->json('0.est_mien'));
++        // Second appel : plus aucune lecture des signalements ni des photos,
++        // seulement l'utilisateur du jeton.
++        $this->assertSame([], array_values(array_filter($this->dernieresRequetes,
++            fn ($q) => str_contains($q, 'car_positions') || str_contains($q, 'car_photos'))));
++        $this->assertGreaterThan($q2, $q1);
++
++        // Jamais l'auteur dans la réponse, mêmes clés qu'avant.
++        $this->assertSame(
++            ['signalementId', 'latitude', 'longitude', 'titre', 'vehicle_kind', 'commune', 'etat', 'formatted_date', 'image_url', 'est_mien', 'public', 'avancement'],
++            array_keys($r2->json('0'))
++        );
++    }
++
++    public function test_un_nouveau_signalement_vide_le_cache(): void
++    {
++        $alice = User::factory()->create(['role_id' => 5]);
++        $bob = User::factory()->create(['role_id' => 5]);
++        $this->signalements($alice, 2);
++        $hB = ['Authorization' => 'Bearer '.JWTAuth::fromUser($bob)];
++
++        $this->getJson('/api/signalementsCommunaute', $hB)->assertJsonCount(2);
++
++        $this->postJson('/api/faireSignalement', [
++            'vehicle_kind' => 'Voiture', 'latitude' => 14.7, 'longitude' => -17.4,
++            'photos' => [['position' => 'vue_ensemble', 'image' => self::PNG]],
++        ], $hB)->assertOk();
++
++        auth()->guard()->forgetUser();
++        $this->getJson('/api/signalementsCommunaute', $hB)->assertJsonCount(3)->assertJsonPath('0.est_mien', true);
++    }
++
++    // ---------------------------------------------------- 3. taille des photos
++
++    public function test_une_photo_de_plus_de_4_mo_est_refusee(): void
++    {
++        $citoyen = User::factory()->create(['role_id' => 5]);
++        $h = ['Authorization' => 'Bearer '.JWTAuth::fromUser($citoyen)];
++
++        $this->postJson('/api/faireSignalement', [
++            'vehicle_kind' => 'Voiture', 'latitude' => 14.7, 'longitude' => -17.4,
++            'photos' => [['position' => 'vue_ensemble', 'image' => str_repeat('A', 5600001)]],
++        ], $h)->assertJsonPath('errorList.0', null)->assertJsonStructure(['errorList' => ['photos.0.image']]);
++
++        $this->assertSame(0, CarPosition::count());
++    }
++
++    // ---------------------------------------------------- 4. missions
++
++    private function mission(User $agent, array $attributs, int $vehicules): Mission
++    {
++        $m = Mission::forceCreate(array_merge([
++            'title' => 'M', 'type' => 'brute', 'status' => 'en_cours', 'scheduled_at' => now(),
++            'address' => 'Yoff', 'latitude' => 14.7, 'longitude' => -17.4, 'created_by' => $agent->id,
++        ], $attributs));
++        $m->agents()->attach($agent->id, ['checked_in_at' => now()]);
++        $citoyen = User::factory()->create(['role_id' => 5]);
++        for ($i = 0; $i < $vehicules; $i++) {
++            $s = CarPosition::factory()->create(['user_id' => $citoyen->id]);
++            CarPhoto::forceCreate(['card_id' => $s->id, 'filepath' => "p{$i}.jpg", 'position' => 'vue_ensemble', 'source' => 'citoyen']);
++            $m->vehicles()->attach($s->id);
++        }
++
++        return $m;
++    }
++
++    public function test_missions_photos_chargees_d_avance_et_vieilles_missions_terminees_masquees(): void
++    {
++        $agent = User::factory()->create(['role_id' => 2]);
++        $h = ['Authorization' => 'Bearer '.JWTAuth::fromUser($agent)];
++
++        $enCours = $this->mission($agent, [], 2);
++        $recente = $this->mission($agent, ['status' => 'terminee', 'completed_at' => now()->subDays(10)], 1);
++        $vieille = $this->mission($agent, ['status' => 'terminee', 'completed_at' => now()->subDays(40)], 1);
++
++        [$r, $avec2] = $this->mesurer(fn () => $this->getJson('/api/missions', $h));
++        $ids = array_column($r->assertOk()->json('data'), 'id');
++        $this->assertContains($enCours->id, $ids);
++        $this->assertContains($recente->id, $ids);
++        $this->assertNotContains($vieille->id, $ids);
++        $m = collect($r->json('data'))->firstWhere('id', $enCours->id);
++        $this->assertCount(2, $m['vehicles']);
++        $this->assertCount(1, $m['vehicles'][0]['photos_signalement']);
++        $this->assertNotNull($m['vehicles'][0]['thumbnail_url']);
++
++        // Dix véhicules de plus : le nombre de requêtes ne bouge pas.
++        $citoyen = User::factory()->create(['role_id' => 5]);
++        for ($i = 0; $i < 10; $i++) {
++            $s = CarPosition::factory()->create(['user_id' => $citoyen->id]);
++            CarPhoto::forceCreate(['card_id' => $s->id, 'filepath' => "q{$i}.jpg", 'position' => 'vue_ensemble', 'source' => 'citoyen']);
++            $enCours->vehicles()->attach($s->id);
++        }
++        auth()->guard()->forgetUser();
++        [, $avec12] = $this->mesurer(fn () => $this->getJson('/api/missions', $h));
++        $this->assertSame($avec2, $avec12, "$avec2 requêtes avant, $avec12 après");
++
++        // La vieille mission reste consultable une à une.
++        $this->getJson("/api/missions/{$vieille->id}", $h)->assertOk();
++    }
++
++    // ---------------------------------------------------- 6. index
++
++    public function test_index_sur_uuid(): void
++    {
++        $index = collect(DB::select("SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'car_positions'"))->pluck('name');
++        $this->assertContains('car_positions_uuid_index', $index);
++        $this->assertTrue(Schema::hasColumn('car_positions', 'uuid'));
++    }
++}

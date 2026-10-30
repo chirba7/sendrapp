@@ -9,7 +9,9 @@ use App\Models\CarPhoto;
 use App\Models\CarPosition;
 use App\Support\HistoriqueSignalement;
 use App\Support\ImageOptimizer;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 
@@ -109,6 +111,7 @@ class CarPositionController extends Controller
         }
 
         HistoriqueSignalement::enregistrer($carPosition, 'cree');
+        self::oublierCacheCommunaute();
 
         return response()->json(['message' => 'Signalisation effectuée avec succès'], 200);
     }
@@ -120,6 +123,7 @@ class CarPositionController extends Controller
     {
         $carPosition->is_deleted = true;
         $carPosition->update();
+        self::oublierCacheCommunaute();
 
         return response()->json(['Signalisation supprimée avec success']);
     }
@@ -133,11 +137,15 @@ class CarPositionController extends Controller
         // changer le format de réponse (pas de pagination ici, pour rester
         // compatible avec l'app mobile qui traite ce endpoint comme un
         // tableau brut, contrairement à listerSignalements).
+        // Correction perf (29/10/2026) : 'agent' chargé d'avance (nom de
+        // l'agent pour le personnel) et historique préchargé en une requête,
+        // au lieu d'une requête par signalement (jusqu'à 201 par appel).
         $signalement = CarPosition::where([['user_id', Auth::user()->id], ['is_deleted', false]])
-            ->with('photo')
+            ->with(['photo', 'agent'])
             ->orderBy('created_at', 'desc')
             ->limit(200)
             ->get();
+        HistoriqueSignalement::precharger($signalement);
         // return response()->json($signalement);
         return response()->json(SignalementRessource::collection($signalement));
     }
@@ -149,6 +157,7 @@ class CarPositionController extends Controller
             ->with(['photo', 'agent'])
             ->orderBy('created_at', 'desc')
             ->paginate(10);
+        HistoriqueSignalement::precharger($signalement->getCollection());
         // dd($signalement);
         // return response()->json($signalement);
         return SignalementRessource::collection($signalement);
@@ -186,15 +195,46 @@ class CarPositionController extends Controller
      * précise, ni historique, ni identité de l'auteur — seulement de quoi
      * savoir qu'un véhicule est déjà signalé et où en est son traitement.
      */
-    public function signalementsCommunaute()
+    public function signalementsCommunaute(Request $request)
     {
-        $signalements = CarPosition::where('is_deleted', false)
-            ->with('photo')
-            ->orderBy('created_at', 'desc')
-            ->limit(300)
-            ->get();
+        // Correction perf (29/10/2026) : la liste est la même pour tous les
+        // citoyens et l'app la relit à chaque ouverture de l'onglet « Autres »
+        // ou de la carte. Elle est mise en cache 60 s (vidée à chaque nouveau
+        // signalement) ; seul `est_mien` dépend de l'appelant, il est calculé
+        // après le cache à partir de l'auteur, qui n'est jamais renvoyé.
+        // La clé porte l'hôte appelé (image_url en dépend) et un numéro de
+        // version, incrémenté pour invalider sans connaître tous les hôtes.
+        $cle = self::CLE_CACHE_COMMUNAUTE.':v'.(int) Cache::get(self::CLE_CACHE_COMMUNAUTE.':version', 0)
+            .':'.$request->getSchemeAndHttpHost();
+        $lignes = Cache::remember($cle, self::DUREE_CACHE_COMMUNAUTE, function () use ($request) {
+            $signalements = CarPosition::where('is_deleted', false)
+                ->with('photo')
+                ->orderBy('created_at', 'desc')
+                ->limit(300)
+                ->get();
 
-        return response()->json(SignalementPublicRessource::collection($signalements));
+            return $signalements->map(fn ($s) => [
+                'auteur' => (int) $s->user_id,
+                'donnees' => (new SignalementPublicRessource($s))->toArray($request),
+            ])->all();
+        });
+
+        $moi = (int) Auth::id();
+
+        return response()->json(array_map(
+            fn ($l) => array_merge($l['donnees'], ['est_mien' => $l['auteur'] === $moi]),
+            $lignes
+        ));
+    }
+
+    public const CLE_CACHE_COMMUNAUTE = 'signalements-communaute';
+    private const DUREE_CACHE_COMMUNAUTE = 60;
+
+    /** Invalide la liste publique en cache (nouvelle version de clé). */
+    public static function oublierCacheCommunaute(): void
+    {
+        $cle = self::CLE_CACHE_COMMUNAUTE.':version';
+        Cache::forever($cle, (int) Cache::get($cle, 0) + 1);
     }
 
     public function listerSignalement(CarPosition $carPosition)

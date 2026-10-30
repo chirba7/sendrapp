@@ -90,16 +90,20 @@
 
     /* --------------------------- Initialize Markers --------------------------- */
     function initMarkers() {
-        const initialMarkers = <?php echo json_encode($initialMarkers); ?>;
-        console.log(initialMarkers);
+        const initialMarkers = <?php echo json_encode($initialMarkers, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+        // Le titre est saisi par le citoyen : échappé avant d'entrer dans le
+        // HTML de la bulle (sinon un titre piégé s'exécute chez l'admin).
+        const echapper = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => ({
+            '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+        })[c]);
         for (let index = 0; index < initialMarkers.length; index++) {
             const data = initialMarkers[index];
             const marker = generateMarker(data, index);
             const baseUrl = "{{ config('services.backend.storage_url') }}";
-            const imageUrl = baseUrl + "/" + data.image;
+            const imageUrl = baseUrl + "/" + encodeURI(data.image ?? '');
             const popupContent = `
                 <div class="square-popup">
-                    <b>${data.titre}</b>
+                    <b>${echapper(data.titre)}</b>
                     <br>
                     <img src="${imageUrl}" alt="Marker Image" style="width: 230px; height: 230px">
                 </div>

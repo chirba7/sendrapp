@@ -60,18 +60,66 @@ class HistoriqueSignalement
      */
     public static function pour(CarPosition $carPosition): array
     {
+        // Préchargé par precharger() : aucune requête de plus.
+        if ($carPosition->relationLoaded(self::RELATION)) {
+            return $carPosition->getRelation(self::RELATION);
+        }
+
         return DB::table('signalement_status_history')
             ->where('car_position_id', $carPosition->id)
             ->orderBy('created_at')
             ->orderBy('id')
             ->get(['event', 'etat', 'is_approve', 'motif', 'created_at'])
-            ->map(fn ($l) => [
-                'event' => $l->event,
-                'libelle' => self::LIBELLES[$l->event] ?? $l->event,
-                'etat' => $l->etat,
-                'motif' => $l->motif,
-                'date' => $l->created_at,
-            ])
+            ->map(fn ($l) => self::ligne($l))
             ->all();
+    }
+
+    /**
+     * Correction perf (audit du 29/10/2026) : SignalementRessource appelait
+     * pour() une fois par signalement — jusqu'à 201 requêtes pour un
+     * citoyen qui ouvre l'app (voirSignalements, 200 lignes). Une seule
+     * requête pour toute la liste ; le résultat est rangé sur chaque modèle
+     * et pour() le relit. Même contenu, même ordre qu'avant.
+     *
+     * @param  iterable<CarPosition>  $signalements
+     */
+    public static function precharger(iterable $signalements): void
+    {
+        $parId = [];
+        foreach ($signalements as $s) {
+            $parId[$s->id] = $s;
+        }
+        if (!$parId) {
+            return;
+        }
+
+        $lignes = [];
+        foreach (array_chunk(array_keys($parId), 500) as $ids) {
+            DB::table('signalement_status_history')
+                ->whereIn('car_position_id', $ids)
+                ->orderBy('created_at')
+                ->orderBy('id')
+                ->get(['car_position_id', 'event', 'etat', 'is_approve', 'motif', 'created_at'])
+                ->each(function ($l) use (&$lignes) {
+                    $lignes[$l->car_position_id][] = self::ligne($l);
+                });
+        }
+
+        foreach ($parId as $id => $s) {
+            $s->setRelation(self::RELATION, $lignes[$id] ?? []);
+        }
+    }
+
+    private const RELATION = 'historique_precharge';
+
+    private static function ligne(object $l): array
+    {
+        return [
+            'event' => $l->event,
+            'libelle' => self::LIBELLES[$l->event] ?? $l->event,
+            'etat' => $l->etat,
+            'motif' => $l->motif,
+            'date' => $l->created_at,
+        ];
     }
 }

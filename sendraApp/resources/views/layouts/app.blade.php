@@ -18,7 +18,10 @@
         @livewireStyles
     </head>
     <body class="font-sans antialiased">
-        <x-banner />
+        {{-- <x-banner /> retiré le 30/10/2026 : composant Jetstream jamais publié
+             dans ce projet, il faisait échouer `php artisan view:cache`. Ce
+             gabarit n'est utilisé par aucune page (seul AppLayout le
+             référence, et aucune vue n'appelle <x-app-layout>). --}}
 
         <div class="min-h-screen bg-gray-100">
             @livewire('navigation-menu')

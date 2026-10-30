@@ -1,0 +1,113 @@
+--- /tmp/claude-0/-home-claude/9570022f-2924-5cbb-89b2-963b3de66ea3/scratchpad/orig2/sa/app/Http/Controllers/CarPositionController.php	2026-10-26 13:15:56.000000000 +0000
++++ app/Http/Controllers/CarPositionController.php	2026-10-30 10:00:39.098709414 +0000
+@@ -97,7 +97,14 @@
+      */
+     public function maps()
+     {
+-        $signalement = CarPosition::with('photo')->get();
++        // Correction perf (audit du 29/10/2026) : toute la table était chargée,
++        // signalements supprimés compris, avec toutes les colonnes et toutes
++        // les photos. La carte n'affiche que les signalements visibles, et
++        // SignalementRessource n'utilise que ces colonnes et la 1re photo.
++        $signalement = CarPosition::where('is_deleted', false)
++            ->select(['id', 'latitude', 'longitude', 'title', 'commune', 'etat', 'created_at'])
++            ->with(['photo' => fn ($q) => $q->select(['id', 'card_id', 'filepath'])->orderBy('id')])
++            ->get();
+         $initialMarkers = SignalementRessource::collection($signalement);
+         return view('carPosition.map', compact('initialMarkers'));
+     }
+--- /tmp/claude-0/-home-claude/9570022f-2924-5cbb-89b2-963b3de66ea3/scratchpad/orig2/sa/resources/views/carPosition/map.blade.php	2026-08-12 16:29:50.000000000 +0000
++++ resources/views/carPosition/map.blade.php	2026-10-30 10:11:32.835250938 +0000
+@@ -90,16 +90,20 @@
+ 
+     /* --------------------------- Initialize Markers --------------------------- */
+     function initMarkers() {
+-        const initialMarkers = <?php echo json_encode($initialMarkers); ?>;
+-        console.log(initialMarkers);
++        const initialMarkers = <?php echo json_encode($initialMarkers, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
++        // Le titre est saisi par le citoyen : échappé avant d'entrer dans le
++        // HTML de la bulle (sinon un titre piégé s'exécute chez l'admin).
++        const echapper = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => ({
++            '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
++        })[c]);
+         for (let index = 0; index < initialMarkers.length; index++) {
+             const data = initialMarkers[index];
+             const marker = generateMarker(data, index);
+             const baseUrl = "{{ config('services.backend.storage_url') }}";
+-            const imageUrl = baseUrl + "/" + data.image;
++            const imageUrl = baseUrl + "/" + encodeURI(data.image ?? '');
+             const popupContent = `
+                 <div class="square-popup">
+-                    <b>${data.titre}</b>
++                    <b>${echapper(data.titre)}</b>
+                     <br>
+                     <img src="${imageUrl}" alt="Marker Image" style="width: 230px; height: 230px">
+                 </div>
+--- /tmp/claude-0/-home-claude/9570022f-2924-5cbb-89b2-963b3de66ea3/scratchpad/orig2/sa/resources/views/layouts/app.blade.php	2026-08-12 13:16:44.000000000 +0000
++++ resources/views/layouts/app.blade.php	2026-10-30 10:11:10.621049468 +0000
+@@ -18,7 +18,10 @@
+         @livewireStyles
+     </head>
+     <body class="font-sans antialiased">
+-        <x-banner />
++        {{-- <x-banner /> retiré le 30/10/2026 : composant Jetstream jamais publié
++             dans ce projet, il faisait échouer `php artisan view:cache`. Ce
++             gabarit n'est utilisé par aucune page (seul AppLayout le
++             référence, et aucune vue n'appelle <x-app-layout>). --}}
+ 
+         <div class="min-h-screen bg-gray-100">
+             @livewire('navigation-menu')
+--- /dev/null	2026-10-30 03:44:05.965887829 +0000
++++ tests/Feature/CartographieTest.php	2026-10-30 10:11:25.015350294 +0000
+@@ -0,0 +1,51 @@
++<?php
++
++namespace Tests\Feature;
++
++use App\Models\CarPhoto;
++use App\Models\CarPosition;
++use App\Models\User;
++use Illuminate\Foundation\Testing\RefreshDatabase;
++use Tests\TestCase;
++
++/**
++ * Carte du back-office (audit du 29/10/2026) : seulement les signalements
++ * visibles, colonnes réduites, titre du citoyen échappé dans la bulle.
++ */
++class CartographieTest extends TestCase
++{
++    use RefreshDatabase;
++
++    public function test_la_carte_n_affiche_que_les_signalements_visibles(): void
++    {
++        $admin = User::factory()->create(['role_id' => 1, 'is_enabled' => true]);
++        $visible = CarPosition::factory()->create(['is_deleted' => false, 'title' => 'Épave visible', 'etat' => 'SIGNALE']);
++        CarPosition::factory()->create(['is_deleted' => true, 'title' => 'Épave supprimée']);
++        CarPhoto::forceCreate(['card_id' => $visible->id, 'filepath' => 'signalement/photo/b.jpg']);
++        CarPhoto::forceCreate(['card_id' => $visible->id, 'filepath' => 'signalement/photo/a-seconde.jpg']);
++
++        $reponse = $this->actingAs($admin)->get('/dashboard/cartographie')->assertOk();
++
++        $marqueurs = json_decode(json_encode($reponse->viewData('initialMarkers')), true);
++        $this->assertCount(1, $marqueurs);
++        $this->assertSame('Épave visible', $marqueurs[0]['titre']);
++        // Première photo enregistrée, comme avant.
++        $this->assertSame('signalement/photo/b.jpg', $marqueurs[0]['image']);
++        $this->assertSame(
++            ['signalementId', 'latitude', 'longitude', 'titre', 'commune', 'etat', 'formatted_date', 'image_url', 'image'],
++            array_keys($marqueurs[0])
++        );
++        $reponse->assertDontSee('Épave supprimée');
++    }
++
++    public function test_le_titre_est_echappe_dans_la_bulle(): void
++    {
++        $admin = User::factory()->create(['role_id' => 1, 'is_enabled' => true]);
++        CarPosition::factory()->create(['is_deleted' => false, 'title' => '<img src=x onerror=alert(1)>']);
++
++        $this->actingAs($admin)->get('/dashboard/cartographie')
++            ->assertOk()
++            ->assertSee('${echapper(data.titre)}', false)
++            ->assertDontSee('<img src=x onerror', false);
++    }
++}

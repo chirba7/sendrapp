@@ -25,7 +25,7 @@ class DommagesController extends Controller
         // ~15M caractères ≈ 11 Mo décodés, largement suffisant pour une
         // signature/composite dessiné(e) sur une image de constatation.
         $request->validate([
-            'signature' => 'required|string|max:15000000',
+            'signature' => 'required|string|max:5000000', // comme la signature du PV (29/10/2026)
             'pieces_manquantes' => 'nullable|string|max:2000',
         ]);
 

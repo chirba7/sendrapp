@@ -97,7 +97,14 @@ class CarPositionController extends Controller
      */
     public function maps()
     {
-        $signalement = CarPosition::with('photo')->get();
+        // Correction perf (audit du 29/10/2026) : toute la table était chargée,
+        // signalements supprimés compris, avec toutes les colonnes et toutes
+        // les photos. La carte n'affiche que les signalements visibles, et
+        // SignalementRessource n'utilise que ces colonnes et la 1re photo.
+        $signalement = CarPosition::where('is_deleted', false)
+            ->select(['id', 'latitude', 'longitude', 'title', 'commune', 'etat', 'created_at'])
+            ->with(['photo' => fn ($q) => $q->select(['id', 'card_id', 'filepath'])->orderBy('id')])
+            ->get();
         $initialMarkers = SignalementRessource::collection($signalement);
         return view('carPosition.map', compact('initialMarkers'));
     }
